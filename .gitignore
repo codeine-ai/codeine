@@ -44,3 +44,6 @@ Thumbs.db
 *.sqlite
 *.db
 test_output/
+
+.reter/
+.mcp.json
