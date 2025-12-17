@@ -48,19 +48,19 @@ python -m codeine
 
 ### Configure with Claude Code
 
-Add to your project (saves to `.claude/settings.local.json`):
+Add to your project shared with team (saves to `.mcp.json`):
 
 ```bash
 claude mcp add codeine -s project -e ANTHROPIC_API_KEY=your-api-key -- uvx --from git+https://github.com/codeine-ai/codeine --find-links https://raw.githubusercontent.com/codeine-ai/reter/main/reter_core/index.html codeine
 ```
 
-Or add globally (saves to `~/.claude/settings.json`):
+Or add for yourself across all projects (saves to `~/.claude/settings.json`):
 
 ```bash
-claude mcp add codeine -e ANTHROPIC_API_KEY=your-api-key -- uvx --from git+https://github.com/codeine-ai/codeine --find-links https://raw.githubusercontent.com/codeine-ai/reter/main/reter_core/index.html codeine
+claude mcp add codeine -s user -e ANTHROPIC_API_KEY=your-api-key -- uvx --from git+https://github.com/codeine-ai/codeine --find-links https://raw.githubusercontent.com/codeine-ai/reter/main/reter_core/index.html codeine
 ```
 
-> **First run**: Add `"timeout": 120000` to the server config in settings file, or start with `MCP_TIMEOUT=120000 claude` (downloads ~400MB dependencies).
+> **First run**: Start with `MCP_TIMEOUT=120000 claude` to allow time for dependency download (~400MB).
 
 ### Configure with Claude Desktop
 
