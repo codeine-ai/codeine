@@ -607,29 +607,29 @@ class DefaultInstanceManager:
         def track_changed_source(rel_path: str, source_id: str) -> None:
             """Add source to appropriate changed list based on file extension."""
             ext = Path(rel_path).suffix.lower()
-            if ext in PYTHON_EXTENSIONS:
+            if ext in self.PYTHON_EXTENSIONS:
                 changed_python_sources.append(source_id)
-            elif ext in JAVASCRIPT_EXTENSIONS:
+            elif ext in self.JAVASCRIPT_EXTENSIONS:
                 changed_javascript_sources.append(source_id)
-            elif ext in HTML_EXTENSIONS:
+            elif ext in self.HTML_EXTENSIONS:
                 changed_html_sources.append(source_id)
-            elif ext in CSHARP_EXTENSIONS:
+            elif ext in self.CSHARP_EXTENSIONS:
                 changed_csharp_sources.append(source_id)
-            elif ext in CPP_EXTENSIONS:
+            elif ext in self.CPP_EXTENSIONS:
                 changed_cpp_sources.append(source_id)
 
         def track_deleted_source(rel_path: str, source_id: str) -> None:
             """Add source to appropriate deleted list based on file extension."""
             ext = Path(rel_path).suffix.lower()
-            if ext in PYTHON_EXTENSIONS:
+            if ext in self.PYTHON_EXTENSIONS:
                 deleted_python_sources.append(source_id)
-            elif ext in JAVASCRIPT_EXTENSIONS:
+            elif ext in self.JAVASCRIPT_EXTENSIONS:
                 deleted_javascript_sources.append(source_id)
-            elif ext in HTML_EXTENSIONS:
+            elif ext in self.HTML_EXTENSIONS:
                 deleted_html_sources.append(source_id)
-            elif ext in CSHARP_EXTENSIONS:
+            elif ext in self.CSHARP_EXTENSIONS:
                 deleted_csharp_sources.append(source_id)
-            elif ext in CPP_EXTENSIONS:
+            elif ext in self.CPP_EXTENSIONS:
                 deleted_cpp_sources.append(source_id)
 
         # Debug: log first few current files for comparison
