@@ -51,22 +51,13 @@ python -m codeine
 Add to your project (saves to `.claude/settings.local.json`):
 
 ```bash
-claude mcp add codeine -s project \
-  -e CODEINE_PROJECT_ROOT=. \
-  -e ANTHROPIC_API_KEY=your-api-key \
-  -- uvx --from git+https://github.com/codeine-ai/codeine \
-  --find-links https://raw.githubusercontent.com/codeine-ai/reter/main/reter_core/index.html \
-  codeine
+claude mcp add codeine -s project -e CODEINE_PROJECT_ROOT=. -e ANTHROPIC_API_KEY=your-api-key -- uvx --from git+https://github.com/codeine-ai/codeine --find-links https://raw.githubusercontent.com/codeine-ai/reter/main/reter_core/index.html codeine
 ```
 
 Or add globally (saves to `~/.claude/settings.json`):
 
 ```bash
-claude mcp add codeine \
-  -e ANTHROPIC_API_KEY=your-api-key \
-  -- uvx --from git+https://github.com/codeine-ai/codeine \
-  --find-links https://raw.githubusercontent.com/codeine-ai/reter/main/reter_core/index.html \
-  codeine
+claude mcp add codeine -e ANTHROPIC_API_KEY=your-api-key -- uvx --from git+https://github.com/codeine-ai/codeine --find-links https://raw.githubusercontent.com/codeine-ai/reter/main/reter_core/index.html codeine
 ```
 
 ### Configure with Claude Desktop
