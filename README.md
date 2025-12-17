@@ -51,14 +51,16 @@ python -m codeine
 Add to your project (saves to `.claude/settings.local.json`):
 
 ```bash
-claude mcp add codeine -s project -e ANTHROPIC_API_KEY=your-api-key -e MCP_TIMEOUT=120000 -- uvx --from git+https://github.com/codeine-ai/codeine --find-links https://raw.githubusercontent.com/codeine-ai/reter/main/reter_core/index.html codeine
+claude mcp add codeine -s project -e ANTHROPIC_API_KEY=your-api-key -- uvx --from git+https://github.com/codeine-ai/codeine --find-links https://raw.githubusercontent.com/codeine-ai/reter/main/reter_core/index.html codeine
 ```
 
 Or add globally (saves to `~/.claude/settings.json`):
 
 ```bash
-claude mcp add codeine -e ANTHROPIC_API_KEY=your-api-key -e MCP_TIMEOUT=120000 -- uvx --from git+https://github.com/codeine-ai/codeine --find-links https://raw.githubusercontent.com/codeine-ai/reter/main/reter_core/index.html codeine
+claude mcp add codeine -e ANTHROPIC_API_KEY=your-api-key -- uvx --from git+https://github.com/codeine-ai/codeine --find-links https://raw.githubusercontent.com/codeine-ai/reter/main/reter_core/index.html codeine
 ```
+
+> **First run**: Add `"timeout": 120000` to the server config in settings file, or start with `MCP_TIMEOUT=120000 claude` (downloads ~400MB dependencies).
 
 ### Configure with Claude Desktop
 
@@ -78,8 +80,7 @@ Add to your Claude Desktop config:
         "codeine"
       ],
       "env": {
-        "ANTHROPIC_API_KEY": "your-api-key",
-        "MCP_TIMEOUT": "120000"
+        "ANTHROPIC_API_KEY": "your-api-key"
       },
       "timeout": 120000
     }
@@ -93,7 +94,6 @@ Add to your Claude Desktop config:
 |----------|-------------|---------|
 | `RETER_PROJECT_ROOT` | Path to project for auto-loading code | Auto-detected from CWD |
 | `ANTHROPIC_API_KEY` | API key for sampling handler | - |
-| `MCP_TIMEOUT` | Server startup timeout in milliseconds | 30000 |
 
 ## Tools
 
