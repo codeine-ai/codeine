@@ -4,16 +4,41 @@ AI-powered code reasoning MCP server.
 
 ## Installation
 
+### Step 1: Add to Claude Code
+
 ```bash
 claude mcp add codeine -s user -e ANTHROPIC_API_KEY=your-api-key -- uvx --from git+https://github.com/codeine-ai/codeine --find-links https://raw.githubusercontent.com/codeine-ai/reter/main/reter_core/index.html codeine
 ```
 
-> **First run**: Start with `MCP_TIMEOUT=120000 claude` to allow time for dependency download.
+### Step 2: First Run (with timeout for dependency download)
 
-### Configure with Claude Desktop
+First startup downloads ~400MB of dependencies. Set timeout to allow this:
 
-**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-**Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+**Linux / macOS:**
+```bash
+MCP_TIMEOUT=120000 claude
+```
+
+**Windows (PowerShell):**
+```powershell
+$env:MCP_TIMEOUT=120000; claude
+```
+
+**Windows (CMD):**
+```cmd
+set MCP_TIMEOUT=120000 && claude
+```
+
+After first run, dependencies are cached and no timeout is needed.
+
+---
+
+## Configure with Claude Desktop
+
+**Config file location:**
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+- **Linux**: `~/.config/Claude/claude_desktop_config.json`
 
 ```json
 {
@@ -34,12 +59,16 @@ claude mcp add codeine -s user -e ANTHROPIC_API_KEY=your-api-key -- uvx --from g
 }
 ```
 
-### Environment Variables
+---
+
+## Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `RETER_PROJECT_ROOT` | Path to project for auto-loading code | Auto-detected from CWD |
 | `ANTHROPIC_API_KEY` | API key for sampling handler | - |
+
+---
 
 ## Tools
 
@@ -65,6 +94,8 @@ claude mcp add codeine -s user -e ANTHROPIC_API_KEY=your-api-key -- uvx --from g
 | Tool | Description |
 |------|-------------|
 | `instance_manager` | Manage RETER instances and sources |
+
+---
 
 ## Supported Languages
 
