@@ -13,7 +13,7 @@ uv tool install git+https://github.com/codeine-ai/codeine --find-links https://r
 **Step 2: Add to Claude Code**
 
 ```bash
-claude mcp add codeine -s user -e ANTHROPIC_API_KEY=your-api-key -- codeine
+claude mcp add codeine -s user -e ANTHROPIC_API_KEY=your-api-key -- uv tool run codeine
 ```
 
 > **Note**: The `--find-links` flag is required because `reter-core` (the C++ engine) is distributed as platform-specific wheels from a private index.
@@ -29,16 +29,11 @@ Add to your Claude Desktop config:
 {
   "mcpServers": {
     "codeine": {
-      "command": "uvx",
-      "args": [
-        "--from", "git+https://github.com/codeine-ai/codeine",
-        "--find-links", "https://raw.githubusercontent.com/codeine-ai/reter/main/reter_core/index.html",
-        "codeine"
-      ],
+      "command": "uv",
+      "args": ["tool", "run", "codeine"],
       "env": {
         "ANTHROPIC_API_KEY": "your-api-key"
-      },
-      "timeout": 120000
+      }
     }
   }
 }
