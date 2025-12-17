@@ -4,63 +4,19 @@ AI-powered code reasoning MCP server.
 
 ## Installation
 
-### One-liner with uvx
+**Step 1: Install with uv**
 
 ```bash
-uvx --from git+https://github.com/codeine-ai/codeine --find-links https://raw.githubusercontent.com/codeine-ai/reter/main/reter_core/index.html codeine
+uv tool install git+https://github.com/codeine-ai/codeine --find-links https://raw.githubusercontent.com/codeine-ai/reter/main/reter_core/index.html
 ```
 
-### Install with uv/pip
+**Step 2: Add to Claude Code**
 
 ```bash
-uv pip install git+https://github.com/codeine-ai/codeine --find-links https://raw.githubusercontent.com/codeine-ai/reter/main/reter_core/index.html
-```
-
-Or with pip:
-
-```bash
-pip install git+https://github.com/codeine-ai/codeine --find-links https://raw.githubusercontent.com/codeine-ai/reter/main/reter_core/index.html
-```
-
-### Local development
-
-```bash
-git clone https://github.com/codeine-ai/codeine.git
-cd codeine
-uv pip install -e . --find-links https://raw.githubusercontent.com/codeine-ai/reter/main/reter_core/index.html
+claude mcp add codeine -s user -e ANTHROPIC_API_KEY=your-api-key -- codeine
 ```
 
 > **Note**: The `--find-links` flag is required because `reter-core` (the C++ engine) is distributed as platform-specific wheels from a private index.
-
-## Usage
-
-### Run the server
-
-```bash
-codeine
-```
-
-Or:
-
-```bash
-python -m codeine
-```
-
-### Configure with Claude Code
-
-Add to your project shared with team (saves to `.mcp.json`):
-
-```bash
-claude mcp add codeine -s project -e ANTHROPIC_API_KEY=your-api-key -- uvx --from git+https://github.com/codeine-ai/codeine --find-links https://raw.githubusercontent.com/codeine-ai/reter/main/reter_core/index.html codeine
-```
-
-Or add for yourself across all projects (saves to `~/.claude/settings.json`):
-
-```bash
-claude mcp add codeine -s user -e ANTHROPIC_API_KEY=your-api-key -- uvx --from git+https://github.com/codeine-ai/codeine --find-links https://raw.githubusercontent.com/codeine-ai/reter/main/reter_core/index.html codeine
-```
-
-> **First run**: Start with `MCP_TIMEOUT=120000 claude` to allow time for dependency download (~400MB).
 
 ### Configure with Claude Desktop
 
