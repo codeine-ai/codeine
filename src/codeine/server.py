@@ -50,7 +50,8 @@ from .services.config_loader import load_config, get_config_loader
 from .services.rag_index_manager import RAGIndexManager
 from .services.initialization_progress import get_component_readiness
 
-from sentence_transformers import SentenceTransformer
+# SentenceTransformer imported lazily to speed up startup (~12s saved)
+# from sentence_transformers import SentenceTransformer
 
 # Use stderr for import timing since logger might not be configured yet
 print(f"[TIMING] Module imports completed in {_import_time.time() - _import_start:.3f}s", file=sys.stderr)
@@ -294,6 +295,7 @@ class CodeineServer:
                     logger.info("Loading embedding model '%s'...", model_name)
                     model_start = time.time()
                     try:
+                        from sentence_transformers import SentenceTransformer
                         cache_dir = os.environ.get('TRANSFORMERS_CACHE', None)
                         preloaded_model = SentenceTransformer(model_name, cache_folder=cache_dir)
                         self.rag_manager.set_preloaded_model(preloaded_model)
