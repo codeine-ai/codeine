@@ -193,6 +193,20 @@ class CodeineServer:
         _t = _time.time()
         self.app = FastMCP(
             "codeine",
+            instructions="""Codeine is an AI-powered code reasoning MCP server.
+
+CRITICAL: Call `session(action="context")` at the START of every conversation to restore your reasoning state.
+
+Key tools:
+- `thinking` - Record reasoning steps, analysis, decisions (primary tool)
+- `session` - Manage reasoning sessions (start, context, end)
+- `items` - Query thoughts, requirements, tasks
+- `project` - Analytics (health, critical path, impact)
+- `code_inspection` - Python/JS/C#/C++ code analysis
+- `recommender` - Refactoring and test coverage recommendations
+- `diagram` - Generate UML diagrams
+
+Always use the `thinking` tool when analyzing problems or making decisions.""",
             sampling_handler=anthropic_sampling_handler,
             sampling_handler_behavior="fallback"
         )
