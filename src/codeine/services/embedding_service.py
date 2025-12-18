@@ -392,7 +392,6 @@ class EmbeddingService:
         show_progress: bool
     ) -> np.ndarray:
         """Generate embeddings using local sentence-transformers with progress logging."""
-        import sys
         import time
 
         total = len(texts)
@@ -430,11 +429,11 @@ class EmbeddingService:
                 elapsed = time.time() - start_time
                 rate = (i + len(batch_texts)) / elapsed if elapsed > 0 else 0
                 remaining = (total - i - len(batch_texts)) / rate if rate > 0 else 0
-                print(
-                    f"[codeine] Embedding progress: {i + len(batch_texts)}/{total} "
-                    f"({100 * (i + len(batch_texts)) / total:.0f}%) "
-                    f"- {rate:.0f} texts/s, ~{remaining:.0f}s remaining",
-                    file=sys.stderr, flush=True
+                logger.info(
+                    "Embedding progress: %d/%d (%.0f%%) - %.0f texts/s, ~%.0fs remaining",
+                    i + len(batch_texts), total,
+                    100 * (i + len(batch_texts)) / total,
+                    rate, remaining
                 )
 
         return np.vstack(all_embeddings)
