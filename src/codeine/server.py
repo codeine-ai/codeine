@@ -485,7 +485,7 @@ def create_server():
 
 
 def sync_only():
-    """Sync default instance and exit (for pre-warming cache).
+    """Sync default instance and RAG index, then exit (for pre-warming cache).
 
     Runs synchronously in the main thread - sets initialization flags
     to allow RETER operations without the background init thread.
@@ -493,7 +493,7 @@ def sync_only():
     import time
     from .reter_wrapper import set_initialization_in_progress, set_initialization_complete
 
-    print("[codeine] Sync-only mode - syncing default instance...", file=sys.stderr)
+    print("[codeine] Sync-only mode - syncing default instance and RAG...", file=sys.stderr)
     start = time.time()
 
     # CRITICAL: Set initialization flag to allow RETER operations in main thread
@@ -502,7 +502,7 @@ def sync_only():
     set_initialization_in_progress(True)
 
     try:
-        # Initialize just enough to sync
+        # Initialize services
         load_config()
         instance_manager = InstanceManager()
         persistence = StatePersistenceService(instance_manager)
@@ -510,12 +510,48 @@ def sync_only():
         default_manager = DefaultInstanceManager(persistence)
         instance_manager.set_default_manager(default_manager)
 
+        # Initialize RAG manager
+        rag_config = get_config_loader().get_rag_config()
+        rag_manager = None
+        if rag_config.get("rag_enabled", True):
+            try:
+                rag_manager = RAGIndexManager(persistence, rag_config)
+                default_manager.set_rag_manager(rag_manager, rag_config)
+                print("[codeine] RAG manager created", file=sys.stderr)
+            except Exception as e:
+                print(f"[codeine] RAG manager creation failed: {e}", file=sys.stderr)
+
         # Get or create the default instance and sync it
         if default_manager.is_configured():
             reter = instance_manager.get_or_create_instance("default")
             if reter:
                 default_manager.ensure_default_instance_synced(reter)
-                print(f"[codeine] Sync complete in {time.time() - start:.2f}s", file=sys.stderr)
+                print(f"[codeine] RETER sync complete in {time.time() - start:.2f}s", file=sys.stderr)
+
+                # Load embedding model and sync RAG
+                if rag_manager is not None and rag_config.get("rag_enabled", True):
+                    model_name = rag_config.get('rag_embedding_model', 'all-MiniLM-L6-v2')
+                    print(f"[codeine] Loading embedding model '{model_name}'...", file=sys.stderr)
+                    model_start = time.time()
+                    try:
+                        cache_dir = os.environ.get('TRANSFORMERS_CACHE', None)
+                        preloaded_model = SentenceTransformer(model_name, cache_folder=cache_dir)
+                        rag_manager.set_preloaded_model(preloaded_model)
+                        print(f"[codeine] Embedding model loaded in {time.time() - model_start:.1f}s", file=sys.stderr)
+
+                        # Initialize and sync RAG index
+                        print("[codeine] Building RAG index...", file=sys.stderr)
+                        rag_start = time.time()
+                        rag_manager.initialize(default_manager._project_root)
+                        rag_manager.sync_sources(
+                            reter=reter,
+                            project_root=default_manager._project_root
+                        )
+                        print(f"[codeine] RAG index built in {time.time() - rag_start:.1f}s", file=sys.stderr)
+                    except Exception as e:
+                        print(f"[codeine] RAG initialization failed: {e}", file=sys.stderr)
+
+                print(f"[codeine] Total sync complete in {time.time() - start:.2f}s", file=sys.stderr)
             else:
                 print("[codeine] Failed to create default instance", file=sys.stderr)
         else:
