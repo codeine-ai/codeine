@@ -391,14 +391,53 @@ class EmbeddingService:
         batch_size: int,
         show_progress: bool
     ) -> np.ndarray:
-        """Generate embeddings using local sentence-transformers."""
-        return self._model.encode(
-            texts,
-            convert_to_numpy=True,
-            batch_size=batch_size,
-            show_progress_bar=show_progress,
-            normalize_embeddings=True
-        )
+        """Generate embeddings using local sentence-transformers with progress logging."""
+        import sys
+        import time
+
+        total = len(texts)
+
+        # For small batches, just encode directly
+        if total <= batch_size * 2:
+            return self._model.encode(
+                texts,
+                convert_to_numpy=True,
+                batch_size=batch_size,
+                show_progress_bar=False,
+                normalize_embeddings=True
+            )
+
+        # For large batches, process in chunks with progress logging
+        all_embeddings = []
+        start_time = time.time()
+        num_batches = (total + batch_size - 1) // batch_size
+
+        for i in range(0, total, batch_size):
+            batch_num = i // batch_size + 1
+            batch_texts = texts[i:i + batch_size]
+
+            embeddings = self._model.encode(
+                batch_texts,
+                convert_to_numpy=True,
+                batch_size=batch_size,
+                show_progress_bar=False,
+                normalize_embeddings=True
+            )
+            all_embeddings.append(embeddings)
+
+            # Log progress every 10 batches or at end
+            if batch_num % 10 == 0 or batch_num == num_batches:
+                elapsed = time.time() - start_time
+                rate = (i + len(batch_texts)) / elapsed if elapsed > 0 else 0
+                remaining = (total - i - len(batch_texts)) / rate if rate > 0 else 0
+                print(
+                    f"[codeine] Embedding progress: {i + len(batch_texts)}/{total} "
+                    f"({100 * (i + len(batch_texts)) / total:.0f}%) "
+                    f"- {rate:.0f} texts/s, ~{remaining:.0f}s remaining",
+                    file=sys.stderr, flush=True
+                )
+
+        return np.vstack(all_embeddings)
 
     def _embed_voyage(
         self,
