@@ -4,7 +4,7 @@ Data models for RETER Logical Thinking MCP Server
 Pydantic models for reasoning sessions, thoughts, and knowledge structures.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any, Literal
 from datetime import datetime
 from uuid import uuid4, UUID
@@ -150,20 +150,19 @@ class LogicalThinkingInput(BaseModel):
     branch_id: Optional[str] = None
     needs_more_thoughts: bool = False
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "thought": "Loading domain ontology to establish facts",
-                "thought_type": "assertion",
-                "logic_operation": {
-                    "assert": "Person is_a Animal",
-                    "source": "domain"
-                },
-                "thought_number": 1,
-                "total_thoughts": 5,
-                "next_thought_needed": True
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "thought": "Loading domain ontology to establish facts",
+            "thought_type": "assertion",
+            "logic_operation": {
+                "assert": "Person is_a Animal",
+                "source": "domain"
+            },
+            "thought_number": 1,
+            "total_thoughts": 5,
+            "next_thought_needed": True
         }
+    })
 
 
 class ThinkingRequest(BaseModel):
