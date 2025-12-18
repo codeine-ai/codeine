@@ -321,7 +321,7 @@ class DefaultInstanceManager:
                 print(
                     f"[default] RAG initialized: {rag_stats.get('total_vectors', 0)} vectors "
                     f"in {time.time() - rag_start:.2f}s",
-                    flush=True
+                    file=sys.stderr, flush=True
                 )
             except Exception as e:
                 import traceback
@@ -739,7 +739,7 @@ class DefaultInstanceManager:
                     print(
                         f"[default] RAG sync: +{total_added} vectors "
                         f"in {rag_stats.get('time_ms', 0)}ms",
-                        flush=True
+                        file=sys.stderr, flush=True
                     )
                 except Exception as e:
                     print(f"[default] RAG sync error: {e}", file=sys.stderr, flush=True)
