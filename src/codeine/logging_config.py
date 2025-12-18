@@ -7,6 +7,7 @@ All loggers write to files in the auto-detected snapshots directory.
 
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -65,12 +66,22 @@ def _create_file_handler(log_filename: str) -> Optional[logging.FileHandler]:
         return None
 
 
+def _create_stderr_handler() -> logging.StreamHandler:
+    """Create a stderr handler for console output."""
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    ))
+    return handler
+
+
 def get_debug_trace_logger() -> logging.Logger:
     """
     Get the debug trace logger for RETER wrapper operations.
 
     This logger is used for tracing C++ calls and debugging hangs.
-    Output goes to .reter/debug_trace.log
+    Output goes to .reter/debug_trace.log and stderr
 
     Returns:
         Configured logger instance
@@ -82,9 +93,14 @@ def get_debug_trace_logger() -> logging.Logger:
         logger.setLevel(logging.DEBUG)
         logger.propagate = False  # Don't propagate to root logger
 
-        handler = _create_file_handler("debug_trace.log")
-        if handler:
-            logger.addHandler(handler)
+        # File handler
+        file_handler = _create_file_handler("debug_trace.log")
+        if file_handler:
+            logger.addHandler(file_handler)
+
+        # Stderr handler
+        stderr_handler = _create_stderr_handler()
+        logger.addHandler(stderr_handler)
 
     return logger
 
