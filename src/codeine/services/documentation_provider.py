@@ -103,7 +103,8 @@ class DocumentationProvider:
     def __init__(self):
         """Initialize the documentation provider (stateless)."""
         # Calculate resources directory relative to this file
-        self.resources_dir = Path(__file__).parent.parent.parent.parent / "resources"
+        # Resources are now inside the package: src/codeine/resources/
+        self.resources_dir = Path(__file__).parent.parent / "resources"
 
     def load_resource(self, resource_name: str) -> str:
         """

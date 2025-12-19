@@ -391,9 +391,8 @@ class ReterWrapper:
         debug_log("_load_oo_ontology starting...")
         try:
             # Get path to ontology file relative to this module
-            # Path: logical-thinking-server/src/codeine/reter_wrapper.py
-            # Target: logical-thinking-server/resources/oo_ontology.reol
-            ontology_path = Path(__file__).parent.parent.parent / "resources" / "oo_ontology.reol"
+            # Resources are now inside the package: src/codeine/resources/
+            ontology_path = Path(__file__).parent / "resources" / "oo_ontology.reol"
             debug_log(f"OO ontology path: {ontology_path}")
 
             if ontology_path.exists():
@@ -432,9 +431,8 @@ class ReterWrapper:
         debug_log("_load_python_ontology starting...")
         try:
             # Get path to ontology file relative to this module
-            # Path: logical-thinking-server/src/codeine/reter_wrapper.py
-            # Target: logical-thinking-server/resources/python/py_ontology.reol
-            ontology_path = Path(__file__).parent.parent.parent / "resources" / "python" / "py_ontology.reol"
+            # Resources are now inside the package: src/codeine/resources/
+            ontology_path = Path(__file__).parent / "resources" / "python" / "py_ontology.reol"
             debug_log(f"Ontology path: {ontology_path}")
 
             if ontology_path.exists():
@@ -474,9 +472,8 @@ class ReterWrapper:
         debug_log("_load_javascript_ontology starting...")
         try:
             # Get path to ontology file relative to this module
-            # Path: logical-thinking-server/src/codeine/reter_wrapper.py
-            # Target: logical-thinking-server/resources/javascript/js_ontology.reol
-            ontology_path = Path(__file__).parent.parent.parent / "resources" / "javascript" / "js_ontology.reol"
+            # Resources are now inside the package: src/codeine/resources/
+            ontology_path = Path(__file__).parent / "resources" / "javascript" / "js_ontology.reol"
             debug_log(f"JavaScript ontology path: {ontology_path}")
 
             if ontology_path.exists():
@@ -516,9 +513,8 @@ class ReterWrapper:
         debug_log("_load_html_ontology starting...")
         try:
             # Get path to ontology file relative to this module
-            # Path: logical-thinking-server/src/codeine/reter_wrapper.py
-            # Target: logical-thinking-server/resources/html/html_ontology.reol
-            ontology_path = Path(__file__).parent.parent.parent / "resources" / "html" / "html_ontology.reol"
+            # Resources are now inside the package: src/codeine/resources/
+            ontology_path = Path(__file__).parent / "resources" / "html" / "html_ontology.reol"
             debug_log(f"HTML ontology path: {ontology_path}")
 
             if ontology_path.exists():
@@ -558,9 +554,8 @@ class ReterWrapper:
         debug_log("_load_csharp_ontology starting...")
         try:
             # Get path to ontology file relative to this module
-            # Path: logical-thinking-server/src/codeine/reter_wrapper.py
-            # Target: logical-thinking-server/resources/csharp/cs_ontology.reol
-            ontology_path = Path(__file__).parent.parent.parent / "resources" / "csharp" / "cs_ontology.reol"
+            # Resources are now inside the package: src/codeine/resources/
+            ontology_path = Path(__file__).parent / "resources" / "csharp" / "cs_ontology.reol"
             debug_log(f"C# ontology path: {ontology_path}")
 
             if ontology_path.exists():
@@ -601,9 +596,8 @@ class ReterWrapper:
         debug_log("_load_cpp_ontology starting...")
         try:
             # Get path to ontology file relative to this module
-            # Path: logical-thinking-server/src/codeine/reter_wrapper.py
-            # Target: logical-thinking-server/resources/cpp/cpp_ontology.reol
-            ontology_path = Path(__file__).parent.parent.parent / "resources" / "cpp" / "cpp_ontology.reol"
+            # Resources are now inside the package: src/codeine/resources/
+            ontology_path = Path(__file__).parent / "resources" / "cpp" / "cpp_ontology.reol"
             debug_log(f"C++ ontology path: {ontology_path}")
 
             if ontology_path.exists():
