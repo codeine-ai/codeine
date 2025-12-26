@@ -9,9 +9,9 @@ Registers the 4 unified MCP tools:
 """
 
 from typing import Dict, Any, Optional, List
+from dataclasses import dataclass
 from fastmcp import FastMCP
 from .base import ToolRegistrarBase, truncate_mcp_response
-from ...tools.dataclasses import ItemsQueryFilters
 from ...reter_wrapper import DefaultInstanceNotInitialised, is_initialization_complete
 from ..initialization_progress import (
     get_initializing_response,
@@ -19,6 +19,27 @@ from ..initialization_progress import (
     require_default_instance,
     ComponentNotReadyError,
 )
+
+
+@dataclass
+class ItemsQueryFilters:
+    """Filter parameters for querying items."""
+    item_type: Optional[str] = None
+    status: Optional[str] = None
+    priority: Optional[str] = None
+    phase: Optional[str] = None
+    category: Optional[str] = None
+    source_tool: Optional[str] = None
+    traces_to: Optional[str] = None
+    traced_by: Optional[str] = None
+    depends_on: Optional[str] = None
+    blocks: Optional[str] = None
+    affects: Optional[str] = None
+    start_after: Optional[str] = None
+    end_before: Optional[str] = None
+    limit: int = 100
+    offset: int = 0
+    include_relations: bool = False
 
 
 class UnifiedToolsRegistrar(ToolRegistrarBase):
@@ -510,71 +531,96 @@ class UnifiedToolsRegistrar(ToolRegistrarBase):
                 elif diagram_type == "design_doc":
                     return self._generate_design_doc_diagram(store, session_id, format)
 
-            # UML/Code diagrams - delegate to UMLTool
+            # UML/Code diagrams - delegate to CADSL diagram tools
             if diagram_type in ("class_hierarchy", "class_diagram", "sequence", "dependencies", "call_graph", "coupling"):
                 try:
-                    from ...tools.uml.tool import UMLTool
-                    uml_tool = UMLTool(instance_manager)
+                    from ...dsl.core import Context
+                    from ...dsl.tools import diagrams
                     extra = params or {}
 
+                    # Get RETER instance
+                    reter = instance_manager.get_or_create_instance(instance_name)
+
                     if diagram_type == "class_hierarchy":
-                        return uml_tool.get_class_hierarchy(instance_name, target, format)
+                        ctx = Context(
+                            reter=reter,
+                            params={"root_class": target, "format": format},
+                            instance_name=instance_name
+                        )
+                        return diagrams.class_hierarchy(ctx)
 
                     elif diagram_type == "class_diagram":
                         if not classes:
                             return {"success": False, "error": "classes list is required for class_diagram"}
-                        return uml_tool.get_class_diagram(
-                            instance_name, classes, include_methods, include_attributes, format
+                        ctx = Context(
+                            reter=reter,
+                            params={
+                                "classes": classes,
+                                "include_methods": include_methods,
+                                "include_attributes": include_attributes,
+                                "format": format
+                            },
+                            instance_name=instance_name
                         )
+                        return diagrams.class_diagram(ctx)
 
                     elif diagram_type == "sequence":
                         if not classes:
                             return {"success": False, "error": "classes list is required for sequence diagram"}
-                        return uml_tool.get_sequence_diagram(
-                            instance_name=instance_name,
-                            classes=classes,
-                            entry_point=target,
-                            max_depth=max_depth,
-                            exclude_patterns=extra.get("exclude_patterns"),
-                            include_only_classes=extra.get("include_only_classes"),
-                            format=format
+                        ctx = Context(
+                            reter=reter,
+                            params={
+                                "classes": classes,
+                                "entry_point": target,
+                                "max_depth": max_depth,
+                                "format": format
+                            },
+                            instance_name=instance_name
                         )
+                        return diagrams.sequence_diagram(ctx)
 
                     elif diagram_type == "dependencies":
-                        return uml_tool.get_dependency_graph(
-                            instance_name=instance_name,
-                            format=format,
-                            show_external=show_external,
-                            group_by_package=extra.get("group_by_package", True),
-                            highlight_circular=extra.get("highlight_circular", True),
-                            module_filter=target,
-                            summary_only=extra.get("summary_only", False),
-                            limit=extra.get("limit", 100),
-                            offset=extra.get("offset", 0),
-                            circular_deps_limit=extra.get("circular_deps_limit", 10)
+                        ctx = Context(
+                            reter=reter,
+                            params={
+                                "show_external": show_external,
+                                "module_filter": target,
+                                "highlight_circular": extra.get("highlight_circular", True),
+                                "format": format,
+                                "limit": extra.get("limit", 100)
+                            },
+                            instance_name=instance_name
                         )
+                        return diagrams.dependency_graph(ctx)
 
                     elif diagram_type == "call_graph":
                         if not target:
                             return {"success": False, "error": "target (focus_function) is required for call_graph"}
-                        return uml_tool.get_call_graph(
-                            focus_function=target,
-                            instance_name=instance_name,
-                            direction=extra.get("direction", "both"),
-                            max_depth=max_depth,
-                            format=format,
-                            exclude_patterns=extra.get("exclude_patterns")
+                        ctx = Context(
+                            reter=reter,
+                            params={
+                                "focus_function": target,
+                                "direction": extra.get("direction", "both"),
+                                "max_depth": max_depth,
+                                "format": format
+                            },
+                            instance_name=instance_name
                         )
+                        return diagrams.call_graph(ctx)
 
                     elif diagram_type == "coupling":
-                        return uml_tool.get_coupling_matrix(
-                            instance_name=instance_name,
-                            classes=classes,
-                            max_classes=extra.get("max_classes", 20),
-                            threshold=extra.get("threshold", 0),
-                            include_inheritance=extra.get("include_inheritance", True),
-                            format=format
+                        ctx = Context(
+                            reter=reter,
+                            params={
+                                "classes": classes,
+                                "max_classes": extra.get("max_classes", 20),
+                                "threshold": extra.get("threshold", 0),
+                                "include_inheritance": extra.get("include_inheritance", True),
+                                "format": format
+                            },
+                            instance_name=instance_name
                         )
+                        return diagrams.coupling_matrix(ctx)
 
                 except Exception as e:
                     import traceback

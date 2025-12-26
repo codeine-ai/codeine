@@ -1,0 +1,299 @@
+// CADSL.lark - Codeine Analysis DSL Grammar (Brace-delimited)
+// A text-based DSL for defining code analysis tools that compiles to Python Pipeline objects
+
+start: tool_def+
+
+// ============================================================
+// TOOL DEFINITION
+// ============================================================
+
+tool_def: tool_type NAME "(" metadata? ")" "{" tool_body "}"
+
+tool_type: "query"    -> tool_query
+         | "detector" -> tool_detector
+         | "diagram"  -> tool_diagram
+
+metadata: meta_item ("," meta_item)*
+
+meta_item: NAME "=" meta_value
+
+meta_value: STRING
+          | NAME
+          | "[" capability_list? "]" -> capability_array
+
+capability_list: STRING ("," STRING)*
+
+tool_body: docstring? param_def* pipeline
+
+docstring: TRIPLE_STRING
+
+// ============================================================
+// PARAMETERS (with parse-time type validation)
+// ============================================================
+
+param_def: "param" NAME ":" type_spec param_modifiers? ";"
+
+type_spec: "int"                      -> type_int
+         | "str"                      -> type_str
+         | "float"                    -> type_float
+         | "bool"                     -> type_bool
+         | "list"                     -> type_list
+         | "list" "<" type_spec ">"   -> type_list_of
+
+param_modifiers: param_modifier+
+
+param_modifier: "=" value             -> param_default
+              | "required"            -> param_required
+              | "choices" "[" value_list "]" -> param_choices
+
+// ============================================================
+// PIPELINE
+// ============================================================
+
+pipeline: source ("|" step)*
+
+// Sources
+source: reql_source
+      | rag_source
+      | value_source
+
+reql_source: "reql" REQL_BLOCK
+
+rag_source: "rag" "{" rag_args "}"
+
+rag_args: expr ("," "top_k" ":" INT)?
+
+value_source: "value" "{" expr "}"
+
+// ============================================================
+// PIPELINE STEPS
+// ============================================================
+
+step: filter_step
+    | select_step
+    | map_step
+    | flat_map_step
+    | order_by_step
+    | limit_step
+    | offset_step
+    | group_by_step
+    | aggregate_step
+    | unique_step
+    | python_step
+    | render_step
+    | emit_step
+    | flatten_step
+    | tap_step
+
+filter_step: "filter" "{" condition "}"
+
+select_step: "select" "{" field_list "}"
+
+map_step: "map" "{" object_expr "}"
+
+flat_map_step: "flat_map" "{" expr "}"
+
+order_by_step: "order_by" "{" order_field ("," order_field)* "}"
+
+limit_step: "limit" "{" limit_value "}"
+
+limit_value: INT
+           | param_ref
+
+offset_step: "offset" "{" offset_value "}"
+
+offset_value: INT
+            | param_ref
+
+group_by_step: "group_by" "{" group_spec "}"
+
+aggregate_step: "aggregate" "{" agg_field ("," agg_field)* "}"
+
+unique_step: "unique" ("{" NAME "}")?
+
+python_step: "python" PYTHON_BLOCK
+
+render_step: "render" "{" render_spec "}"
+
+emit_step: "emit" "{" NAME "}"
+
+flatten_step: "flatten" "{" "}"
+
+tap_step: "tap" "{" NAME "}"
+
+// ============================================================
+// GROUP BY
+// ============================================================
+
+group_spec: group_key ("," "aggregate" ":" aggregate_func)?
+          | "_all" ("," "aggregate" ":" aggregate_func)?  -> group_all
+
+group_key: NAME                       -> group_field
+         | "key" ":" lambda_expr      -> group_lambda
+
+aggregate_func: NAME                           -> agg_func_ref
+              | "{" agg_field_list "}"         -> agg_inline
+
+agg_field_list: agg_field ("," agg_field)*
+
+agg_field: NAME ":" agg_op "(" NAME ")"
+
+agg_op: "count"   -> agg_count
+      | "sum"     -> agg_sum
+      | "avg"     -> agg_avg
+      | "min"     -> agg_min
+      | "max"     -> agg_max
+      | "collect" -> agg_collect
+      | "first"   -> agg_first
+      | "last"    -> agg_last
+
+// ============================================================
+// RENDER
+// ============================================================
+
+render_spec: "format" ":" format_value ("," "renderer" ":" NAME)?  -> render_with_format
+           | NAME                                                   -> render_func
+
+format_value: STRING
+            | param_ref
+
+// ============================================================
+// FIELDS & ORDERING
+// ============================================================
+
+field_list: field_item ("," field_item)*
+
+field_item: NAME "as" NAME            -> field_alias
+          | NAME ":" NAME             -> field_rename
+          | NAME                      -> field_simple
+
+order_field: "-" NAME                 -> order_desc
+           | "+" NAME                 -> order_asc
+           | NAME                     -> order_asc_default
+
+// ============================================================
+// CONDITIONS (for filter)
+// ============================================================
+
+?condition: or_cond
+
+or_cond: and_cond ("or" and_cond)*    -> or_expr
+
+and_cond: not_cond ("and" not_cond)*  -> and_expr
+
+not_cond: "not" not_cond              -> not_expr
+        | comparison
+
+?comparison: expr comp_op expr                    -> binary_comp
+           | expr "in" "[" value_list "]"         -> in_list
+           | expr "in" param_ref                  -> in_param
+           | expr "matches" STRING                -> regex_match
+           | expr "starts_with" STRING            -> starts_with
+           | expr "ends_with" STRING              -> ends_with
+           | expr "contains" STRING               -> contains_str
+           | expr "is" "null"                     -> is_null
+           | expr "is" "not" "null"               -> is_not_null
+           | "(" condition ")"                    -> paren_cond
+
+comp_op: ">"   -> op_gt
+       | "<"   -> op_lt
+       | ">="  -> op_gte
+       | "<="  -> op_lte
+       | "=="  -> op_eq
+       | "!="  -> op_ne
+
+// ============================================================
+// EXPRESSIONS
+// ============================================================
+
+?expr: add_expr
+
+?add_expr: mul_expr (add_op mul_expr)*
+
+add_op: "+" -> op_add
+      | "-" -> op_sub
+
+?mul_expr: unary_expr (mul_op unary_expr)*
+
+mul_op: "*" -> op_mul
+      | "/" -> op_div
+      | "%" -> op_mod
+
+?unary_expr: "-" unary_expr           -> neg_expr
+           | "+" unary_expr           -> pos_expr
+           | atom
+
+?atom: NAME "(" arg_list? ")"         -> func_call
+     | atom "." NAME                  -> prop_access
+     | param_ref                      -> param_ref_expr
+     | NAME                           -> field_ref
+     | value                          -> literal
+     | "(" expr ")"                   -> paren_expr
+
+param_ref: "{" NAME "}"
+
+arg_list: expr ("," expr)*
+
+// Lambda expression (for group_by key)
+lambda_expr: "row" "=>" expr
+
+// ============================================================
+// OBJECT EXPRESSIONS (for map)
+// ============================================================
+
+object_expr: object_field ("," object_field)*
+
+object_field: NAME ":" expr           -> obj_field
+            | "..." "row"             -> spread_row
+            | "..." NAME              -> spread_var
+
+// ============================================================
+// VALUES
+// ============================================================
+
+value: STRING                         -> val_string
+     | SIGNED_INT                     -> val_int
+     | SIGNED_FLOAT                   -> val_float
+     | "true"                         -> val_true
+     | "false"                        -> val_false
+     | "null"                         -> val_null
+     | list_value
+
+value_list: value ("," value)*
+
+list_value: "[" value_list? "]"       -> val_list
+
+// ============================================================
+// LEXER RULES
+// ============================================================
+
+// Identifiers
+NAME: /[a-zA-Z_][a-zA-Z0-9_]*/
+
+// Strings
+STRING: /"[^"\\]*(?:\\.[^"\\]*)*"/ | /'[^'\\]*(?:\\.[^'\\]*)*'/
+TRIPLE_STRING: /"""[\s\S]*?"""/
+
+// Numbers
+SIGNED_INT: /[+-]?[0-9]+/
+SIGNED_FLOAT: /[+-]?[0-9]+\.[0-9]+([eE][+-]?[0-9]+)?/
+INT: /[0-9]+/
+
+// REQL block - matches { content with balanced braces }
+// Uses a custom pattern to match balanced braces up to 3 levels deep
+// Level 0: outer braces
+// Level 1: WHERE { ... }, OPTIONAL { ... }
+// Level 2: {Class}, {Module}, {param}
+// Level 3: for safety
+REQL_BLOCK.2: /\{(?:[^{}]|\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\})*\}/
+
+// Python block content - matches { content with balanced braces }
+// Same pattern - supports nested dicts up to 3 levels
+PYTHON_BLOCK.2: /\{(?:[^{}]|\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\})*\}/
+
+// Comments and whitespace
+COMMENT: /#[^\n]*/
+WS: /\s+/
+
+%ignore WS
+%ignore COMMENT

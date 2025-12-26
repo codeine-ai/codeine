@@ -5,12 +5,7 @@ Consolidates code analysis tools into a single code_inspection MCP tool.
 Supports multiple languages: Python, JavaScript, HTML, C#, C++, and language-independent (oo).
 UML diagram tools have been moved to the unified 'diagram' tool.
 
-Replaces:
-- PythonBasicToolsRegistrar (10 tools)
-- PythonAdvancedToolsRegistrar (15 tools)
-
-Total: 25 analysis operations -> 1 unified tool
-(UML diagrams moved to 'diagram' tool)
+Uses CADSL (Code Analysis DSL) tools from dsl.tools.inspection module.
 """
 
 from typing import Dict, Any, Optional, Literal
@@ -66,14 +61,14 @@ class CodeInspectionToolsRegistrar(ToolRegistrarBase):
     """
     Registers a unified code_inspection tool with FastMCP.
 
-    Consolidates python_basic and python_advanced tools into one.
+    Uses CADSL tools from dsl.tools.inspection module.
     UML diagrams are available via the 'diagram' tool.
     """
 
     def register(self, app: FastMCP) -> None:
         """Register the code_inspection tool."""
-        from ...tools.python_basic.python_tools import PythonAnalysisTools
-        from ...tools.python_advanced.advanced_python_tools import AdvancedPythonTools
+        from ...dsl.core import Context
+        from ...dsl.tools import inspection
 
         instance_manager = self.instance_manager
 
@@ -224,12 +219,25 @@ class CodeInspectionToolsRegistrar(ToolRegistrarBase):
             except Exception as e:
                 return {"success": False, "error": f"Failed to get RETER instance: {str(e)}"}
 
-            # Initialize tool classes with language support
-            basic_tools = PythonAnalysisTools(reter, language=language)
-            advanced_tools = AdvancedPythonTools(reter, language=language)
-
-            # Extra params
+            # Build context for CADSL tools
             extra = params or {}
+            ctx = Context(
+                reter=reter,
+                params={
+                    "target": target,
+                    "module": module,
+                    "limit": limit,
+                    "offset": offset,
+                    "format": format,
+                    "include_methods": include_methods,
+                    "include_attributes": include_attributes,
+                    "include_docstrings": include_docstrings,
+                    "summary_only": summary_only,
+                    **extra
+                },
+                language=language,
+                instance_name=instance_name
+            )
 
             try:
                 # ═══════════════════════════════════════════════════════════
@@ -237,47 +245,36 @@ class CodeInspectionToolsRegistrar(ToolRegistrarBase):
                 # ═══════════════════════════════════════════════════════════
 
                 if action == "list_modules":
-                    return basic_tools.list_modules(instance_name, limit, offset)
+                    return inspection.list_modules(ctx)
 
                 elif action == "list_classes":
-                    return basic_tools.list_classes(instance_name, module, limit, offset)
+                    return inspection.list_classes(ctx)
 
                 elif action == "list_functions":
-                    return basic_tools.list_functions(instance_name, module, limit, offset)
+                    return inspection.list_functions(ctx)
 
                 elif action == "describe_class":
                     if not target:
                         return {"success": False, "error": "target (class_name) is required for describe_class"}
-                    return basic_tools.describe_class(
-                        instance_name=instance_name,
-                        class_name=target,
-                        include_methods=include_methods,
-                        include_attributes=include_attributes,
-                        include_parameters=extra.get("include_parameters", True),
-                        include_docstrings=include_docstrings,
-                        methods_limit=extra.get("methods_limit", 20),
-                        methods_offset=extra.get("methods_offset", 0),
-                        summary_only=summary_only,
-                        max_docstring_length=extra.get("max_docstring_length", 200)
-                    )
+                    return inspection.describe_class(ctx)
 
                 elif action == "get_docstring":
                     if not target:
                         return {"success": False, "error": "target (name) is required for get_docstring"}
-                    return basic_tools.get_docstring(instance_name, target, limit, offset)
+                    return inspection.get_docstring(ctx)
 
                 elif action == "get_method_signature":
                     if not target:
                         return {"success": False, "error": "target (method_name) is required for get_method_signature"}
-                    return basic_tools.get_method_signature(instance_name, target)
+                    return inspection.get_method_signature(ctx)
 
                 elif action == "get_class_hierarchy":
                     if not target:
                         return {"success": False, "error": "target (class_name) is required for get_class_hierarchy"}
-                    return basic_tools.get_class_hierarchy(instance_name, target)
+                    return inspection.get_class_hierarchy(ctx)
 
                 elif action == "get_package_structure":
-                    return advanced_tools.get_package_structure(instance_name)
+                    return inspection.get_package_structure(ctx)
 
                 # ═══════════════════════════════════════════════════════════
                 # SEARCH/FIND
@@ -286,72 +283,70 @@ class CodeInspectionToolsRegistrar(ToolRegistrarBase):
                 elif action == "find_usages":
                     if not target:
                         return {"success": False, "error": "target (name) is required for find_usages"}
-                    return basic_tools.find_usages(instance_name, target, limit, offset)
+                    return inspection.find_usages(ctx)
 
                 elif action == "find_subclasses":
                     if not target:
                         return {"success": False, "error": "target (class_name) is required for find_subclasses"}
-                    return basic_tools.find_subclasses(instance_name, target, limit, offset)
+                    return inspection.find_subclasses(ctx)
 
                 elif action == "find_callers":
                     if not target:
                         return {"success": False, "error": "target (name) is required for find_callers"}
-                    return advanced_tools.find_callers_recursive(instance_name, target)
+                    return inspection.find_callers(ctx)
 
                 elif action == "find_callees":
                     if not target:
                         return {"success": False, "error": "target (name) is required for find_callees"}
-                    return advanced_tools.find_callees_recursive(instance_name, target)
+                    return inspection.find_callees(ctx)
 
                 elif action == "find_decorators":
-                    return advanced_tools.find_decorators_usage(instance_name, target, limit, offset)
+                    return inspection.find_decorators(ctx)
 
                 elif action == "find_tests":
-                    return self._find_tests(
-                        basic_tools, instance_name, target, module, limit, offset
-                    )
+                    return inspection.find_tests(ctx)
 
                 # ═══════════════════════════════════════════════════════════
                 # ANALYSIS
                 # ═══════════════════════════════════════════════════════════
 
                 elif action == "analyze_dependencies":
-                    return basic_tools.analyze_dependencies(instance_name, limit, offset)
+                    return inspection.analyze_dependencies(ctx)
 
                 elif action == "get_imports":
-                    return advanced_tools.get_import_graph(instance_name, limit, offset)
+                    return inspection.get_imports(ctx)
 
                 elif action == "get_external_deps":
-                    return advanced_tools.get_external_dependencies(instance_name, limit, offset)
+                    return inspection.get_external_deps(ctx)
 
                 elif action == "predict_impact":
                     if not target:
                         return {"success": False, "error": "target (entity_name) is required for predict_impact"}
-                    return advanced_tools.predict_change_impact(instance_name, target)
+                    return inspection.predict_impact(ctx)
 
                 elif action == "get_complexity":
-                    return advanced_tools.get_complexity_metrics(instance_name)
+                    return inspection.get_complexity(ctx)
 
                 elif action == "get_magic_methods":
-                    return advanced_tools.get_magic_methods(instance_name, limit, offset)
+                    return inspection.get_magic_methods(ctx)
 
                 elif action == "get_interfaces":
-                    return advanced_tools.get_interface_implementations(instance_name, target, limit, offset)
+                    return inspection.get_interfaces(ctx)
 
                 elif action == "get_public_api":
-                    return advanced_tools.get_public_api(instance_name, limit, offset)
+                    return inspection.get_public_api(ctx)
 
                 elif action == "get_type_hints":
-                    return advanced_tools.get_type_hints(instance_name, limit, offset)
+                    return inspection.get_type_hints(ctx)
 
                 elif action == "get_api_docs":
-                    return advanced_tools.get_api_documentation(instance_name, limit, offset)
+                    return inspection.get_api_docs(ctx)
 
                 elif action == "get_exceptions":
-                    return advanced_tools.get_exception_hierarchy(instance_name)
+                    return inspection.get_exceptions(ctx)
 
                 elif action == "get_architecture":
-                    return advanced_tools.get_architecture_overview(instance_name, format)
+                    return inspection.get_architecture(ctx)
 
                 else:
                     return {"success": False, "error": f"Action '{action}' not implemented"}
@@ -365,292 +360,3 @@ class CodeInspectionToolsRegistrar(ToolRegistrarBase):
                     "traceback": traceback.format_exc()
                 }
 
-    def _find_tests(
-        self,
-        basic_tools,
-        instance_name: str,
-        target: Optional[str],
-        module: Optional[str],
-        limit: int,
-        offset: int
-    ) -> Dict[str, Any]:
-        """
-        Find tests for a specific module, class, method, or function.
-
-        Args:
-            basic_tools: PythonAnalysisTools instance
-            instance_name: RETER instance name
-            target: Target entity name (class, method, or function)
-            module: Module name to find tests for
-            limit: Maximum results
-            offset: Pagination offset
-
-        Returns:
-            Dict with found tests and suggestions
-        """
-        from ...tools.test_coverage.matcher import TestMatcher
-
-        # Get all test classes and functions
-        all_classes = basic_tools.list_classes(instance_name, limit=500).get("classes", [])
-        all_functions = basic_tools.list_functions(instance_name, limit=1000).get("functions", [])
-
-        test_classes = [c for c in all_classes if c.get("name", "").startswith("Test")]
-        test_functions = [f for f in all_functions if f.get("name", "").startswith("test_")]
-
-        matcher = TestMatcher(test_classes, test_functions)
-
-        results = {
-            "success": True,
-            "action": "find_tests",
-            "target": target,
-            "module": module,
-            "tests_found": [],
-            "suggestions": []
-        }
-
-        # If module is specified, find tests for the module
-        if module:
-            module_tests = self._find_tests_for_module(
-                module, test_classes, test_functions, matcher
-            )
-            results["tests_found"].extend(module_tests["tests"])
-            results["suggestions"].extend(module_tests["suggestions"])
-            results["module_coverage"] = module_tests["coverage"]
-
-        # If target is specified, find tests for the entity
-        if target:
-            # Try to determine entity type
-            entity_type = self._determine_entity_type(target, all_classes, all_functions)
-
-            if entity_type == "class":
-                class_tests = self._find_tests_for_class(target, matcher, test_classes)
-                results["tests_found"].extend(class_tests["tests"])
-                results["suggestions"].extend(class_tests["suggestions"])
-                results["entity_type"] = "class"
-
-            elif entity_type == "function":
-                func_tests = self._find_tests_for_function(target, matcher)
-                results["tests_found"].extend(func_tests["tests"])
-                results["suggestions"].extend(func_tests["suggestions"])
-                results["entity_type"] = "function"
-
-            elif entity_type == "method":
-                # target is in format "ClassName.method_name"
-                parts = target.split(".")
-                if len(parts) >= 2:
-                    class_name = parts[0]
-                    method_name = parts[-1]
-                    method_tests = self._find_tests_for_method(
-                        class_name, method_name, matcher
-                    )
-                    results["tests_found"].extend(method_tests["tests"])
-                    results["suggestions"].extend(method_tests["suggestions"])
-                    results["entity_type"] = "method"
-            else:
-                # Unknown - try all approaches
-                results["entity_type"] = "unknown"
-                results["suggestions"].append({
-                    "message": f"Could not determine entity type for '{target}'",
-                    "hint": "Use format 'ClassName' for classes, 'function_name' for functions, or 'ClassName.method_name' for methods"
-                })
-
-        # Apply pagination
-        results["total_tests"] = len(results["tests_found"])
-        results["tests_found"] = results["tests_found"][offset:offset + limit]
-
-        return results
-
-    def _determine_entity_type(
-        self,
-        target: str,
-        all_classes: list,
-        all_functions: list
-    ) -> str:
-        """Determine if target is a class, function, or method."""
-        # Check if it's a method (contains dot)
-        if "." in target:
-            return "method"
-
-        # Check if it's a known class
-        class_names = {c.get("name", "") for c in all_classes}
-        if target in class_names:
-            return "class"
-
-        # Check if it's a known function
-        func_names = {f.get("name", "") for f in all_functions}
-        if target in func_names:
-            return "function"
-
-        # Default: assume it's a class if PascalCase, function otherwise
-        if target and target[0].isupper():
-            return "class"
-        return "function"
-
-    def _find_tests_for_module(
-        self,
-        module: str,
-        test_classes: list,
-        test_functions: list,
-        matcher
-    ) -> Dict[str, Any]:
-        """Find all tests for a module."""
-        tests = []
-        suggestions = []
-
-        # Find test modules that might test this module
-        module_name = module.split(".")[-1]
-        test_module_patterns = [
-            f"test_{module_name}",
-            f"{module_name}_test",
-            f"tests.test_{module_name}",
-            f"tests.{module_name}_test"
-        ]
-
-        for tc in test_classes:
-            tc_module = tc.get("module", "")
-            tc_name = tc.get("name", "")
-            for pattern in test_module_patterns:
-                if pattern in tc_module or pattern in tc_name.lower():
-                    tests.append({
-                        "type": "test_class",
-                        "name": tc_name,
-                        "module": tc_module,
-                        "file": tc.get("file", ""),
-                        "confidence": 0.9
-                    })
-                    break
-
-        for tf in test_functions:
-            tf_module = tf.get("module", "")
-            tf_name = tf.get("name", "")
-            for pattern in test_module_patterns:
-                if pattern in tf_module:
-                    tests.append({
-                        "type": "test_function",
-                        "name": tf_name,
-                        "module": tf_module,
-                        "file": tf.get("file", ""),
-                        "confidence": 0.8
-                    })
-                    break
-
-        if not tests:
-            suggestions.append({
-                "type": "create_test_module",
-                "suggested_name": f"test_{module_name}.py",
-                "suggested_location": f"tests/test_{module_name}.py"
-            })
-
-        return {
-            "tests": tests,
-            "suggestions": suggestions,
-            "coverage": {
-                "test_classes": len([t for t in tests if t["type"] == "test_class"]),
-                "test_functions": len([t for t in tests if t["type"] == "test_function"])
-            }
-        }
-
-    def _find_tests_for_class(
-        self,
-        class_name: str,
-        matcher,
-        test_classes: list
-    ) -> Dict[str, Any]:
-        """Find tests for a specific class."""
-        tests = []
-        suggestions = []
-
-        # Use matcher to find test class
-        match = matcher.find_test_for_class(class_name)
-
-        if match.is_tested:
-            # Find the actual test class info
-            for tc in test_classes:
-                if tc.get("name") == match.test_name:
-                    tests.append({
-                        "type": "test_class",
-                        "name": match.test_name,
-                        "module": tc.get("module", ""),
-                        "file": tc.get("file", ""),
-                        "confidence": match.confidence,
-                        "match_pattern": match.pattern_used
-                    })
-                    break
-        else:
-            suggestions.append({
-                "type": "create_test_class",
-                "for_class": class_name,
-                "suggested_name": matcher.suggest_test_class(class_name),
-                "suggested_methods": ["test_init", "test_basic_functionality"]  # Generic suggestions
-            })
-
-        return {"tests": tests, "suggestions": suggestions}
-
-    def _find_tests_for_function(
-        self,
-        func_name: str,
-        matcher
-    ) -> Dict[str, Any]:
-        """Find tests for a specific function."""
-        tests = []
-        suggestions = []
-
-        match = matcher.find_test_for_function(func_name)
-
-        if match.is_tested:
-            tests.append({
-                "type": "test_function",
-                "name": match.test_name,
-                "confidence": match.confidence,
-                "match_pattern": match.pattern_used
-            })
-        else:
-            suggestions.append({
-                "type": "create_test_function",
-                "for_function": func_name,
-                "suggested_name": f"test_{func_name}"
-            })
-
-        return {"tests": tests, "suggestions": suggestions}
-
-    def _find_tests_for_method(
-        self,
-        class_name: str,
-        method_name: str,
-        matcher
-    ) -> Dict[str, Any]:
-        """Find tests for a specific method."""
-        tests = []
-        suggestions = []
-
-        # First find the test class
-        class_match = matcher.find_test_for_class(class_name)
-
-        if class_match.is_tested:
-            # Look for method test
-            method_match = matcher.find_test_for_method(method_name, class_name)
-
-            if method_match.is_tested:
-                tests.append({
-                    "type": "test_method",
-                    "name": method_match.test_name,
-                    "test_class": class_match.test_name,
-                    "confidence": method_match.confidence,
-                    "match_pattern": method_match.pattern_used
-                })
-            else:
-                suggestions.append({
-                    "type": "add_test_method",
-                    "for_method": f"{class_name}.{method_name}",
-                    "test_class": class_match.test_name,
-                    "suggested_name": f"test_{method_name}"
-                })
-        else:
-            suggestions.append({
-                "type": "create_test_class",
-                "for_class": class_name,
-                "suggested_name": matcher.suggest_test_class(class_name),
-                "then_add_test": f"test_{method_name}"
-            })
-
-        return {"tests": tests, "suggestions": suggestions}
