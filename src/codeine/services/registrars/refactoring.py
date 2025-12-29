@@ -64,7 +64,6 @@ class RecommenderToolsRegistrar(ToolRegistrarBase):
         def recommender(
             recommender_type: Optional[str] = None,
             detector_name: Optional[str] = None,
-            instance_name: str = "default",
             session_instance: str = "default",
             categories: Optional[List[str]] = None,
             severities: Optional[List[str]] = None,
@@ -85,7 +84,6 @@ class RecommenderToolsRegistrar(ToolRegistrarBase):
             Args:
                 recommender_type: Type of recommender. If None, queues tasks for all types.
                 detector_name: Specific detector to run. If None, queues all detectors as tasks.
-                instance_name: RETER instance to analyze
                 session_instance: Session instance for storing tasks
                 categories: Filter detectors by category
                 severities: Filter by severity: low, medium, high

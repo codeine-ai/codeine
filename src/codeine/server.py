@@ -436,22 +436,6 @@ Always use the `thinking` tool when analyzing problems or making decisions.""",
             stats["error"] = str(e)
             return stats
 
-    def _register_initialization_tool(self):
-        """Register the initialize_project tool with background task support."""
-
-        @self.app.tool(task=True)
-        async def initialize_project(progress: Progress = Progress()) -> dict:
-            """
-            Initialize or re-initialize the default project instance.
-
-            This tool runs as a background task and reports progress.
-            It loads Python files into RETER and builds the RAG semantic index.
-
-            Returns:
-                dict with initialization status and statistics
-            """
-            return await self._async_initialize(mcp_progress=progress)
-
     def run(self):
         """
         Start the MCP server with graceful shutdown support.
@@ -525,9 +509,6 @@ Always use the `thinking` tool when analyzing problems or making decisions.""",
             _t = _time.time()
             self.resource_registrar.register_all_resources(self.app)
             self.tool_registrar.register_all_tools(self.app)
-
-            # Register the initialize_project background task tool
-            self._register_initialization_tool()
 
             logger.info("[TIMING] Tools registered in %.3fs", _time.time() - _t)
             logger.info("All tools registered successfully (total init: %.3fs)", _time.time() - _init_start)

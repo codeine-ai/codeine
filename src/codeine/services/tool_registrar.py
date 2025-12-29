@@ -21,6 +21,7 @@ from .reter_operations import ReterOperations
 from .state_persistence import StatePersistenceService
 from .instance_manager import InstanceManager
 from .tools_service import ToolsRegistrar
+from .registrars.system_tools import SystemToolsRegistrar
 from .nlq_constants import REQL_SYSTEM_PROMPT
 from .nlq_helpers import (
     query_instance_schema,
@@ -65,6 +66,11 @@ class ToolRegistrar:
         # Direct tools registration (pass default_manager for RAG)
         self.tools_registrar = ToolsRegistrar(instance_manager, persistence, default_manager)
 
+        # System tools registrar (unified system management)
+        self.system_registrar = SystemToolsRegistrar(
+            instance_manager, persistence, default_manager, reter_ops
+        )
+
     def register_all_tools(self, app: FastMCP) -> None:
         """
         Register all MCP tools with the application.
@@ -74,17 +80,15 @@ class ToolRegistrar:
         """
         self._register_knowledge_tools(app)
         self._register_query_tools(app)
-        self._register_instance_manager_tool(app)
+        self.system_registrar.register(app)  # Unified system tool
         self._register_domain_tools(app)
         self._register_experimental_tools(app)
-        self._register_info_tools(app)
 
     def _register_knowledge_tools(self, app: FastMCP) -> None:
         """Register knowledge management tools."""
 
         @app.tool()
         def add_knowledge(
-            instance_name: str,
             source: str,
             type: str = "ontology",
             source_id: Optional[str] = None,
@@ -103,10 +107,6 @@ class ToolRegistrar:
             - Assert new facts (incremental reasoning)
 
             Args:
-                instance_name: RETER instance name (auto-created if doesn't exist)
-                    Special instance "default": Auto-syncs with RETER_PROJECT_ROOT.
-                    Files are automatically loaded/reloaded/forgotten based on MD5 changes.
-                    Best for project-wide analysis - changes detected automatically.
                 source: Ontology content, file path, or single Python file path
                 type: 'ontology' (DL/SWRL), 'python' (.py), 'javascript' (.js/.ts), 'html', 'csharp' (.cs), or 'cpp' (.cpp/.hpp/.h)
                 source_id: Optional identifier for selective forgetting later
@@ -121,11 +121,10 @@ class ToolRegistrar:
                 require_default_instance()
             except ComponentNotReadyError as e:
                 return e.to_response()
-            return self.reter_ops.add_knowledge(instance_name, source, type, source_id, ctx)
+            return self.reter_ops.add_knowledge("default", source, type, source_id, ctx)
 
         @app.tool()
         def add_external_directory(
-            instance_name: str,
             directory: str,
             recursive: bool = True,
             exclude_patterns: list[str] = None,
@@ -140,12 +139,7 @@ class ToolRegistrar:
             Use this tool to load code from external libraries, dependencies,
             or other codebases that are NOT your main project.
 
-            IMPORTANT: Cannot use 'default' instance - it auto-syncs with RETER_PROJECT_ROOT.
-            Your main project code should be loaded via RETER_PROJECT_ROOT env var instead.
-
             Args:
-                instance_name: RETER instance name - MUST NOT be 'default'.
-                    Use descriptive names like 'external', 'dependencies', 'library_name'.
                 directory: Path to directory containing external code files
                 recursive: Whether to recursively search subdirectories (default: True)
                 exclude_patterns: List of glob patterns to exclude (e.g., ["test_*.py", "*/tests/*", "node_modules/*"])
@@ -163,14 +157,13 @@ class ToolRegistrar:
                 require_default_instance()
             except ComponentNotReadyError as e:
                 return e.to_response()
-            return self.reter_ops.add_external_directory(instance_name, directory, recursive, exclude_patterns, ctx)
+            return self.reter_ops.add_external_directory("default", directory, recursive, exclude_patterns, ctx)
 
     def _register_query_tools(self, app: FastMCP) -> None:
         """Register query execution tools."""
 
         @app.tool()
         def quick_query(
-            instance_name: str,
             query: str,
             type: str = "reql"
         ) -> Dict[str, Any]:
@@ -185,9 +178,6 @@ class ToolRegistrar:
             warnings if any sources are outdated or deleted.
 
             Args:
-                instance_name: RETER instance name (auto-created if doesn't exist)
-                    Special instance "default": Auto-syncs with RETER_PROJECT_ROOT.
-                    Ideal for querying project-wide code patterns and relationships.
                 query: Query string in REQL syntax
                 type: 'reql', 'dl', or 'pattern'
 
@@ -201,121 +191,8 @@ class ToolRegistrar:
                 require_default_instance()
             except ComponentNotReadyError as e:
                 return e.to_response()
-            result = self.reter_ops.quick_query(instance_name, query, type)
+            result = self.reter_ops.quick_query("default", query, type)
             return truncate_response(result)
-
-    def _register_instance_manager_tool(self, app: FastMCP) -> None:
-        """Register unified instance manager tool."""
-
-        @app.tool()
-        def instance_manager(
-            action: str,
-            instance_name: str = "default",
-            source: Optional[str] = None
-        ) -> Dict[str, Any]:
-            """
-            Unified tool for managing RETER instances and sources.
-
-            **See: system://reter/multiple-instances for complete documentation**
-
-            Actions:
-            - list: List all RETER instances (loaded and available snapshots)
-            - list_sources: List all sources loaded in an instance
-            - get_facts: Get fact IDs for a specific source
-            - forget: Remove all facts from a source (selective forgetting)
-            - reload: Reload all modified file-based sources
-            - check: Quick consistency check of knowledge base
-
-            Args:
-                action: One of: list, list_sources, get_facts, forget, reload, check
-                instance_name: RETER instance name (default: "default")
-                source: Source ID or file path (required for get_facts, forget)
-
-            Returns:
-                Action-specific results with success status
-
-            Examples:
-                instance_manager("list")  # List all instances
-                instance_manager("list_sources", "default")  # List sources in default
-                instance_manager("get_facts", "default", "path/to/file.py")  # Get facts
-                instance_manager("forget", "default", "path/to/file.py")  # Forget source
-                instance_manager("reload", "default")  # Reload modified sources
-                instance_manager("check", "default")  # Check consistency
-            """
-            try:
-                require_default_instance()
-            except ComponentNotReadyError as e:
-                return e.to_response()
-
-            if action == "list":
-                # List all instances
-                loaded_instances_dict = self.instance_manager.get_all_instances()
-                loaded_instances = list(loaded_instances_dict.keys())
-                available_snapshots = self.persistence.get_available_snapshot_names()
-
-                all_instances = {}
-                default_status = self.default_manager.get_status()
-                all_instances["default"] = default_status
-
-                for inst_name in loaded_instances:
-                    if inst_name != "default":
-                        all_instances[inst_name] = "loaded"
-
-                for inst_name in available_snapshots:
-                    if inst_name not in all_instances:
-                        all_instances[inst_name] = "available"
-
-                return {
-                    "success": True,
-                    "action": "list",
-                    "instances": all_instances,
-                    "total_count": len(all_instances),
-                    "loaded_count": len([s for s in all_instances.values() if s == "loaded"]),
-                    "available_count": len([s for s in all_instances.values() if s == "available"]),
-                    "_resources": {
-                        "system://reter/multiple-instances": "Multiple Instances Guide",
-                        "system://reter/source-management": "Source Management Guide"
-                    }
-                }
-
-            elif action == "list_sources":
-                result = self.persistence.list_sources(instance_name)
-                result["action"] = "list_sources"
-                return result
-
-            elif action == "get_facts":
-                if not source:
-                    return {"success": False, "error": "source parameter required for get_facts action"}
-                result = self.persistence.get_source_facts(instance_name, source)
-                result["action"] = "get_facts"
-                return result
-
-            elif action == "forget":
-                if not source:
-                    return {"success": False, "error": "source parameter required for forget action"}
-                result = self.reter_ops.forget_source(instance_name, source)
-                result["action"] = "forget"
-                return result
-
-            elif action == "reload":
-                result = self.reter_ops.reload_sources(instance_name)
-                result["action"] = "reload"
-                return result
-
-            elif action == "check":
-                result = self.reter_ops.check_consistency(instance_name)
-                result["action"] = "check"
-                return result
-
-            else:
-                return {
-                    "success": False,
-                    "error": f"Unknown action: {action}",
-                    "available_actions": ["list", "list_sources", "get_facts", "forget", "reload", "check"],
-                    "_resources": {
-                        "system://reter/multiple-instances": "Multiple Instances Guide"
-                    }
-                }
 
     def _register_domain_tools(self, app: FastMCP) -> None:
         """Register all RETER domain-specific tools (Python analysis, UML, Gantt, etc.)."""
@@ -331,7 +208,6 @@ class ToolRegistrar:
         @app.tool()
         async def natural_language_query(
             question: str,
-            instance_name: str = "default",
             max_retries: int = 5,
             timeout: int = 30,
             max_results: int = 500,
@@ -362,7 +238,6 @@ class ToolRegistrar:
 
             Args:
                 question: Natural language question about code structure (plain English)
-                instance_name: RETER instance to query (default: "default")
                 max_retries: Maximum retry attempts on syntax errors (default: 5)
                 timeout: Query timeout in seconds (default: 30)
                 max_results: Maximum results to return (default: 500)
@@ -507,76 +382,3 @@ class ToolRegistrar:
             attempts
         )
 
-    def _register_info_tools(self, app: FastMCP) -> None:
-        """Register info/diagnostic tools."""
-
-        @app.tool()
-        def reter_info() -> Dict[str, Any]:
-            """
-            Get version and diagnostic information about RETER components.
-
-            Returns version info for:
-            - MCP server (reter-logical-thinking-server)
-            - Python reter package
-            - C++ RETE binding (owl_rete_cpp)
-
-            Useful for debugging deployment issues and verifying correct module versions.
-
-            Returns:
-                Dictionary with version information for all components.
-            """
-            import reter
-            from reter import owl_rete_cpp
-
-            # Get MCP server version
-            try:
-                from codeine import __version__ as mcp_version
-            except ImportError:
-                mcp_version = "unknown"
-
-            # Get reter Python package version
-            try:
-                reter_version = reter.__version__
-            except AttributeError:
-                reter_version = "unknown"
-
-            # Get C++ binding version info
-            try:
-                cpp_version = getattr(owl_rete_cpp, "__version__", "unknown")
-                cpp_build_timestamp = getattr(owl_rete_cpp, "__build_timestamp__", "unknown")
-                cpp_info = owl_rete_cpp.get_version_info() if hasattr(owl_rete_cpp, "get_version_info") else {}
-            except Exception as e:
-                cpp_version = f"error: {e}"
-                cpp_build_timestamp = "unknown"
-                cpp_info = {}
-
-            # Get reter module file location
-            try:
-                reter_location = reter.__file__
-            except AttributeError:
-                reter_location = "unknown"
-
-            # Get owl_rete_cpp module location
-            try:
-                cpp_location = owl_rete_cpp.__file__
-            except AttributeError:
-                cpp_location = "unknown"
-
-            return {
-                "success": True,
-                "mcp_server": {
-                    "name": "reter-logical-thinking-server",
-                    "version": mcp_version,
-                },
-                "reter_package": {
-                    "version": reter_version,
-                    "location": reter_location,
-                },
-                "cpp_binding": {
-                    "version": cpp_version,
-                    "build_timestamp": cpp_build_timestamp,
-                    "location": cpp_location,
-                    "info": cpp_info,
-                },
-                "optional_fix_present": cpp_info.get("optional_fix", False),
-            }

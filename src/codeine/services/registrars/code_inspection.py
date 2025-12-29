@@ -76,7 +76,6 @@ class CodeInspectionToolsRegistrar(ToolRegistrarBase):
         @truncate_mcp_response
         def code_inspection(
             action: str,
-            instance_name: str = "default",
             target: Optional[str] = None,
             module: Optional[str] = None,
             limit: int = 100,
@@ -163,7 +162,6 @@ class CodeInspectionToolsRegistrar(ToolRegistrarBase):
                     - get_architecture: Generate high-level architectural overview.
                       Params: format="json"|"markdown"|"mermaid". Returns: overview, layers[], components[]
 
-                instance_name: RETER instance name (default: "default")
                 target: Target entity name (class, method, function, decorator)
                 module: Module name filter for list operations
                 limit: Maximum results to return (default: 100)
@@ -213,7 +211,7 @@ class CodeInspectionToolsRegistrar(ToolRegistrarBase):
 
             # Get RETER instance
             try:
-                reter = instance_manager.get_or_create_instance(instance_name)
+                reter = instance_manager.get_or_create_instance("default")
             except DefaultInstanceNotInitialised as e:
                 return {"success": False, "error": str(e), "status": "initializing"}
             except Exception as e:

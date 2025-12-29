@@ -144,7 +144,6 @@ class UnifiedToolsRegistrar(ToolRegistrarBase):
             thought: str,
             thought_number: int,
             total_thoughts: int,
-            instance_name: str = "default",
             thought_type: str = "reasoning",
             section: Optional[str] = None,
             next_thought_needed: bool = True,
@@ -170,7 +169,6 @@ class UnifiedToolsRegistrar(ToolRegistrarBase):
                 thought: Your current reasoning step
                 thought_number: Current step number (1-indexed)
                 total_thoughts: Estimated total steps
-                instance_name: Session instance name (default: "default")
                 thought_type: reasoning, analysis, decision, planning, verification
                 section: Design doc section (context, goals, non_goals, design, alternatives, risks, implementation, tasks)
                 next_thought_needed: Whether more thoughts are needed
@@ -196,9 +194,9 @@ class UnifiedToolsRegistrar(ToolRegistrarBase):
             except ComponentNotReadyError as e:
                 return e.to_response()
 
-            session = self._get_session(instance_name)
+            session = self._get_session("default")
             return session.think(
-                instance_name=instance_name,
+                instance_name="default",
                 thought=thought,
                 thought_number=thought_number,
                 total_thoughts=total_thoughts,
@@ -220,7 +218,6 @@ class UnifiedToolsRegistrar(ToolRegistrarBase):
         @truncate_mcp_response
         def session(
             action: str,
-            instance_name: str = "default",
             goal: Optional[str] = None,
             project_start: Optional[str] = None,
             project_end: Optional[str] = None
@@ -257,21 +254,21 @@ class UnifiedToolsRegistrar(ToolRegistrarBase):
             except ComponentNotReadyError as e:
                 return e.to_response()
 
-            sess = self._get_session(instance_name)
+            sess = self._get_session("default")
 
             if action == "start":
                 return sess.start_session(
-                    instance_name=instance_name,
+                    instance_name="default",
                     goal=goal,
                     project_start=project_start,
                     project_end=project_end
                 )
             elif action == "context":
-                return sess.get_context(instance_name)
+                return sess.get_context("default")
             elif action == "end":
-                return sess.end_session(instance_name)
+                return sess.end_session("default")
             elif action == "clear":
-                return sess.clear_session(instance_name)
+                return sess.clear_session("default")
             else:
                 return {"success": False, "error": f"Unknown action: {action}"}
 
@@ -281,7 +278,6 @@ class UnifiedToolsRegistrar(ToolRegistrarBase):
         @app.tool()
         @truncate_mcp_response
         def items(
-            instance_name: str = "default",
             action: str = "list",
             item_id: Optional[str] = None,
             updates: Optional[Dict[str, Any]] = None,
@@ -313,7 +309,6 @@ class UnifiedToolsRegistrar(ToolRegistrarBase):
             - clear: Delete multiple items matching filters (requires at least one filter)
 
             Args:
-                instance_name: Session instance name
                 action: list, get, delete, update, clear
                 item_id: Item ID (required for get/delete/update)
                 updates: Fields to update (for update action)
@@ -347,11 +342,11 @@ class UnifiedToolsRegistrar(ToolRegistrarBase):
             except ComponentNotReadyError as e:
                 return e.to_response()
 
-            sess = self._get_session(instance_name)
+            sess = self._get_session("default")
             store = sess.store
 
             # Start session if needed
-            session_id = store.get_or_create_session(instance_name)
+            session_id = store.get_or_create_session("default")
 
             if action == "list":
                 # Create filters object to reduce parameter passing
@@ -452,7 +447,6 @@ class UnifiedToolsRegistrar(ToolRegistrarBase):
         @app.tool()
         def diagram(
             diagram_type: str,
-            instance_name: str = "default",
             format: str = "mermaid",
             root_id: Optional[str] = None,
             start_date: Optional[str] = None,
@@ -518,9 +512,9 @@ class UnifiedToolsRegistrar(ToolRegistrarBase):
 
             # Session/Project diagrams
             if diagram_type in ("gantt", "thought_chain", "traceability", "design_doc"):
-                sess = self._get_session(instance_name)
+                sess = self._get_session("default")
                 store = sess.store
-                session_id = store.get_or_create_session(instance_name)
+                session_id = store.get_or_create_session("default")
 
                 if diagram_type == "gantt":
                     return self._generate_gantt_diagram(store, session_id, start_date, end_date, format)
@@ -539,13 +533,13 @@ class UnifiedToolsRegistrar(ToolRegistrarBase):
                     extra = params or {}
 
                     # Get RETER instance
-                    reter = instance_manager.get_or_create_instance(instance_name)
+                    reter = instance_manager.get_or_create_instance("default")
 
                     if diagram_type == "class_hierarchy":
                         ctx = Context(
                             reter=reter,
                             params={"root_class": target, "format": format},
-                            instance_name=instance_name
+                            instance_name="default"
                         )
                         return diagrams.class_hierarchy(ctx)
 
@@ -560,7 +554,7 @@ class UnifiedToolsRegistrar(ToolRegistrarBase):
                                 "include_attributes": include_attributes,
                                 "format": format
                             },
-                            instance_name=instance_name
+                            instance_name="default"
                         )
                         return diagrams.class_diagram(ctx)
 
@@ -575,7 +569,7 @@ class UnifiedToolsRegistrar(ToolRegistrarBase):
                                 "max_depth": max_depth,
                                 "format": format
                             },
-                            instance_name=instance_name
+                            instance_name="default"
                         )
                         return diagrams.sequence_diagram(ctx)
 
@@ -589,7 +583,7 @@ class UnifiedToolsRegistrar(ToolRegistrarBase):
                                 "format": format,
                                 "limit": extra.get("limit", 100)
                             },
-                            instance_name=instance_name
+                            instance_name="default"
                         )
                         return diagrams.dependency_graph(ctx)
 
@@ -604,7 +598,7 @@ class UnifiedToolsRegistrar(ToolRegistrarBase):
                                 "max_depth": max_depth,
                                 "format": format
                             },
-                            instance_name=instance_name
+                            instance_name="default"
                         )
                         return diagrams.call_graph(ctx)
 
@@ -618,7 +612,7 @@ class UnifiedToolsRegistrar(ToolRegistrarBase):
                                 "include_inheritance": extra.get("include_inheritance", True),
                                 "format": format
                             },
-                            instance_name=instance_name
+                            instance_name="default"
                         )
                         return diagrams.coupling_matrix(ctx)
 
