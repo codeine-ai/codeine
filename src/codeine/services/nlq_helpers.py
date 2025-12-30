@@ -25,9 +25,9 @@ def query_instance_schema(reter) -> str:
         Schema info as formatted string, or empty string if failed
     """
     try:
-        schema_query = """SELECT ?type ?pred (COUNT(*) AS ?count)
+        schema_query = """SELECT ?concept ?pred (COUNT(*) AS ?count)
             WHERE { ?s type ?concept . ?s ?pred ?o }
-            GROUP BY ?type ?pred
+            GROUP BY ?concept ?pred
             ORDER BY ?concept DESC(?count)"""
         schema_result = reter.reql(schema_query)
 

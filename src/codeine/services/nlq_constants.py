@@ -104,10 +104,25 @@ prefixes (py:, cpp:, cs:, js:) only when specifically asked about one language.
 - `definedIn` - Class/module where defined
 - `inheritsFrom` - Class inheritance
 - `calls` - Function/method calls another (unified across all languages)
-- `imports` - Module imports another
 - `hasParameter` - Function has parameter
 - `ofFunction` - Parameter belongs to function
 - `visibility` - "public", "protected", "private"
+
+### Import Predicates (oo:Import, py:Import, js:Import, cs:Using)
+- `modulePath` - The imported module/package path (e.g., "watchdog.observers", "os.path")
+- `imports` - Specific names imported from the module (e.g., "Observer", "join")
+- `inModule` - Module containing the import statement
+- `atLine` - Line number of the import
+
+Example - Find modules importing watchdog:
+```
+SELECT ?module ?path WHERE {
+    ?imp type py:Import .
+    ?imp modulePath ?path .
+    ?imp inModule ?module .
+    FILTER(CONTAINS(?path, "watchdog"))
+}
+```
 
 ## Python-Specific Predicates (py: prefix)
 
@@ -292,6 +307,27 @@ SELECT ?class ?name WHERE {
     ?class name ?name .
     ?class inheritsFrom ?base .
     FILTER(CONTAINS(?base, "ABC"))
+}
+```
+
+### Cross-Language: Find imports of a specific module
+```
+SELECT ?module ?path WHERE {
+    ?imp type oo:Import .
+    ?imp modulePath ?path .
+    ?imp inModule ?module .
+    FILTER(CONTAINS(?path, "os"))
+}
+```
+
+### Cross-Language: Find what names are imported from a module
+```
+SELECT ?module ?importedName WHERE {
+    ?imp type oo:Import .
+    ?imp modulePath ?path .
+    ?imp imports ?importedName .
+    ?imp inModule ?module .
+    FILTER(CONTAINS(?path, "typing"))
 }
 ```
 
