@@ -234,7 +234,7 @@ class CodeInspectionToolsRegistrar(ToolRegistrarBase):
                     **extra
                 },
                 language=language,
-                instance_name=instance_name
+                instance_name="default"
             )
 
             try:

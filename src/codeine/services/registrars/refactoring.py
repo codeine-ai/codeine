@@ -132,7 +132,7 @@ class RecommenderToolsRegistrar(ToolRegistrarBase):
 
             # Get RETER instance
             try:
-                reter = instance_manager.get_or_create_instance(instance_name)
+                reter = instance_manager.get_or_create_instance("default")
             except DefaultInstanceNotInitialised as e:
                 return {"success": False, "error": str(e), "status": "initializing"}
             except Exception as e:
@@ -205,7 +205,7 @@ class RecommenderToolsRegistrar(ToolRegistrarBase):
                 reter=reter,
                 params=extra,
                 language="oo",
-                instance_name=instance_name
+                instance_name=session_instance
             )
 
             try:

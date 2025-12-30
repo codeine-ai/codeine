@@ -293,6 +293,82 @@ class GitignoreParser:
         """Get list of loaded .gitignore files."""
         return list(self._loaded_gitignores)
 
+    def load_all_gitignores(self) -> None:
+        """
+        Pre-load all .gitignore files in the project tree.
+
+        This is more efficient than lazy loading during file scans,
+        as it loads all patterns upfront in a single pass.
+        """
+        import hashlib
+
+        # Find all .gitignore files in project
+        for gitignore_path in self.project_root.rglob(".gitignore"):
+            try:
+                directory = gitignore_path.parent
+                self._load_gitignore(directory)
+            except Exception:
+                pass  # Skip unreadable gitignore files
+
+        # Compute combined hash of all gitignore contents
+        self._gitignore_files_hashes: Dict[str, str] = {}
+        for gitignore_path in self._loaded_gitignores:
+            try:
+                content = gitignore_path.read_text(encoding='utf-8', errors='ignore')
+                file_hash = hashlib.md5(content.encode('utf-8')).hexdigest()
+                rel_path = str(gitignore_path.relative_to(self.project_root))
+                self._gitignore_files_hashes[rel_path] = file_hash
+            except Exception:
+                pass
+
+        # Compute combined hash
+        import json
+        combined = json.dumps(self._gitignore_files_hashes, sort_keys=True)
+        self._combined_hash = hashlib.md5(combined.encode('utf-8')).hexdigest()
+
+    def get_gitignore_hash(self) -> str:
+        """
+        Get combined hash of all gitignore files.
+
+        Use this to detect when gitignore patterns have changed.
+        Must call load_all_gitignores() first.
+
+        Returns:
+            MD5 hash of combined gitignore contents, or empty string if not loaded
+        """
+        return getattr(self, '_combined_hash', '')
+
+    def get_gitignore_files_hashes(self) -> Dict[str, str]:
+        """
+        Get individual hashes for each .gitignore file.
+
+        Returns:
+            Dict mapping relative gitignore path -> content hash
+        """
+        return getattr(self, '_gitignore_files_hashes', {})
+
+    def is_ignored_fast(self, rel_path_str: str, is_dir: bool = False) -> bool:
+        """
+        Fast check if a path should be ignored (no lazy loading).
+
+        Use this after calling load_all_gitignores() for maximum performance.
+        Unlike is_ignored(), this doesn't lazily load nested gitignore files.
+
+        Args:
+            rel_path_str: Relative path string (forward slashes)
+            is_dir: Whether the path is a directory
+
+        Returns:
+            True if path should be ignored
+        """
+        # Check patterns in order (last match wins)
+        ignored = False
+        for pattern in self._patterns:
+            if pattern.matches(rel_path_str, is_dir, self.project_root):
+                ignored = not pattern.negation
+
+        return ignored
+
 
 # Convenience function
 def is_git_ignored(project_root: Path, file_path: Path) -> bool:

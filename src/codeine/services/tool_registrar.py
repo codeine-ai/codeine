@@ -258,13 +258,13 @@ class ToolRegistrar:
                 return e.to_response()
 
             debug_log.debug(f"\n{'#'*60}\nNEW NLQ REQUEST\n{'#'*60}")
-            debug_log.debug(f"Question: {question}, Instance: {instance_name}")
+            debug_log.debug(f"Question: {question}, Instance: default")
 
             if ctx is None:
                 return self._nlq_error_response("Context not available for LLM sampling")
 
             try:
-                reter = self.instance_manager.get_or_create_instance(instance_name)
+                reter = self.instance_manager.get_or_create_instance("default")
             except Exception as e:
                 return self._nlq_error_response(f"Failed to get RETER instance: {str(e)}")
 

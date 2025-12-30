@@ -25,14 +25,67 @@ RAG Integration:
 import sys
 import os
 import hashlib
+import threading
 from pathlib import Path
 from typing import Dict, List, Set, Optional, Tuple, Any, TYPE_CHECKING
 from ..reter_wrapper import ReterWrapper, debug_log
 from .gitignore_parser import GitignoreParser
+from .source_state_manager import SourceStateManager, SyncChanges, FileInfo
+
+try:
+    from watchdog.observers import Observer
+    from watchdog.events import FileSystemEventHandler, FileSystemEvent
+    WATCHDOG_AVAILABLE = True
+except ImportError:
+    WATCHDOG_AVAILABLE = False
+    Observer = None
+    FileSystemEventHandler = object
+    FileSystemEvent = None
 
 if TYPE_CHECKING:
     from .state_persistence import StatePersistenceService
     from .rag_index_manager import RAGIndexManager
+
+
+class _FileChangeHandler(FileSystemEventHandler):
+    """
+    Watchdog event handler that sets a dirty flag when files change.
+
+    Only triggers on supported code file extensions and respects
+    gitignore/exclude patterns.
+    """
+
+    def __init__(self, manager: "DefaultInstanceManager"):
+        super().__init__()
+        self._manager = manager
+
+    def on_any_event(self, event: "FileSystemEvent") -> None:
+        """Handle any filesystem event."""
+        if event.is_directory:
+            return
+
+        # Get relative path
+        try:
+            src_path = Path(event.src_path)
+            if not self._manager._project_root:
+                return
+            rel_path = src_path.relative_to(self._manager._project_root)
+        except (ValueError, TypeError):
+            return
+
+        # Check if it's a supported code file
+        ext = src_path.suffix.lower()
+        if ext not in self._manager.ALL_CODE_EXTENSIONS:
+            return
+
+        # Check if excluded
+        if self._manager._is_excluded_for_scan(rel_path):
+            return
+
+        # Set dirty flag
+        if not self._manager._dirty:
+            debug_log(f"[FileWatcher] Change detected: {rel_path} ({event.event_type})")
+            self._manager._dirty = True
 
 
 class DefaultInstanceManager:
@@ -63,8 +116,11 @@ class DefaultInstanceManager:
         self._initialized = False
         self._syncing = False  # Re-entrancy guard to prevent recursive sync calls
 
-        # Gitignore support
+        # Gitignore support (patterns pre-loaded for performance)
         self._gitignore_parser: Optional[GitignoreParser] = None
+
+        # Source state manager (single source of truth for tracked files)
+        self._source_state: Optional[SourceStateManager] = None
 
         # RAG integration
         self._rag_manager: Optional["RAGIndexManager"] = None
@@ -80,6 +136,12 @@ class DefaultInstanceManager:
         # Python package roots - directories containing __init__.py
         # Used to calculate correct module names for Python files
         self._package_roots: Optional[Set[str]] = None
+
+        # File watcher for detecting changes (avoids 10s scan on every tool call)
+        # _dirty=True means we need to scan; False means no changes since last scan
+        self._dirty = True  # Start dirty - need initial scan
+        self._observer: Optional["Observer"] = None
+        self._watcher_started = False
 
         # Read configuration from environment
         self._load_config()
@@ -104,12 +166,22 @@ class DefaultInstanceManager:
             if not self._project_root.is_dir():
                 raise ValueError(f"RETER_PROJECT_ROOT is not a directory: {self._project_root}")
 
-            # Always initialize gitignore parser to handle nested .gitignore files
-            # even if there's no root .gitignore - nested ones will be discovered during scan
+            # Initialize gitignore parser and pre-load ALL .gitignore files
+            # This is more efficient than lazy loading during file scans
             self._gitignore_parser = GitignoreParser(self._project_root)
+            self._gitignore_parser.load_all_gitignores()
             pattern_count = self._gitignore_parser.get_pattern_count()
             if pattern_count > 0:
-                debug_log(f"[default] Loaded root .gitignore with {pattern_count} patterns")
+                debug_log(f"[default] Pre-loaded {pattern_count} gitignore patterns from {len(self._gitignore_parser.get_loaded_gitignores())} files")
+
+            # Initialize source state manager (single source of truth)
+            state_file = self._persistence.snapshots_dir / ".default.sources.json"
+            self._source_state = SourceStateManager(state_file, self._project_root)
+            self._source_state.set_gitignore_patterns(
+                patterns=self._gitignore_parser._patterns,
+                gitignore_hash=self._gitignore_parser.get_gitignore_hash(),
+                gitignore_files=self._gitignore_parser.get_gitignore_files_hashes(),
+            )
 
         include = os.getenv("RETER_PROJECT_INCLUDE", "")
         if include:
@@ -184,6 +256,72 @@ class DefaultInstanceManager:
         """Get the RAG index manager if configured."""
         return self._rag_manager
 
+    def get_source_state(self) -> Optional[SourceStateManager]:
+        """
+        Get the source state manager.
+
+        The source state manager is the single source of truth for what files
+        are loaded in RETER and RAG. Use this to query tracked files without
+        making expensive RETER queries.
+
+        Returns:
+            SourceStateManager instance, or None if not configured
+        """
+        return self._source_state
+
+    def start_file_watcher(self) -> bool:
+        """
+        Start the filesystem watcher to detect file changes.
+
+        The watcher monitors the project root for changes to code files,
+        setting a dirty flag when changes are detected. This allows
+        ensure_default_instance_synced to skip expensive filesystem scans
+        when no files have changed.
+
+        Returns:
+            True if watcher started successfully, False otherwise
+        """
+        if not WATCHDOG_AVAILABLE:
+            print("[FileWatcher] watchdog not installed, file watching disabled", file=sys.stderr)
+            return False
+
+        if self._watcher_started:
+            return True
+
+        if not self._project_root:
+            return False
+
+        try:
+            self._observer = Observer()
+            handler = _FileChangeHandler(self)
+            self._observer.schedule(handler, str(self._project_root), recursive=True)
+            self._observer.start()
+            self._watcher_started = True
+            print(f"[FileWatcher] Started watching {self._project_root}", file=sys.stderr)
+            return True
+        except Exception as e:
+            print(f"[FileWatcher] Failed to start: {e}", file=sys.stderr)
+            self._observer = None
+            return False
+
+    def stop_file_watcher(self) -> None:
+        """Stop the filesystem watcher."""
+        if self._observer and self._watcher_started:
+            try:
+                self._observer.stop()
+                self._observer.join(timeout=2.0)
+                print("[FileWatcher] Stopped", file=sys.stderr)
+            except Exception as e:
+                print(f"[FileWatcher] Error stopping: {e}", file=sys.stderr)
+            finally:
+                self._observer = None
+                self._watcher_started = False
+
+    def mark_dirty(self) -> None:
+        """Mark the instance as needing a sync (for manual triggering)."""
+        self._dirty = True
+        debug_log("[FileWatcher] Manually marked dirty")
+
     def get_status(self) -> str:
         """
         Get status of default instance.
@@ -245,7 +383,12 @@ class DefaultInstanceManager:
 
     def _do_sync(self, reter: ReterWrapper) -> Optional[ReterWrapper]:
         """
-        Internal sync implementation.
+        Internal sync implementation using SourceStateManager for optimized tracking.
+
+        Key optimizations:
+        1. Uses mtime-first checking (only computes MD5 when mtime/size changes)
+        2. JSON state file is the source of truth (no RETER query needed)
+        3. Pre-loaded gitignore patterns (no lazy loading during scan)
 
         Returns:
             None if no rebuild was needed (sync completed in-place)
@@ -259,16 +402,39 @@ class DefaultInstanceManager:
         if self._exclude_patterns:
             print(f"[default] Exclude patterns: {self._exclude_patterns}", file=sys.stderr, flush=True)
 
-        # Get current files from filesystem
-        print(f"[default] Scanning filesystem...", file=sys.stderr, flush=True)
-        current_files = self._scan_project_files()
-        print(f"[default] Found {len(current_files)} Python files in {time.time()-start:.2f}s", file=sys.stderr, flush=True)
+        # Load source state from JSON (single source of truth)
+        state_loaded = self._source_state.load() if self._source_state else False
+
+        # If no state file exists, build initial state from RETER (migration)
+        if not state_loaded and self._source_state:
+            print(f"[default] No state file found, building from RETER...", file=sys.stderr, flush=True)
+            all_sources, _ = reter.get_all_sources()
+            self._source_state.build_from_reter(all_sources)
 
         # Check if we should do a full rebuild instead of incremental sync
         # This compacts the RETE network which bloats ~20% per modify cycle
         if self._modification_count >= self.REBUILD_THRESHOLD:
             print(f"[default] Modification threshold exceeded ({self._modification_count} >= {self.REBUILD_THRESHOLD})", file=sys.stderr, flush=True)
+            # For rebuild, we need to scan all files
+            current_files = self._scan_project_files()
             fresh_reter = self._force_rebuild(current_files)
+
+            # Update state with all loaded files
+            if self._source_state:
+                self._source_state.clear()
+                for rel_path, (abs_path, md5_hash) in current_files.items():
+                    source_id = f"{md5_hash}|{rel_path}"
+                    file_info = FileInfo(
+                        rel_path=rel_path,
+                        abs_path=abs_path,
+                        md5=md5_hash,
+                        mtime=Path(abs_path).stat().st_mtime,
+                        size=Path(abs_path).stat().st_size,
+                        in_reter=True,
+                        reter_source_id=source_id,
+                    )
+                    self._source_state.set_file(file_info)
+                self._source_state.save()
 
             # Save the fresh (compacted) snapshot
             self._persistence.snapshots_dir.mkdir(parents=True, exist_ok=True)
@@ -280,39 +446,79 @@ class DefaultInstanceManager:
             print(f"[default] Compacted snapshot saved in {time.time()-save_start:.2f}s (total: {time.time()-start:.2f}s)", file=sys.stderr, flush=True)
 
             self._initialized = True
+            self._dirty = False  # Just rebuilt, everything is clean
+
+            # Start file watcher after rebuild
+            if not self._watcher_started:
+                self.start_file_watcher()
+
             return fresh_reter  # Caller should replace instance
 
-        # Get existing sources from RETER
-        print(f"[default] Querying existing sources...", file=sys.stderr, flush=True)
-        existing_sources = self._get_existing_sources(reter)
-        print(f"[default] Found {len(existing_sources)} sources already loaded in {time.time()-start:.2f}s", file=sys.stderr, flush=True)
+        # Use SourceStateManager for fast mtime-first diff
+        if self._source_state:
+            # Check if we can skip the scan (no changes detected by watcher)
+            if not self._dirty and self._watcher_started and self._initialized:
+                debug_log(f"[default] No changes detected by watcher, skipping scan")
+                print(f"[default] No changes (watcher), skipping scan (total: {time.time()-start:.2f}s)", file=sys.stderr, flush=True)
+                return None
 
-        # Sync files
-        print(f"[default] Syncing files...", file=sys.stderr, flush=True)
-        changes_made = self._sync_files(reter, current_files, existing_sources)
+            print(f"[default] Quick scanning with mtime-first check...", file=sys.stderr, flush=True)
+            changes = self._source_state.scan_and_diff(
+                include_patterns=self._include_patterns,
+                exclude_patterns=self._exclude_patterns,
+                is_excluded_func=self._is_excluded_for_scan,
+            )
+            print(f"[default] Quick scan found +{len(changes.to_add)} ~{len(changes.to_modify)} -{len(changes.to_delete)} in {time.time()-start:.2f}s", file=sys.stderr, flush=True)
+
+            # Clear dirty flag after successful scan
+            self._dirty = False
+
+            # Apply changes using the optimized method
+            changes_made = self._apply_sync_changes(reter, changes)
+        else:
+            # Fallback to old method if no state manager
+            print(f"[default] Scanning filesystem (fallback)...", file=sys.stderr, flush=True)
+            current_files = self._scan_project_files()
+            print(f"[default] Found {len(current_files)} code files in {time.time()-start:.2f}s", file=sys.stderr, flush=True)
+
+            print(f"[default] Querying existing sources...", file=sys.stderr, flush=True)
+            existing_sources = self._get_existing_sources(reter)
+            print(f"[default] Found {len(existing_sources)} sources already loaded in {time.time()-start:.2f}s", file=sys.stderr, flush=True)
+
+            print(f"[default] Syncing files...", file=sys.stderr, flush=True)
+            changes_made = self._sync_files(reter, current_files, existing_sources)
+
+            # Clear dirty flag after fallback scan too
+            self._dirty = False
+
         print(f"[default] Sync completed in {time.time()-start:.2f}s", file=sys.stderr, flush=True)
 
         # Auto-save snapshot if any changes were made
         if changes_made:
             self._persistence.snapshots_dir.mkdir(parents=True, exist_ok=True)
-            snapshot_path = self._persistence.snapshots_dir / ".default.reter"  # Leading dot matches persistence convention
+            snapshot_path = self._persistence.snapshots_dir / ".default.reter"
             print(f"[default] Saving snapshot to {snapshot_path}...", file=sys.stderr, flush=True)
             save_start = time.time()
             reter.save_network(str(snapshot_path))
             reter.mark_clean()
+            # Also save source state
+            if self._source_state:
+                self._source_state.save()
             print(f"[default] Snapshot saved in {time.time()-save_start:.2f}s (total: {time.time()-start:.2f}s)", file=sys.stderr, flush=True)
         else:
             print(f"[default] No changes detected, skipping snapshot save (total: {time.time()-start:.2f}s)", file=sys.stderr, flush=True)
 
         self._initialized = True
 
+        # Start file watcher after first successful sync
+        if not self._watcher_started:
+            self.start_file_watcher()
+
         # Initialize RAG index if configured (lazy initialization)
-        # This ensures RAG is ready for semantic search after first use
         if self._rag_manager and self._rag_manager.is_enabled and not self._rag_manager.is_initialized:
             print(f"[default] Initializing RAG index...", file=sys.stderr, flush=True)
             try:
                 rag_start = time.time()
-                # sync_sources calls initialize() internally and indexes all sources
                 rag_stats = self._rag_manager.sync_sources(
                     reter=reter,
                     project_root=self._project_root,
@@ -328,6 +534,196 @@ class DefaultInstanceManager:
                 debug_log(f"[default] RAG initialization error: {traceback.format_exc()}")
 
         return None  # No rebuild needed, sync completed in-place
+
+    def _apply_sync_changes(self, reter: ReterWrapper, changes: SyncChanges) -> bool:
+        """
+        Apply sync changes from SourceStateManager to RETER.
+
+        Args:
+            reter: ReterWrapper instance
+            changes: SyncChanges with files to add, modify, or delete
+
+        Returns:
+            True if any changes were made
+        """
+        if not changes.has_changes:
+            return False
+
+        added_count = 0
+        modified_count = 0
+        deleted_count = 0
+        errors = []
+
+        # Track source IDs for RAG sync (separated by language)
+        changed_python_sources: List[str] = []
+        deleted_python_sources: List[str] = []
+        changed_javascript_sources: List[str] = []
+        deleted_javascript_sources: List[str] = []
+        changed_html_sources: List[str] = []
+        deleted_html_sources: List[str] = []
+        changed_csharp_sources: List[str] = []
+        deleted_csharp_sources: List[str] = []
+        changed_cpp_sources: List[str] = []
+        deleted_cpp_sources: List[str] = []
+
+        def track_changed_source(rel_path: str, source_id: str) -> None:
+            """Add source to appropriate changed list based on file extension."""
+            ext = Path(rel_path).suffix.lower()
+            if ext in self.PYTHON_EXTENSIONS:
+                changed_python_sources.append(source_id)
+            elif ext in self.JAVASCRIPT_EXTENSIONS:
+                changed_javascript_sources.append(source_id)
+            elif ext in self.HTML_EXTENSIONS:
+                changed_html_sources.append(source_id)
+            elif ext in self.CSHARP_EXTENSIONS:
+                changed_csharp_sources.append(source_id)
+            elif ext in self.CPP_EXTENSIONS:
+                changed_cpp_sources.append(source_id)
+
+        def track_deleted_source(rel_path: str, source_id: str) -> None:
+            """Add source to appropriate deleted list based on file extension."""
+            ext = Path(rel_path).suffix.lower()
+            if ext in self.PYTHON_EXTENSIONS:
+                deleted_python_sources.append(source_id)
+            elif ext in self.JAVASCRIPT_EXTENSIONS:
+                deleted_javascript_sources.append(source_id)
+            elif ext in self.HTML_EXTENSIONS:
+                deleted_html_sources.append(source_id)
+            elif ext in self.CSHARP_EXTENSIONS:
+                deleted_csharp_sources.append(source_id)
+            elif ext in self.CPP_EXTENSIONS:
+                deleted_cpp_sources.append(source_id)
+
+        # Scan for Python package roots if we have changes
+        if changes.to_add or changes.to_modify:
+            self._package_roots = ReterWrapper.scan_package_roots(str(self._project_root))
+
+        # Process deletions first
+        for file_info in changes.to_delete:
+            if file_info.reter_source_id:
+                print(f"[default] Forgetting deleted file: {file_info.rel_path}", file=sys.stderr, flush=True)
+                try:
+                    reter.forget_source(file_info.reter_source_id)
+                    deleted_count += 1
+                    track_deleted_source(file_info.rel_path, file_info.reter_source_id)
+                    # Remove from state
+                    if self._source_state:
+                        self._source_state.remove_file(file_info.rel_path)
+                except Exception as e:
+                    error_msg = f"Error forgetting {file_info.rel_path}: {type(e).__name__}: {e}"
+                    print(f"[default]   ✗ {error_msg}", file=sys.stderr, flush=True)
+                    errors.append(error_msg)
+
+        # Process modifications (forget then reload)
+        for new_info, old_info in changes.to_modify:
+            print(f"[default] Reloading modified file: {new_info.rel_path}", file=sys.stderr, flush=True)
+            try:
+                # Forget old version
+                if old_info.reter_source_id:
+                    reter.forget_source(old_info.reter_source_id)
+                    track_deleted_source(old_info.rel_path, old_info.reter_source_id)
+
+                # Load new version
+                self._load_code_file(reter, new_info.abs_path, new_info.rel_path)
+                modified_count += 1
+
+                # Update state
+                source_id = f"{new_info.md5}|{new_info.rel_path}"
+                new_info.in_reter = True
+                new_info.reter_source_id = source_id
+                if self._source_state:
+                    self._source_state.set_file(new_info)
+                track_changed_source(new_info.rel_path, source_id)
+
+            except Exception as e:
+                error_msg = f"Error reloading {new_info.rel_path}: {type(e).__name__}: {e}"
+                print(f"[default]   ✗ {error_msg}", file=sys.stderr, flush=True)
+                errors.append(error_msg)
+
+        # Process additions
+        for file_info in changes.to_add:
+            print(f"[default] Adding new file: {file_info.rel_path}", file=sys.stderr, flush=True)
+            try:
+                self._load_code_file(reter, file_info.abs_path, file_info.rel_path)
+                added_count += 1
+
+                # Update state
+                source_id = f"{file_info.md5}|{file_info.rel_path}"
+                file_info.in_reter = True
+                file_info.reter_source_id = source_id
+                if self._source_state:
+                    self._source_state.set_file(file_info)
+                track_changed_source(file_info.rel_path, source_id)
+
+            except Exception as e:
+                error_msg = f"Error loading {file_info.rel_path}: {type(e).__name__}: {e}"
+                print(f"[default]   ✗ {error_msg}", file=sys.stderr, flush=True)
+                errors.append(error_msg)
+
+        if errors:
+            print(f"[default] Sync completed with {len(errors)} errors", file=sys.stderr, flush=True)
+
+        changes_made = added_count > 0 or modified_count > 0 or deleted_count > 0
+
+        if changes_made:
+            print(f"[default] Sync complete: +{added_count} ~{modified_count} -{deleted_count}", file=sys.stderr)
+
+        # Track modifications for compaction
+        modification_ops = modified_count + deleted_count
+        if modification_ops > 0:
+            self._modification_count += modification_ops
+            debug_log(f"[default] Modification count: {self._modification_count} (threshold: {self.REBUILD_THRESHOLD})")
+
+        # Sync with RAG index if configured
+        if self._rag_manager and self._rag_manager.is_enabled and self._rag_manager.is_initialized:
+            has_changes = (
+                changed_python_sources or deleted_python_sources or
+                changed_javascript_sources or deleted_javascript_sources or
+                changed_html_sources or deleted_html_sources or
+                changed_csharp_sources or deleted_csharp_sources or
+                changed_cpp_sources or deleted_cpp_sources
+            )
+            if has_changes:
+                print(f"[default] Syncing RAG index...", file=sys.stderr, flush=True)
+                try:
+                    rag_stats = self._rag_manager.sync(
+                        reter=reter,
+                        changed_python_sources=changed_python_sources,
+                        deleted_python_sources=deleted_python_sources,
+                        project_root=self._project_root,
+                        changed_javascript_sources=changed_javascript_sources,
+                        deleted_javascript_sources=deleted_javascript_sources,
+                        changed_html_sources=changed_html_sources,
+                        deleted_html_sources=deleted_html_sources,
+                        changed_csharp_sources=changed_csharp_sources,
+                        deleted_csharp_sources=deleted_csharp_sources,
+                        changed_cpp_sources=changed_cpp_sources,
+                        deleted_cpp_sources=deleted_cpp_sources,
+                    )
+                    total_added = (
+                        rag_stats.get('python_vectors_added', 0) +
+                        rag_stats.get('javascript_vectors_added', 0) +
+                        rag_stats.get('html_vectors_added', 0) +
+                        rag_stats.get('csharp_vectors_added', 0) +
+                        rag_stats.get('cpp_vectors_added', 0)
+                    )
+                    print(
+                        f"[default] RAG sync: +{total_added} vectors "
+                        f"in {rag_stats.get('time_ms', 0)}ms",
+                        file=sys.stderr, flush=True
+                    )
+
+                    # Mark files as indexed in RAG
+                    if self._source_state:
+                        for source_id in changed_python_sources + changed_javascript_sources + changed_html_sources + changed_csharp_sources + changed_cpp_sources:
+                            if "|" in source_id:
+                                _, rel_path = source_id.split("|", 1)
+                                self._source_state.mark_in_rag(rel_path)
+
+                except Exception as e:
+                    print(f"[default] RAG sync error: {e}", file=sys.stderr, flush=True)
+
+        return changes_made
 
     # Supported file extensions for code analysis
     PYTHON_EXTENSIONS = {".py"}
@@ -452,14 +848,40 @@ class DefaultInstanceManager:
         """
         path_str = str(rel_path).replace('\\', '/')
 
-        # Check gitignore patterns first
+        # Check gitignore patterns first (use fast method if available)
         if self._gitignore_parser is not None:
-            if self._gitignore_parser.is_ignored(rel_path):
+            if self._gitignore_parser.is_ignored_fast(path_str):
                 return True
 
         # Check explicit exclude patterns
         for pattern in self._exclude_patterns:
             # Simple glob pattern matching
+            if self._matches_pattern(path_str, pattern):
+                return True
+
+        return False
+
+    def _is_excluded_for_scan(self, rel_path: Path) -> bool:
+        """
+        Fast exclusion check for use during filesystem scan.
+
+        Uses pre-loaded gitignore patterns for maximum performance.
+
+        Args:
+            rel_path: Relative path to check
+
+        Returns:
+            True if file should be excluded
+        """
+        path_str = str(rel_path).replace('\\', '/')
+
+        # Check gitignore patterns (pre-loaded, no lazy loading)
+        if self._gitignore_parser is not None:
+            if self._gitignore_parser.is_ignored_fast(path_str):
+                return True
+
+        # Check explicit exclude patterns
+        for pattern in self._exclude_patterns:
             if self._matches_pattern(path_str, pattern):
                 return True
 
