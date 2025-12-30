@@ -409,6 +409,49 @@ def build_pipeline_factory(spec: CADSLToolSpec,
                 from .transformer import ComputeStep
                 pipeline = pipeline >> ComputeStep(step_spec.get("fields", {}))
 
+            elif step_type == "render_chart":
+                # Render data as chart (bar, line, pie)
+                from .transformer import RenderChartStep
+                pipeline = pipeline >> RenderChartStep(
+                    chart_type=step_spec.get("chart_type", "bar"),
+                    x=step_spec.get("x"),
+                    y=step_spec.get("y"),
+                    series=step_spec.get("series"),
+                    title=step_spec.get("title"),
+                    format=step_spec.get("format", "mermaid"),
+                    colors=step_spec.get("colors"),
+                    stacked=step_spec.get("stacked", False),
+                    horizontal=step_spec.get("horizontal", False),
+                )
+
+            elif step_type == "render_mermaid":
+                # Render to Mermaid diagram
+                from .transformer import RenderMermaidStep
+                pipeline = pipeline >> RenderMermaidStep(
+                    mermaid_type=step_spec.get("mermaid_type", "flowchart"),
+                    nodes=step_spec.get("nodes"),
+                    edges_from=step_spec.get("edges_from"),
+                    edges_to=step_spec.get("edges_to"),
+                    direction=step_spec.get("direction", "TB"),
+                    title=step_spec.get("title"),
+                    participants=step_spec.get("participants"),
+                    messages_from=step_spec.get("messages_from"),
+                    messages_to=step_spec.get("messages_to"),
+                    messages_label=step_spec.get("messages_label"),
+                    classes=step_spec.get("classes"),
+                    methods=step_spec.get("methods"),
+                    attributes=step_spec.get("attributes"),
+                    inheritance_from=step_spec.get("inheritance_from"),
+                    inheritance_to=step_spec.get("inheritance_to"),
+                    labels=step_spec.get("labels"),
+                    values=step_spec.get("values"),
+                    states=step_spec.get("states"),
+                    transitions_from=step_spec.get("transitions_from"),
+                    transitions_to=step_spec.get("transitions_to"),
+                    entities=step_spec.get("entities"),
+                    relationships=step_spec.get("relationships"),
+                )
+
         if emit_key:
             pipeline = pipeline.emit(emit_key)
 

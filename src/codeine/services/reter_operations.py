@@ -741,13 +741,16 @@ class ReterOperations:
                     else:
                         results = table.to_pylist()
                         count = len(results)
-                        # Convert None values to "null" string sentinel
+                        # Get all column names from schema
+                        # PyArrow's to_pylist() may not include keys for null values
+                        column_names = table.column_names
+                        # Ensure all columns are present in each row with "null" sentinel
                         # MCP protocol uses exclude_none=True which strips None values
                         # This preserves OPTIONAL clause null results
                         for row in results:
-                            for key, value in row.items():
-                                if value is None:
-                                    row[key] = "null"
+                            for col_name in column_names:
+                                if col_name not in row or row[col_name] is None:
+                                    row[col_name] = "null"
 
                     execution_time_ms = 0  # reql doesn't return time yet
                 except Exception as query_error:

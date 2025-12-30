@@ -1,0 +1,50 @@
+## REQL Formal Grammar (Lark Format)
+
+Your query must conform to this grammar:
+
+```lark
+{GRAMMAR}
+```
+
+## Common Syntax Errors and Fixes
+
+### FILTER requires parentheses
+WRONG:  FILTER ?x > 5
+RIGHT:  FILTER(?x > 5)
+
+### Use "!" to negate functions, NOT only works with EXISTS
+WRONG:  FILTER(NOT REGEX(?x, "pat"))
+RIGHT:  FILTER(!REGEX(?x, "pat"))
+
+WRONG:  FILTER(NOT CONTAINS(?x, "str"))
+RIGHT:  FILTER(!CONTAINS(?x, "str"))
+
+### Pattern negation uses NOT EXISTS
+RIGHT:  FILTER(NOT EXISTS { ?x deleted true })
+
+### Triple patterns need dots between them
+WRONG:  ?x type py:Class ?x name ?n
+RIGHT:  ?x type py:Class . ?x name ?n
+
+### Semicolon for same subject
+RIGHT:  ?x type py:Class ; name ?n ; inFile ?f
+
+### UNION must be inside WHERE braces
+WRONG:  WHERE { ?x type A } UNION { ?x type B }
+RIGHT:  WHERE { { ?x type A } UNION { ?x type B } }
+
+### Aggregate with alias needs parentheses
+WRONG:  SELECT COUNT(?x) AS ?count WHERE ...
+RIGHT:  SELECT (COUNT(?x) AS ?count) WHERE ...
+
+### String literals use quotes
+RIGHT:  ?x name "MyClass"
+RIGHT:  ?x name 'MyClass'
+
+### HAVING clause needs parentheses
+WRONG:  HAVING ?count > 5
+RIGHT:  HAVING (?count > 5)
+
+### ORDER BY with DESC needs parentheses for expressions
+RIGHT:  ORDER BY DESC(?count)
+RIGHT:  ORDER BY ?name

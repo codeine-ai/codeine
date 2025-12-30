@@ -626,8 +626,12 @@ class GroupByStep(Step[List[Dict], Dict[str, Any]]):
     key_fn: Optional[Callable[[Dict], str]] = None
     aggregate_fn: Optional[Callable[[List[Dict]], Any]] = None
 
-    def execute(self, data: List[Dict], ctx: Optional["Context"] = None) -> PipelineResult[Dict[str, Any]]:
+    def execute(self, data: Union[pa.Table, List[Dict]], ctx: Optional["Context"] = None) -> PipelineResult[Dict[str, Any]]:
         try:
+            # Convert Arrow table to list of dicts
+            if is_arrow(data):
+                data = data.to_pylist()
+
             groups: Dict[str, List[Dict]] = {}
             for item in data:
                 if self.key_fn:

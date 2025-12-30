@@ -54,11 +54,30 @@ def dict_list_to_table(data: List[Dict[str, Any]]) -> pa.Table:
     return pa.table(columns)
 
 
-def table_to_dict_list(table: pa.Table) -> List[Dict[str, Any]]:
-    """Convert PyArrow table to list of dicts."""
+def table_to_dict_list(table: pa.Table, preserve_nulls: bool = True) -> List[Dict[str, Any]]:
+    """Convert PyArrow table to list of dicts.
+
+    Args:
+        table: PyArrow table to convert
+        preserve_nulls: If True, ensures all columns from schema are present in each row,
+                       even if the value is None. This is important for OPTIONAL clause results
+                       where PyArrow's to_pylist() may omit keys for null values.
+    """
     if table is None or table.num_rows == 0:
         return []
-    return table.to_pylist()
+
+    results = table.to_pylist()
+
+    if preserve_nulls:
+        # PyArrow's to_pylist() may not include keys for null values (e.g., from OPTIONAL)
+        # Ensure all columns from the schema are present in each row
+        column_names = table.column_names
+        for row in results:
+            for col_name in column_names:
+                if col_name not in row:
+                    row[col_name] = None
+
+    return results
 
 
 def ensure_table(data: Union[pa.Table, List[Dict[str, Any]]]) -> pa.Table:
