@@ -63,11 +63,14 @@ async def anthropic_sampling_handler(
     context: Any
 ) -> CreateMessageResult:
     """
-    Sampling handler that uses Anthropic's API.
+    Sampling handler that uses Anthropic's API with prompt caching.
+
+    Uses Anthropic's prompt caching feature to cache system prompts,
+    reducing latency and costs for repeated queries with the same prompts.
 
     Environment variables:
         ANTHROPIC_API_KEY: Required. Your Anthropic API key.
-        ANTHROPIC_MODEL_NAME: Optional. Model to use (default: claude-sonnet-4-20250514)
+        ANTHROPIC_MODEL_NAME: Optional. Model to use (default: claude-opus-4-5-20251101)
         ANTHROPIC_MAX_TOKENS: Optional. Max tokens for response (default: 1024)
     """
     try:
@@ -80,7 +83,7 @@ async def anthropic_sampling_handler(
         raise ValueError("ANTHROPIC_API_KEY environment variable not set")
 
     # Get configurable settings from environment
-    model_name = os.getenv("ANTHROPIC_MODEL_NAME", "claude-sonnet-4-20250514")
+    model_name = os.getenv("ANTHROPIC_MODEL_NAME", "claude-opus-4-5-20251101")
     default_max_tokens = int(os.getenv("ANTHROPIC_MAX_TOKENS", "1024"))
 
     client = anthropic.Anthropic(api_key=api_key)
@@ -98,13 +101,37 @@ async def anthropic_sampling_handler(
             "content": text
         })
 
-    # Call Anthropic API
+    # Build system prompt with cache_control for prompt caching
+    # Prompt caching requires minimum 1024 tokens for Sonnet/Opus 4
+    # If prompt is shorter, caching is silently skipped (no error)
+    system_prompt = params.systemPrompt or ""
+    if system_prompt:
+        system_content = [
+            {
+                "type": "text",
+                "text": system_prompt,
+                "cache_control": {"type": "ephemeral"}
+            }
+        ]
+    else:
+        system_content = []
+
+    # Call Anthropic API with prompt caching
     response = client.messages.create(
         model=model_name,
         max_tokens=params.maxTokens or default_max_tokens,
-        system=params.systemPrompt or "",
+        system=system_content,
         messages=anthropic_messages
     )
+
+    # Log cache performance (helps track caching effectiveness)
+    usage = response.usage
+    if hasattr(usage, 'cache_read_input_tokens') or hasattr(usage, 'cache_creation_input_tokens'):
+        cache_read = getattr(usage, 'cache_read_input_tokens', 0) or 0
+        cache_write = getattr(usage, 'cache_creation_input_tokens', 0) or 0
+        if cache_read > 0 or cache_write > 0:
+            print(f"[CACHE] read={cache_read}, write={cache_write}, input={usage.input_tokens}",
+                  file=sys.stderr)
 
     # Extract response text
     response_text = response.content[0].text if response.content else ""

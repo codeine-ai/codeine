@@ -154,3 +154,4 @@ IMPORTANT:
 4. For semantic queries, use rag { search } or rag { duplicates }
 5. Always include | emit { results } or | emit { findings } at the end
 6. Use parameters with {param_name} syntax for user-provided values
+7. Inside REQL blocks, do NOT use comments - REQL does not support `#` or `//` comments

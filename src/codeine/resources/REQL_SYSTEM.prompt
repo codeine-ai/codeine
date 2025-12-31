@@ -284,3 +284,4 @@ IMPORTANT:
 8. UNION must be INSIDE the WHERE clause: `{ pattern1 } UNION { pattern2 } .`
 9. The `calls` predicate works uniformly across all languages for call graph analysis
 10. Use `inFile` (not `inModule`) for file path filtering across all languages
+11. REQL does NOT support comments - do NOT include `#` or `//` comments in your query

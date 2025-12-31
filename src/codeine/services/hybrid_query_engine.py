@@ -15,10 +15,312 @@ import re
 import json
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Any, List, Optional
-from dataclasses import dataclass
+from typing import Dict, Any, List, Optional, Tuple
+from dataclasses import dataclass, field
+
+import numpy as np
 
 from ..logging_config import nlq_debug_logger as debug_log
+
+
+# ============================================================
+# CADSL TOOL INDEX FOR CASE-BASED REASONING
+# ============================================================
+
+@dataclass
+class CADSLToolMetadata:
+    """Metadata extracted from a CADSL tool file."""
+    name: str
+    file_path: Path
+    category: str
+    tool_type: str  # detector, query, diagram
+    description: str
+    docstring: str
+    severity: Optional[str] = None
+    keywords: List[str] = field(default_factory=list)
+    embedding_text: str = ""  # Text used for semantic embedding
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "name": self.name,
+            "category": self.category,
+            "tool_type": self.tool_type,
+            "description": self.description,
+            "severity": self.severity,
+            "keywords": self.keywords,
+        }
+
+
+class CADSLToolIndex:
+    """
+    Index of CADSL tools for case-based reasoning.
+
+    Uses sentence-transformers embeddings for semantic similarity matching.
+    Scans CADSL tool files and creates embeddings for efficient search.
+    """
+
+    def __init__(self, tools_dir: Optional[Path] = None):
+        self.tools_dir = tools_dir or _CADSL_TOOLS_DIR
+        self._tools: Dict[str, CADSLToolMetadata] = {}
+        self._tool_names: List[str] = []  # Ordered list for embedding index mapping
+        self._embeddings: Optional[np.ndarray] = None
+        self._embedding_service = None
+        self._indexed = False
+
+    def _get_embedding_service(self):
+        """Lazy-load the embedding service."""
+        if self._embedding_service is None:
+            from .embedding_service import get_embedding_service
+            self._embedding_service = get_embedding_service()
+        return self._embedding_service
+
+    def index(self) -> None:
+        """Scan and index all CADSL tool files with semantic embeddings."""
+        if self._indexed:
+            return
+
+        if not self.tools_dir.exists():
+            debug_log.warning(f"CADSL tools directory not found: {self.tools_dir}")
+            return
+
+        # First pass: extract metadata
+        for cadsl_file in self.tools_dir.rglob("*.cadsl"):
+            try:
+                metadata = self._extract_metadata(cadsl_file)
+                if metadata:
+                    self._tools[metadata.name] = metadata
+                    self._tool_names.append(metadata.name)
+            except Exception as e:
+                debug_log.debug(f"Failed to index {cadsl_file}: {e}")
+
+        if not self._tools:
+            self._indexed = True
+            return
+
+        # Second pass: generate embeddings
+        try:
+            embedding_service = self._get_embedding_service()
+            texts = [self._tools[name].embedding_text for name in self._tool_names]
+            self._embeddings = embedding_service.generate_embeddings_batch(texts)
+            debug_log.debug(f"Generated embeddings for {len(self._tools)} CADSL tools")
+        except Exception as e:
+            debug_log.warning(f"Failed to generate embeddings, falling back to keyword matching: {e}")
+            self._embeddings = None
+
+        self._indexed = True
+        debug_log.debug(f"Indexed {len(self._tools)} CADSL tools with semantic embeddings")
+
+    def _extract_metadata(self, file_path: Path) -> Optional[CADSLToolMetadata]:
+        """Extract metadata from a CADSL file."""
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        # Extract header comments (description)
+        header_lines = []
+        for line in content.split('\n'):
+            if line.startswith('#'):
+                header_lines.append(line.lstrip('#').strip())
+            elif line.strip() and not line.startswith('#'):
+                break
+        description = ' '.join(header_lines)
+
+        # Extract tool definition: detector/query/diagram name(...)
+        tool_match = re.search(
+            r'(detector|query|diagram)\s+(\w+)\s*\(([^)]*)\)',
+            content
+        )
+        if not tool_match:
+            return None
+
+        tool_type = tool_match.group(1)
+        tool_name = tool_match.group(2)
+        params_str = tool_match.group(3)
+
+        # Extract category and severity from params
+        category = file_path.parent.name  # Default to directory name
+        severity = None
+
+        cat_match = re.search(r'category\s*=\s*"([^"]+)"', params_str)
+        if cat_match:
+            category = cat_match.group(1)
+
+        sev_match = re.search(r'severity\s*=\s*"([^"]+)"', params_str)
+        if sev_match:
+            severity = sev_match.group(1)
+
+        # Extract docstring
+        docstring_match = re.search(r'"""([^"]+)"""', content)
+        docstring = docstring_match.group(1).strip() if docstring_match else ""
+
+        # Build rich embedding text for semantic search
+        # Include name (with underscores replaced), description, docstring, and category
+        name_readable = tool_name.replace('_', ' ')
+        embedding_text = f"{name_readable}. {description} {docstring} Category: {category}"
+
+        # Generate keywords for fallback matching
+        text = f"{tool_name} {description} {docstring}".lower()
+        keywords = self._extract_keywords(text)
+
+        return CADSLToolMetadata(
+            name=tool_name,
+            file_path=file_path,
+            category=category,
+            tool_type=tool_type,
+            description=description,
+            docstring=docstring,
+            severity=severity,
+            keywords=keywords,
+            embedding_text=embedding_text,
+        )
+
+    def _extract_keywords(self, text: str) -> List[str]:
+        """Extract meaningful keywords from text (used as fallback)."""
+        keywords = set()
+        keyword_patterns = [
+            r'\b(god\s*class|large\s*class)\b', r'\b(long\s*method)\b',
+            r'\b(dead\s*code|unused)\b', r'\b(duplicate|clone)\b',
+            r'\b(magic\s*number)\b', r'\b(exception|error)\b',
+            r'\b(silent|swallow)\b', r'\b(import|circular)\b',
+            r'\b(test|untested)\b', r'\b(singleton|factory)\b',
+            r'\b(class|method|function)\b', r'\b(diagram|graph)\b',
+        ]
+        for pattern in keyword_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                keywords.add(match.group(1).lower().replace(' ', '_'))
+        return list(keywords)
+
+    def find_similar_tools(
+        self,
+        question: str,
+        max_results: int = 3,
+        min_score: float = 0.3
+    ) -> List[Tuple[CADSLToolMetadata, float]]:
+        """
+        Find CADSL tools similar to the given question using semantic embeddings.
+
+        Uses sentence-transformers for semantic similarity matching.
+        Falls back to keyword matching if embeddings are unavailable.
+
+        Args:
+            question: Natural language question
+            max_results: Maximum number of similar tools to return
+            min_score: Minimum similarity score (0-1)
+
+        Returns:
+            List of (metadata, score) tuples sorted by score descending
+        """
+        self.index()
+
+        if not self._tools:
+            return []
+
+        # Use semantic similarity if embeddings are available
+        if self._embeddings is not None:
+            return self._find_similar_semantic(question, max_results, min_score)
+        else:
+            return self._find_similar_keyword(question, max_results, min_score)
+
+    def _find_similar_semantic(
+        self,
+        question: str,
+        max_results: int,
+        min_score: float
+    ) -> List[Tuple[CADSLToolMetadata, float]]:
+        """Find similar tools using semantic embeddings."""
+        try:
+            embedding_service = self._get_embedding_service()
+
+            # Generate embedding for query
+            query_embedding = embedding_service.generate_embedding(question)
+
+            # Compute similarities
+            similarities = embedding_service.compute_similarities_batch(
+                query_embedding, self._embeddings
+            )
+
+            # Get top results above threshold
+            results = []
+            for idx, score in enumerate(similarities):
+                if score >= min_score:
+                    tool_name = self._tool_names[idx]
+                    results.append((self._tools[tool_name], float(score)))
+
+            # Sort by score descending
+            results.sort(key=lambda x: x[1], reverse=True)
+
+            debug_log.debug(
+                f"Semantic search for '{question[:50]}...': "
+                f"found {len(results)} matches, top={results[0][0].name if results else 'none'}"
+            )
+
+            return results[:max_results]
+
+        except Exception as e:
+            debug_log.warning(f"Semantic search failed, falling back to keywords: {e}")
+            return self._find_similar_keyword(question, max_results, min_score)
+
+    def _find_similar_keyword(
+        self,
+        question: str,
+        max_results: int,
+        min_score: float
+    ) -> List[Tuple[CADSLToolMetadata, float]]:
+        """Fallback: find similar tools using keyword matching."""
+        question_lower = question.lower()
+        question_keywords = set(self._extract_keywords(question_lower))
+        question_words = set(re.findall(r'\b[a-z]{3,}\b', question_lower))
+
+        scores = []
+        for name, metadata in self._tools.items():
+            score = 0.0
+
+            # Keyword overlap
+            tool_keywords = set(metadata.keywords)
+            if tool_keywords:
+                overlap = len(question_keywords & tool_keywords)
+                score += (overlap / len(tool_keywords)) * 0.5
+
+            # Name matching
+            name_lower = name.lower().replace('_', ' ')
+            if any(word in name_lower for word in question_words if len(word) > 3):
+                score += 0.3
+            if name_lower in question_lower:
+                score += 0.5
+
+            if score >= min_score:
+                scores.append((metadata, min(score, 1.0)))
+
+        scores.sort(key=lambda x: x[1], reverse=True)
+        return scores[:max_results]
+
+    def get_tool_content(self, name: str) -> Optional[str]:
+        """Get the full content of a CADSL tool file."""
+        self.index()
+
+        if name not in self._tools:
+            return None
+
+        metadata = self._tools[name]
+        with open(metadata.file_path, 'r', encoding='utf-8') as f:
+            return f.read()
+
+    def get_all_tools(self) -> Dict[str, CADSLToolMetadata]:
+        """Get all indexed tools."""
+        self.index()
+        return self._tools.copy()
+
+
+# Global tool index singleton
+_cadsl_tool_index: Optional[CADSLToolIndex] = None
+
+
+def get_cadsl_tool_index() -> CADSLToolIndex:
+    """Get the global CADSL tool index."""
+    global _cadsl_tool_index
+    if _cadsl_tool_index is None:
+        _cadsl_tool_index = CADSLToolIndex()
+    return _cadsl_tool_index
 
 
 # ============================================================
@@ -203,27 +505,157 @@ class QueryType(Enum):
 
 
 @dataclass
+class SimilarTool:
+    """A similar CADSL tool found via case-based reasoning."""
+    name: str
+    score: float
+    category: str
+    description: str
+    content: str  # Full CADSL code
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "name": self.name,
+            "score": self.score,
+            "category": self.category,
+            "description": self.description,
+        }
+
+
+@dataclass
 class QueryClassification:
     """Result of classifying a natural language query."""
     query_type: QueryType
     confidence: float
     reasoning: str
     suggested_cadsl_tool: Optional[str] = None
+    similar_tools: List[SimilarTool] = field(default_factory=list)
+
+
+def find_similar_cadsl_tools(question: str, max_results: int = 3) -> List[SimilarTool]:
+    """
+    Find CADSL tools similar to the question using case-based reasoning.
+
+    Args:
+        question: Natural language question
+        max_results: Maximum number of similar tools to return
+
+    Returns:
+        List of SimilarTool instances with content
+    """
+    tool_index = get_cadsl_tool_index()
+    similar = tool_index.find_similar_tools(question, max_results=max_results)
+
+    result = []
+    for metadata, score in similar:
+        content = tool_index.get_tool_content(metadata.name)
+        if content:
+            result.append(SimilarTool(
+                name=metadata.name,
+                score=score,
+                category=metadata.category,
+                description=metadata.description,
+                content=content,
+            ))
+
+    return result
+
+
+def build_classification_context(similar_tools: List[SimilarTool]) -> str:
+    """
+    Build context about similar tools to help the classifier.
+
+    Args:
+        similar_tools: List of similar CADSL tools found
+
+    Returns:
+        Context string to append to classification prompt
+    """
+    if not similar_tools:
+        return ""
+
+    lines = ["\n\n## Available Similar Tools (from case-based reasoning)"]
+    lines.append("These existing CADSL tools match your query semantically:")
+
+    for tool in similar_tools:
+        tool_type = "REQL-based" if "reql" in tool.content.lower() else "CADSL pipeline"
+        lines.append(f"- **{tool.name}** ({tool.category}, score: {tool.score:.2f}): {tool.description[:100]}...")
+        lines.append(f"  Type: {tool_type}")
+
+    lines.append("\nIf a similar tool exists, prefer REQL or CADSL over RAG for structural queries.")
+
+    return "\n".join(lines)
+
+
+def _check_keyword_rag_routing(question: str) -> Optional[QueryClassification]:
+    """
+    Fast-path keyword check for queries that MUST use RAG.
+
+    Some query types (duplicate detection, similarity search) always require
+    semantic embeddings and should never use REQL structural queries.
+
+    Returns:
+        QueryClassification if keyword match, None to proceed with LLM classification
+    """
+    question_lower = question.lower()
+
+    # Keywords that REQUIRE RAG (semantic comparison needed)
+    rag_keywords = [
+        "duplicate", "duplicated", "duplication",
+        "similar code", "similar methods", "similar functions", "similar classes",
+        "clone", "cloned", "code clone",
+        "copy", "copied",
+        "redundant", "repeated code", "code repetition",
+        "same code", "identical code",
+        "find similar", "detect similar",
+    ]
+
+    for keyword in rag_keywords:
+        if keyword in question_lower:
+            debug_log.debug(f"KEYWORD RAG ROUTING: '{keyword}' detected, forcing RAG")
+            return QueryClassification(
+                query_type=QueryType.RAG,
+                confidence=1.0,
+                reasoning=f"Keyword '{keyword}' requires semantic similarity analysis (RAG)",
+                similar_tools=[],
+            )
+
+    return None
 
 
 async def classify_query_with_llm(question: str, ctx) -> QueryClassification:
     """
     Use LLM to classify a natural language query.
 
+    First checks for keywords that MUST use RAG (duplicate/similar detection),
+    then performs case-based reasoning to find similar CADSL tools,
+    then passes them to the classifier as context to improve routing.
+
     Args:
         question: The natural language question
         ctx: MCP context for LLM sampling
 
     Returns:
-        QueryClassification with type and reasoning
+        QueryClassification with type, reasoning, and similar tools
     """
+    # Fast-path: check for keywords that require RAG
+    keyword_classification = _check_keyword_rag_routing(question)
+    if keyword_classification:
+        return keyword_classification
+
+    # Case-based reasoning: find similar CADSL tools FIRST
+    # This helps the classifier make better routing decisions
+    similar_tools = find_similar_cadsl_tools(question, max_results=3)
+    if similar_tools:
+        tool_names = [t.name for t in similar_tools]
+        debug_log.debug(f"CASE-BASED REASONING: Found similar tools: {tool_names}")
+
     try:
+        # Build prompt with similar tools context
         prompt = f"Classify this code analysis question:\n\n{question}"
+        classification_context = build_classification_context(similar_tools)
+        if classification_context:
+            prompt = prompt + classification_context
 
         response = await ctx.sample(prompt, system_prompt=CLASSIFICATION_SYSTEM_PROMPT)
         response_text = response.text if hasattr(response, 'text') else str(response)
@@ -243,7 +675,8 @@ async def classify_query_with_llm(question: str, ctx) -> QueryClassification:
             query_type=query_type,
             confidence=float(result.get("confidence", 0.8)),
             reasoning=result.get("reasoning", "LLM classification"),
-            suggested_cadsl_tool=result.get("suggested_tool")
+            suggested_cadsl_tool=result.get("suggested_tool"),
+            similar_tools=similar_tools,  # Always include similar tools
         )
 
     except Exception as e:
@@ -251,7 +684,8 @@ async def classify_query_with_llm(question: str, ctx) -> QueryClassification:
         return QueryClassification(
             query_type=QueryType.REQL,
             confidence=0.5,
-            reasoning=f"Fallback to REQL (classification error: {e})"
+            reasoning=f"Fallback to REQL (classification error: {e})",
+            similar_tools=similar_tools,  # Still include similar tools
         )
 
 
@@ -273,9 +707,46 @@ CRITICAL SYNTAX RULES:
 4. FILTER needs parentheses: `FILTER(?count > 5)`
 5. Separate patterns with dots: `?x type oo:Class . ?x name ?n`
 
-COMMON MISTAKE - NEVER do this:
+NOT SUPPORTED - DO NOT USE:
+- BIND(...AS ?var) - NOT available in REQL
+- VALUES ?var { ... } - NOT available in REQL
+- If you need labels, just omit them or use separate queries per type
+
+BOOLEAN PREDICATES (for code quality queries):
+Many boolean predicates exist for code analysis. Use them directly with `true`:
+- Exception handling: `?handler isSilentSwallow true`, `?handler bodyIsEmpty true`
+- Code patterns: `?literal isMagicNumber true`, `?method isAsync true`
+- Example: Find silent exception handlers:
+  SELECT ?handler ?file ?line WHERE {
+      ?handler type oo:CatchClause .
+      ?handler isSilentSwallow true .
+      ?handler inFile ?file .
+      ?handler atLine ?line
+  }
+
+AGGREGATION PATTERNS (for counting, finding "more than N", etc.):
+- Use (COUNT(?var) AS ?alias) in SELECT clause
+- Use GROUP BY for the variables you want to group by
+- Use HAVING (?alias > N) to filter by count (NOT FILTER!)
+- Example: "Find classes with more than 10 methods":
+  SELECT ?class ?name (COUNT(?method) AS ?method_count) WHERE {
+      ?class type oo:Class . ?class name ?name .
+      ?method type oo:Method . ?method definedIn ?class
+  }
+  GROUP BY ?class ?name
+  HAVING (?method_count > 10)
+  ORDER BY DESC(?method_count)
+
+COMMON MISTAKES:
   WRONG: `?x oo:Class .`           <- missing `type` predicate!
   RIGHT: `?x type oo:Class .`      <- always include `type`
+
+  WRONG: FILTER(?count > 5) for aggregation  <- FILTER is for row-level filtering
+  RIGHT: HAVING (?count > 5) for aggregation <- HAVING filters after GROUP BY
+
+  WRONG: BIND("label" AS ?type)    <- BIND not supported!
+  WRONG: VALUES ?type { "label" }  <- VALUES not supported!
+  RIGHT: Just query without labels, or run separate queries per type
 
 When ready, return ONLY the REQL query (no explanation).
 """
@@ -305,30 +776,75 @@ When ready, return ONLY the CADSL query (no explanation).
 """
 
 
+def build_similar_tools_section(similar_tools: List[SimilarTool]) -> str:
+    """
+    Build a prompt section with similar tools from case-based reasoning.
+
+    Args:
+        similar_tools: List of similar CADSL tools found
+
+    Returns:
+        Formatted string to include in the prompt
+    """
+    if not similar_tools:
+        return ""
+
+    sections = []
+    sections.append("\n## SIMILAR EXISTING TOOLS (Case-Based Reasoning)")
+    sections.append("I found these existing tools that are similar to your question.")
+    sections.append("You can use them as templates and modify as needed:\n")
+
+    for i, tool in enumerate(similar_tools, 1):
+        sections.append(f"### Similar Tool {i}: {tool.name} (score: {tool.score:.2f})")
+        sections.append(f"Category: {tool.category}")
+        sections.append(f"Description: {tool.description}")
+        sections.append("```cadsl")
+        sections.append(tool.content.strip())
+        sections.append("```\n")
+
+    sections.append("**TIP**: If one of these tools closely matches what you need,")
+    sections.append("you can adapt it with minor modifications instead of starting from scratch.")
+    sections.append("For REQL queries, extract the reql {} block and simplify as needed.\n")
+
+    return "\n".join(sections)
+
+
 async def generate_query_with_tools(
     question: str,
     query_type: QueryType,
     ctx,
-    max_iterations: int = 5
+    max_iterations: int = 5,
+    similar_tools: Optional[List[SimilarTool]] = None
 ) -> str:
     """
-    Generate a query using tool-augmented LLM.
+    Generate a query using tool-augmented LLM with case-based reasoning.
 
     The LLM can call tools to fetch grammars and examples before generating.
+    If similar tools are provided from case-based reasoning, they are included
+    as templates that the LLM can adapt.
 
     Args:
         question: Natural language question
         query_type: REQL or CADSL
         ctx: MCP context for sampling
         max_iterations: Maximum tool-use iterations
+        similar_tools: Similar CADSL tools from case-based reasoning
 
     Returns:
         Generated query string
     """
     system_prompt = REQL_GENERATION_PROMPT if query_type == QueryType.REQL else CADSL_GENERATION_PROMPT
 
+    # Build user message with similar tools if available
+    user_content = f"Generate a query for: {question}"
+
+    if similar_tools:
+        similar_section = build_similar_tools_section(similar_tools)
+        user_content = f"{user_content}\n{similar_section}"
+        debug_log.debug(f"Including {len(similar_tools)} similar tools as templates")
+
     messages = [
-        {"role": "user", "content": f"Generate a query for: {question}"}
+        {"role": "user", "content": user_content}
     ]
 
     for iteration in range(max_iterations):
@@ -451,16 +967,43 @@ Please fix the CADSL query to correct the error. Return ONLY the corrected query
 # ============================================================
 
 def build_rag_query_params(question: str) -> Dict[str, Any]:
-    """Extract RAG query parameters from natural language question."""
+    """Extract RAG query parameters from natural language question.
+
+    Detects three RAG modes:
+    - "search": Semantic similarity search (default)
+    - "duplicates": Find duplicate/similar code pairs
+    - "clusters": Find clusters of semantically similar code
+    """
     params = {
         "top_k": 20,
         "search_scope": "code",
         "include_content": False,
+        "analysis_type": "search",  # search, duplicates, or clusters
     }
 
     question_lower = question.lower()
     entity_types = []
 
+    # Detect duplicate/cluster analysis requests
+    duplicate_keywords = ["duplicate", "duplicated", "copy", "copied", "clone", "cloned",
+                          "similar code", "same code", "repeated code", "code repetition"]
+    cluster_keywords = ["cluster", "group similar", "semantic groups", "code groups",
+                        "similar patterns", "related code blocks"]
+
+    if any(kw in question_lower for kw in duplicate_keywords):
+        params["analysis_type"] = "duplicates"
+        params["similarity_threshold"] = 0.85  # Default similarity threshold
+        params["max_results"] = 50
+        params["exclude_same_file"] = True
+        params["exclude_same_class"] = True
+    elif any(kw in question_lower for kw in cluster_keywords):
+        params["analysis_type"] = "clusters"
+        params["n_clusters"] = 50
+        params["min_size"] = 2
+        params["exclude_same_file"] = True
+        params["exclude_same_class"] = True
+
+    # Entity type detection
     if "class" in question_lower and "method" not in question_lower:
         entity_types.append("class")
     if "method" in question_lower or "function" in question_lower:

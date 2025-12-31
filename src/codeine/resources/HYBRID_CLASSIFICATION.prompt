@@ -33,14 +33,22 @@ Examples:
 Use for questions about code MEANING or SIMILARITY:
 - Finding code similar to a description
 - Semantic search by concept
-- Finding duplicates or clones
+- Finding duplicates, clones, or similar code (ALWAYS use RAG for these!)
 - Questions about what code "does" rather than structure
+- Code similarity comparisons
+
+IMPORTANT: Any question about "duplicate", "similar", "clone", "copy", "redundant",
+or "repeated" code MUST use RAG, not REQL. These require semantic comparison.
 
 Examples:
 - "Find code similar to authentication handlers"
 - "Search for error handling patterns"
 - "Find duplicate implementations"
 - "What code handles user login?"
+- "Find duplicate code across the codebase"
+- "Which methods are similar to each other?"
+- "Find redundant functions"
+- "Detect code clones"
 
 ## Response Format
 Return ONLY a JSON object:

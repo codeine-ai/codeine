@@ -382,6 +382,16 @@ def build_pipeline_factory(spec: CADSLToolSpec,
                 fields = step_spec.get("fields", {})
                 pipeline = pipeline >> CollectStep(by_field, fields)
 
+            elif step_type == "join":
+                # Join with another source
+                from .transformer import JoinStep
+                pipeline = pipeline >> JoinStep(
+                    left_key=step_spec.get("left_key"),
+                    right_source_spec=step_spec.get("right_source"),
+                    right_key=step_spec.get("right_key"),
+                    join_type=step_spec.get("join_type", "inner"),
+                )
+
             elif step_type == "cross_join":
                 # Cartesian product
                 from .transformer import CrossJoinStep

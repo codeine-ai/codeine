@@ -4465,7 +4465,8 @@ class RAGIndexManager:
                     "docstring_preview": meta.get("docstring_preview", ""),
                 })
 
-                files_in_cluster.add(file_path)
+                # Normalize path for comparison (handle / vs \ differences)
+                files_in_cluster.add(file_path.replace("\\", "/"))
                 if class_name:
                     classes_in_cluster.add(class_name)
 
@@ -4595,8 +4596,12 @@ class RAGIndexManager:
             class1 = meta1.get("class_name", "")
             class2 = meta2.get("class_name", "")
 
+            # Normalize paths for comparison (handle / vs \ differences)
+            file1_norm = file1.replace("\\", "/")
+            file2_norm = file2.replace("\\", "/")
+
             # Apply exclusion filters
-            if exclude_same_file and file1 == file2:
+            if exclude_same_file and file1_norm == file2_norm:
                 continue
             if exclude_same_class and class1 and class1 == class2:
                 continue

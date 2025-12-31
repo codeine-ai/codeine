@@ -12,7 +12,7 @@ Supported settings in codeine.json:
 {
     "project_include": "src/*,lib/*",      // -> RETER_PROJECT_INCLUDE
     "project_exclude": "test_*.py,**/__pycache__/*",  // -> RETER_PROJECT_EXCLUDE
-    "anthropic_model": "claude-sonnet-4-20250514",    // -> ANTHROPIC_MODEL_NAME
+    "anthropic_model": "claude-opus-4-5-20251101",    // -> ANTHROPIC_MODEL_NAME
     "anthropic_max_tokens": 1024,          // -> ANTHROPIC_MAX_TOKENS
 
     // RAG Configuration

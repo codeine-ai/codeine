@@ -3108,6 +3108,13 @@ class JoinStep:
                 join_type=self.join_type
             )
 
+            # PyArrow join drops the right key column (since it equals left key).
+            # If the right key is different from left key name, add it back.
+            if right_col != left_col and right_col not in joined.column_names:
+                # Add right key column as copy of left key column
+                left_col_data = joined.column(left_col)
+                joined = joined.append_column(right_col, left_col_data)
+
             # Convert back to list of dicts
             return pipeline_ok(joined.to_pylist())
         except Exception as e:
@@ -3134,32 +3141,41 @@ class JoinStep:
 
         source_type = spec.get("type")
 
+        # Helper to resolve parameter placeholders like "{similarity}" to actual values
+        def resolve_param(value, default=None):
+            if isinstance(value, str) and value.startswith("{") and value.endswith("}"):
+                param_name = value[1:-1]
+                if ctx and hasattr(ctx, 'params') and param_name in ctx.params:
+                    return ctx.params[param_name]
+                return default
+            return value if value is not None else default
+
         if source_type == "reql":
             source = REQLSource(spec.get("content", ""))
         elif source_type == "rag_search":
             params = spec.get("params", {})
             source = RAGSearchSource(
-                query=params.get("query", ""),
-                top_k=params.get("top_k", 10),
-                entity_types=params.get("entity_types"),
+                query=resolve_param(params.get("query"), ""),
+                top_k=resolve_param(params.get("top_k"), 10),
+                entity_types=resolve_param(params.get("entity_types")),
             )
         elif source_type == "rag_duplicates":
             params = spec.get("params", {})
             source = RAGDuplicatesSource(
-                similarity=params.get("similarity", 0.85),
-                limit=params.get("limit", 50),
-                exclude_same_file=params.get("exclude_same_file", True),
-                exclude_same_class=params.get("exclude_same_class", True),
-                entity_types=params.get("entity_types"),
+                similarity=resolve_param(params.get("similarity"), 0.85),
+                limit=resolve_param(params.get("limit"), 50),
+                exclude_same_file=resolve_param(params.get("exclude_same_file"), True),
+                exclude_same_class=resolve_param(params.get("exclude_same_class"), True),
+                entity_types=resolve_param(params.get("entity_types")),
             )
         elif source_type == "rag_clusters":
             params = spec.get("params", {})
             source = RAGClustersSource(
-                n_clusters=params.get("n_clusters", 50),
-                min_size=params.get("min_size", 2),
-                exclude_same_file=params.get("exclude_same_file", True),
-                exclude_same_class=params.get("exclude_same_class", True),
-                entity_types=params.get("entity_types"),
+                n_clusters=resolve_param(params.get("n_clusters"), 50),
+                min_size=resolve_param(params.get("min_size"), 2),
+                exclude_same_file=resolve_param(params.get("exclude_same_file"), True),
+                exclude_same_class=resolve_param(params.get("exclude_same_class"), True),
+                entity_types=resolve_param(params.get("entity_types")),
             )
         elif source_type == "value":
             source = ValueSource(spec.get("content", []))

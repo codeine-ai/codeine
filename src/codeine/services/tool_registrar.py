@@ -32,10 +32,12 @@ from .hybrid_query_engine import (
     classify_query_with_llm,
     QueryType,
     QueryClassification,
+    SimilarTool,
     build_cadsl_prompt,
     extract_cadsl_from_response,
     extract_query_from_response,
     build_rag_query_params,
+    build_similar_tools_section,
     HybridQueryResult,
     generate_query_with_tools,
     QUERY_TOOLS,
@@ -315,7 +317,8 @@ class ToolRegistrar:
         schema_info: str,
         max_retries: int,
         max_results: int,
-        ctx
+        ctx,
+        similar_tools: Optional[list] = None
     ) -> Dict[str, Any]:
         """Execute NLQ with retry logic for syntax errors using tool-augmented generation."""
         attempts = 0
@@ -344,9 +347,12 @@ Schema info: {schema_info}"""
                 else:
                     prompt = f"{schema_info}\n\nQuestion: {question}"
 
-                # Use tool-augmented generation
+                # Use tool-augmented generation with case-based reasoning
+                # Only pass similar tools on first attempt
+                tools_for_attempt = similar_tools if attempts == 1 else None
                 generated_query, new_tools = await self._generate_with_tools(
-                    prompt, QueryType.REQL, ctx, max_tool_iterations=5
+                    prompt, QueryType.REQL, ctx, max_tool_iterations=5,
+                    similar_tools=tools_for_attempt
                 )
                 tools_used.extend(new_tools)
                 debug_log.debug(f"GENERATED REQL QUERY:\n{generated_query}")
@@ -357,20 +363,27 @@ Schema info: {schema_info}"""
                 debug_log.debug(f"QUERY SUCCESS: {total_count} results")
 
                 # Check for potential cross-join (excessive results)
-                cross_join_threshold = 1000
-                if total_count > cross_join_threshold:
-                    debug_log.debug(f"CROSS-JOIN DETECTED: {total_count} results exceeds threshold")
-                    return {
-                        "success": False,
-                        "results": [],
+                # Only warn if results exceed threshold AND query lacks aggregation
+                # Aggregation queries (GROUP BY, COUNT) legitimately return many results
+                cross_join_threshold = 5000
+                has_aggregation = any(kw in generated_query.upper() for kw in ['GROUP BY', 'COUNT(', 'SUM(', 'AVG(', 'MIN(', 'MAX('])
+
+                if total_count > cross_join_threshold and not has_aggregation:
+                    debug_log.debug(f"POSSIBLE CROSS-JOIN: {total_count} results exceeds threshold (no aggregation)")
+                    # Return results with warning instead of failing - let user decide
+                    results_sample = results[:max_results]
+                    return truncate_response({
+                        "success": True,  # Changed from False - return results with warning
+                        "results": results_sample,
                         "count": total_count,
                         "reql_query": generated_query,
                         "attempts": attempts,
                         "tools_used": tools_used,
-                        "error": f"Query returned {total_count} results which suggests a cross-join error. "
-                                 f"Please rephrase your question to be more specific.",
-                        "warning": "Possible cross-join detected - query may be missing proper join conditions"
-                    }
+                        "error": None,
+                        "warning": f"Large result set ({total_count} rows). If unexpected, the query may have a cross-join. "
+                                   f"Showing first {len(results_sample)} results.",
+                        "truncated": True
+                    })
 
                 # Apply result truncation
                 truncated = False
@@ -430,7 +443,8 @@ Schema info: {schema_info}"""
         question: str,
         schema_info: str,
         max_retries: int,
-        ctx
+        ctx,
+        similar_tools: Optional[list] = None
     ) -> Dict[str, Any]:
         """Execute a CADSL query using tool-augmented LLM generation."""
         from ..cadsl.parser import parse_cadsl
@@ -461,9 +475,12 @@ Please fix the syntax error and regenerate. Original question: {question}"""
                 else:
                     prompt = question
 
-                # Use tool-augmented generation
+                # Use tool-augmented generation with case-based reasoning
+                # Only pass similar tools on first attempt
+                tools_for_attempt = similar_tools if attempts == 1 else None
                 generated_query, new_tools = await self._generate_with_tools(
-                    prompt, QueryType.CADSL, ctx, max_tool_iterations=5
+                    prompt, QueryType.CADSL, ctx, max_tool_iterations=5,
+                    similar_tools=tools_for_attempt
                 )
                 tools_used.extend(new_tools)
                 debug_log.debug(f"GENERATED CADSL QUERY:\n{generated_query}")
@@ -547,13 +564,17 @@ Please fix the syntax error and regenerate. Original question: {question}"""
         question: str,
         query_type: QueryType,
         ctx,
-        max_tool_iterations: int = 5
+        max_tool_iterations: int = 5,
+        similar_tools: Optional[list] = None
     ) -> tuple:
         """
-        Generate a query using tool-augmented LLM.
+        Generate a query using tool-augmented LLM with case-based reasoning.
 
         Uses a text-based tool calling pattern where LLM can request tools via
         structured output like: TOOL_CALL: get_reql_grammar()
+
+        If similar tools are provided from case-based reasoning, they are included
+        in the prompt as templates the LLM can adapt.
 
         Returns:
             Tuple of (generated_query, list_of_tools_used)
@@ -577,7 +598,13 @@ When you have enough information, output the final query in a code block.
 """
         full_system = system_prompt + "\n" + tool_instructions
 
+        # Build user message with similar tools from case-based reasoning
         conversation = f"Generate a query for: {question}"
+
+        if similar_tools:
+            similar_section = build_similar_tools_section(similar_tools)
+            conversation = f"{conversation}\n{similar_section}"
+            debug_log.debug(f"CASE-BASED: Including {len(similar_tools)} similar tools as templates")
         tools_used = []
 
         for iteration in range(max_tool_iterations):
@@ -623,7 +650,7 @@ When you have enough information, output the final query in a code block.
         return query, tools_used
 
     def _execute_rag_query(self, question: str) -> Dict[str, Any]:
-        """Execute a RAG semantic search query."""
+        """Execute a RAG query - semantic search, duplicate detection, or clustering."""
         rag_manager = self.default_manager.get_rag_manager() if self.default_manager else None
 
         if rag_manager is None:
@@ -646,25 +673,69 @@ When you have enough information, output the final query in a code block.
 
         try:
             params = build_rag_query_params(question)
-            debug_log.debug(f"RAG QUERY PARAMS: {params}")
+            analysis_type = params.get("analysis_type", "search")
+            debug_log.debug(f"RAG QUERY PARAMS: {params} (type: {analysis_type})")
 
-            results, stats = rag_manager.search(
-                query=params.get("query", question),
-                top_k=params.get("top_k", 20),
-                entity_types=params.get("entity_types"),
-                search_scope=params.get("search_scope", "code"),
-                include_content=params.get("include_content", False),
-            )
+            if analysis_type == "duplicates":
+                # Execute duplicate detection
+                result = rag_manager.find_duplicate_candidates(
+                    similarity_threshold=params.get("similarity_threshold", 0.85),
+                    max_results=params.get("max_results", 50),
+                    exclude_same_file=params.get("exclude_same_file", True),
+                    exclude_same_class=params.get("exclude_same_class", True),
+                    entity_types=params.get("entity_types"),
+                )
+                return {
+                    "success": True,
+                    "results": result.get("pairs", []),
+                    "count": result.get("count", 0),
+                    "query_type": "rag",
+                    "analysis_type": "duplicates",
+                    "rag_params": params,
+                    "stats": result.get("stats", {}),
+                    "error": None
+                }
 
-            return {
-                "success": True,
-                "results": [r.to_dict() for r in results],
-                "count": len(results),
-                "query_type": "rag",
-                "rag_params": params,
-                "stats": stats,
-                "error": None
-            }
+            elif analysis_type == "clusters":
+                # Execute cluster detection
+                result = rag_manager.find_similar_clusters(
+                    n_clusters=params.get("n_clusters", 50),
+                    min_size=params.get("min_size", 2),
+                    exclude_same_file=params.get("exclude_same_file", True),
+                    exclude_same_class=params.get("exclude_same_class", True),
+                    entity_types=params.get("entity_types"),
+                )
+                return {
+                    "success": True,
+                    "results": result.get("clusters", []),
+                    "count": result.get("count", 0),
+                    "query_type": "rag",
+                    "analysis_type": "clusters",
+                    "rag_params": params,
+                    "stats": result.get("stats", {}),
+                    "error": None
+                }
+
+            else:
+                # Default: semantic search
+                results, stats = rag_manager.search(
+                    query=params.get("query", question),
+                    top_k=params.get("top_k", 20),
+                    entity_types=params.get("entity_types"),
+                    search_scope=params.get("search_scope", "code"),
+                    include_content=params.get("include_content", False),
+                )
+
+                return {
+                    "success": True,
+                    "results": [r.to_dict() for r in results],
+                    "count": len(results),
+                    "query_type": "rag",
+                    "analysis_type": "search",
+                    "rag_params": params,
+                    "stats": stats,
+                    "error": None
+                }
 
         except Exception as e:
             return {
@@ -777,15 +848,17 @@ When you have enough information, output the final query in a code block.
                         result = self._execute_rag_query(question)
 
                     elif classification.query_type == QueryType.CADSL:
-                        # CADSL pipeline query
+                        # CADSL pipeline query with case-based reasoning
                         result = await self._execute_cadsl_query(
-                            question, schema_info, max_retries, ctx
+                            question, schema_info, max_retries, ctx,
+                            similar_tools=classification.similar_tools
                         )
 
                     else:  # QueryType.REQL
-                        # Standard REQL query (existing logic)
+                        # Standard REQL query with case-based reasoning
                         result = await self._execute_nlq_with_retries(
-                            reter, question, schema_info, max_retries, max_results, ctx
+                            reter, question, schema_info, max_retries, max_results, ctx,
+                            similar_tools=classification.similar_tools
                         )
 
                     # Add classification info to result
@@ -796,6 +869,10 @@ When you have enough information, output the final query in a code block.
                     }
                     if classification.suggested_cadsl_tool:
                         result["suggested_tool"] = classification.suggested_cadsl_tool
+
+                    # Add case-based reasoning info if similar tools were used
+                    if classification.similar_tools:
+                        result["similar_tools"] = [t.to_dict() for t in classification.similar_tools]
 
                     result["execution_time_ms"] = (time.time() - start_time) * 1000
 
