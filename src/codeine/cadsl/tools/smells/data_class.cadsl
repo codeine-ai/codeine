@@ -10,6 +10,7 @@ detector data_class(category="design", severity="low") {
     param max_methods: int = 2;
     param limit: int = 100;
 
+    # Find classes with many fields but few methods using OPTIONAL
     reql {
         SELECT ?c ?name ?file ?line (COUNT(?attr) AS ?attr_count) (COUNT(?method) AS ?method_count)
         WHERE {
@@ -17,7 +18,7 @@ detector data_class(category="design", severity="low") {
             ?c name ?name .
             ?c inFile ?file .
             ?c atLine ?line .
-            OPTIONAL { ?attr type {Field} . ?attr definedIn ?c }
+            OPTIONAL { ?attr type oo:Field . ?attr definedIn ?c }
             OPTIONAL { ?method type {Method} . ?method definedIn ?c }
         }
         GROUP BY ?c ?name ?file ?line

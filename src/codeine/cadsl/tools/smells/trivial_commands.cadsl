@@ -1,41 +1,36 @@
-# trivial_commands - Detect trivial command objects that should be functions
+# trivial_commands - Detect trivial classes that should be functions
 #
-# The Command pattern is useful for undo/redo and queuing, but trivial
-# command classes that just wrap a single call add unnecessary complexity.
+# Small classes with few methods may be over-engineered and could be
+# replaced with simple functions.
 
 detector trivial_commands(category="code_smell", severity="low") {
-    """Detect trivial command classes that should be simple functions."""
+    """Detect small classes that could be simple functions."""
 
     param max_methods: int = 2;
-    param max_lines: int = 5;
     param limit: int = 100;
 
+    # Find classes with very few methods
     reql {
-        SELECT ?c ?name ?file ?line (COUNT(?method) AS ?method_count) ?execute_lines
+        SELECT ?c ?name ?file ?line (COUNT(?method) AS ?method_count)
         WHERE {
             ?c type {Class} .
             ?c name ?name .
             ?c inFile ?file .
             ?c atLine ?line .
             ?method type {Method} .
-            ?method definedIn ?c .
-            ?c hasMethod ?exec .
-            ?exec name ?exec_name .
-            ?exec lineCount ?execute_lines .
-            FILTER ( ?exec_name = "execute" || ?exec_name = "run" || ?exec_name = "__call__" )
-            FILTER ( REGEX(?name, "Command$|Action$|Task$") )
+            ?method definedIn ?c
+            FILTER ( !REGEX(?name, "^_") )
         }
-        GROUP BY ?c ?name ?file ?line ?execute_lines
-        HAVING (?method_count <= {max_methods} && ?execute_lines <= {max_lines})
-        ORDER BY ?execute_lines
+        GROUP BY ?c ?name ?file ?line
+        HAVING (?method_count > 0 && ?method_count <= {max_methods})
+        ORDER BY ?method_count
         LIMIT {limit}
     }
-    | select { name, file, line, method_count, execute_lines }
     | map {
         ...row,
-        issue: "trivial_command",
-        message: "Command class '{name}' is trivial ({execute_lines} lines, {method_count} methods)",
-        suggestion: "Replace with a simple function unless you need undo/redo or queuing"
+        issue: "trivial_class",
+        message: "Class '{name}' has only {method_count} methods",
+        suggestion: "Consider if this class could be replaced with functions"
     }
     | emit { findings }
 }

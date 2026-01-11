@@ -6,21 +6,22 @@ query find_callees() {
     """Find all functions/methods called by the target (direct callees)."""
 
     param target: str required;
+    param limit: int = 500;
 
     reql {
-        SELECT ?callee ?callee_name ?callee_file ?callee_line ?callee_type
+        SELECT ?callee ?callee_name ?callee_file ?callee_line
         WHERE {
-            { ?caller type {Method} } UNION { ?caller type {Function} }
+            ?caller type {Method} .
             ?caller name "{target}" .
             ?caller calls ?callee .
-            { ?callee type {Method} } UNION { ?callee type {Function} }
-            ?callee type ?callee_type .
+            ?callee type {Method} .
             ?callee name ?callee_name .
             ?callee inFile ?callee_file .
             ?callee atLine ?callee_line
         }
         ORDER BY ?callee_file
+        LIMIT {limit}
     }
-    | select { callee_name, callee_file, callee_line, callee_type, qualified_name: callee }
+    | select { callee_name, callee_file, callee_line, qualified_name: callee }
     | emit { callees }
 }

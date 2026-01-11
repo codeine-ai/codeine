@@ -2,36 +2,43 @@
 #
 # Excessive use of setters can lead to mutable objects with unpredictable state.
 # Consider making objects immutable with builder patterns or factory methods.
+# Uses RAG to semantically identify setter/mutator methods.
 
-detector setting_methods(category="code_smell", severity="low") {
-    """Detect classes with many setter methods suggesting mutability issues."""
+detector setting_methods(category="code_smell", severity="medium") {
+    """Detect classes with many setter methods using semantic analysis."""
 
     param min_setters: int = 3;
+    param similarity: float = 0.60;
     param limit: int = 100;
 
+    # Find methods that might be setters
     reql {
-        SELECT ?c ?name ?file ?line (COUNT(?setter) AS ?setter_count)
+        SELECT ?m ?name ?class_name ?file ?line
         WHERE {
-            ?c type {Class} .
-            ?c name ?name .
-            ?c inFile ?file .
-            ?c atLine ?line .
-            ?setter type {Method} .
-            ?setter definedIn ?c .
-            ?setter name ?setter_name .
-            FILTER ( STRSTARTS(?setter_name, "set_") || STRSTARTS(?setter_name, "set") )
+            ?m type {Method} .
+            ?m name ?name .
+            ?m inFile ?file .
+            ?m atLine ?line .
+            ?m definedIn ?c .
+            ?c name ?class_name
+            FILTER ( !REGEX(?name, "^__") )
         }
-        GROUP BY ?c ?name ?file ?line
-        HAVING (?setter_count >= {min_setters})
-        ORDER BY DESC(?setter_count)
-        LIMIT {limit}
+        LIMIT 500
     }
-    | select { name, file, line, setter_count }
+    | join {
+        on: name,
+        right: rag { search, query: "setter set value assign update modify mutate change write store", top_k: 200 },
+        type: inner
+    }
+    | filter { similarity >= {similarity} }
+    | select { name, class_name, file, line, similarity }
     | map {
         ...row,
-        issue: "excessive_setters",
-        message: "Class '{name}' has {setter_count} setter methods",
-        suggestion: "Consider making class immutable with constructor/builder initialization"
+        issue: "setter_method",
+        message: "Method '{class_name}.{name}' appears to be a setter ({similarity})",
+        suggestion: "Consider immutable design with constructor/builder instead of setters"
     }
+    | order_by { -similarity }
+    | limit { {limit} }
     | emit { findings }
 }

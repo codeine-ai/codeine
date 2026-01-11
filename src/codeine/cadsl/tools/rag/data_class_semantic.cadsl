@@ -1,0 +1,42 @@
+# data_class_semantic - Find classes semantically similar to data classes
+#
+# Uses semantic search to find classes that match patterns of data containers,
+# DTOs, value objects, and similar structures. More comprehensive than
+# simple attribute/method counting.
+
+detector data_class_semantic(category="design", severity="low") {
+    """Find classes semantically similar to data class patterns."""
+
+    param similarity: float = 0.65;
+    param limit: int = 50;
+
+    # Get all classes with basic structure
+    reql {
+        SELECT ?c ?name ?file ?line
+        WHERE {
+            ?c type {Class} .
+            ?c name ?name .
+            ?c inFile ?file .
+            ?c atLine ?line
+            FILTER ( !REGEX(?name, "^_") )
+            FILTER ( !REGEX(?file, "test") )
+        }
+        LIMIT 300
+    }
+    | join {
+        on: name,
+        right: rag { search, query: "data class dto transfer object value struct container record model entity schema pojo bean", top_k: 200 },
+        type: inner
+    }
+    | filter { similarity >= {similarity} }
+    | select { name, file, line, similarity }
+    | map {
+        ...row,
+        issue: "data_class_semantic",
+        message: "Class '{name}' resembles a data class pattern ({similarity})",
+        suggestion: "Consider using dataclass decorator, namedtuple, or adding behavior"
+    }
+    | order_by { -similarity }
+    | limit { {limit} }
+    | emit { findings }
+}

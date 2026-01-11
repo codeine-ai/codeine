@@ -6,7 +6,7 @@
 detector collapse_hierarchy_candidates(category="inheritance", severity="low") {
     """Find parent-child class pairs that could be collapsed."""
 
-    param max_added_methods: int = 1;
+    param max_added_methods: int = 2;
     param limit: int = 100;
 
     reql {
@@ -19,16 +19,13 @@ detector collapse_hierarchy_candidates(category="inheritance", severity="low") {
             ?child inheritsFrom ?parent .
             ?parent name ?parent_name .
             ?added_method type {Method} .
-            ?added_method definedIn ?child .
-            ?added_method name ?method_name .
-            FILTER ( !STRSTARTS(?method_name, "_") )
+            ?added_method definedIn ?child
         }
         GROUP BY ?child ?child_name ?parent_name ?file ?line
         HAVING (?added_methods <= {max_added_methods})
         ORDER BY ?added_methods
         LIMIT {limit}
     }
-    | select { child_name, parent_name, file, line, added_methods }
     | map {
         ...row,
         refactoring: "collapse_hierarchy",

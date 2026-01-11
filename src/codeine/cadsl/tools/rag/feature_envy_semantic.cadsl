@@ -1,0 +1,46 @@
+# feature_envy_semantic - Find methods semantically similar to feature envy patterns
+#
+# Uses semantic search to find methods that access external dependencies
+# more than their own class data. Combines structural analysis (external calls)
+# with semantic patterns of methods that belong elsewhere.
+
+detector feature_envy_semantic(category="design", severity="medium") {
+    """Find methods with feature envy using structural and semantic analysis."""
+
+    param min_external: int = 2;
+    param similarity: float = 0.60;
+    param limit: int = 50;
+
+    # Find methods that call other methods (simpler pattern)
+    reql {
+        SELECT ?e ?name ?class_name ?file ?line
+        WHERE {
+            ?e type {Method} .
+            ?e name ?name .
+            ?e inFile ?file .
+            ?e atLine ?line .
+            ?e definedIn ?c .
+            ?c name ?class_name .
+            ?e calls ?call
+            FILTER ( !REGEX(?name, "^__") )
+            FILTER ( !REGEX(?file, "test") )
+        }
+        LIMIT 300
+    }
+    | join {
+        on: name,
+        right: rag { search, query: "delegate wrapper proxy forward helper adapter bridge external access foreign data dependency", top_k: 200 },
+        type: inner
+    }
+    | filter { similarity >= {similarity} }
+    | select { name, class_name, file, line, similarity }
+    | map {
+        ...row,
+        issue: "feature_envy_semantic",
+        message: "Method '{class_name}.{name}' accesses external classes and matches delegation patterns ({similarity})",
+        suggestion: "Consider moving this method to the class it primarily interacts with"
+    }
+    | order_by { -similarity }
+    | limit { {limit} }
+    | emit { findings }
+}

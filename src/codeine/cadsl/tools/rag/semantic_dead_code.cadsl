@@ -1,41 +1,44 @@
-# semantic_dead_code - Find code semantically similar to dead code
+# semantic_dead_code - Find code semantically similar to dead code patterns
 #
-# Uses anti-join to find dead code (no callers), then uses semantic search
-# to find other code that is similar to the dead code patterns.
-# This helps identify potentially unused but not-yet-detected dead code.
+# Uses semantic search to find code that matches patterns of unused/dead code,
+# then joins with REQL to verify no callers exist. Helps find potentially
+# deprecated or forgotten code.
 
 detector semantic_dead_code(category="maintenance", severity="medium") {
-    """Find code semantically similar to known dead code."""
+    """Find code semantically similar to known dead code patterns."""
 
-    param similarity: float = 0.75;
+    param similarity: float = 0.70;
     param limit: int = 50;
 
-    # First, find confirmed dead code (no callers)
+    # Get methods that have no callers (potential dead code)
     reql {
-        SELECT ?e ?name ?file ?line ?line_count
+        SELECT ?e ?name ?file ?line ?line_count ?class_name
         WHERE {
-            { ?e type {Method} } UNION { ?e type {Function} }
+            ?e type {Method} .
             ?e name ?name .
             ?e inFile ?file .
             ?e atLine ?line .
+            ?e definedIn ?c .
+            ?c name ?class_name .
             OPTIONAL { ?e lineCount ?line_count }
             FILTER NOT EXISTS { ?caller calls ?e }
-            FILTER ( !REGEX(?name, "^__|^test_") )
+            FILTER ( !REGEX(?name, "^__") )
+            FILTER ( !REGEX(?name, "^test_") )
             FILTER ( !REGEX(?file, "test_") )
         }
-        LIMIT 100
+        LIMIT 200
     }
     | join {
         on: name,
-        right: rag { search, query: "unused helper utility internal private deprecated", top_k: 200 },
-        type: left
+        right: rag { search, query: "unused helper utility internal private deprecated obsolete legacy dead orphan", top_k: 200 },
+        type: inner
     }
     | filter { similarity >= {similarity} }
-    | select { name, file, line, line_count, similarity }
+    | select { name, file, line, line_count, class_name, similarity }
     | map {
         ...row,
         issue: "semantic_dead_code",
-        message: "'{name}' appears unused and matches dead code patterns ({similarity})",
+        message: "'{class_name}.{name}' appears unused and matches dead code patterns ({similarity})",
         suggestion: "Verify if truly unused, then remove or document why kept"
     }
     | order_by { -similarity }
