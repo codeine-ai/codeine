@@ -1,24 +1,35 @@
 # find_callers - Find all functions/methods that call the target
 #
 # Returns the complete call hierarchy for a function or method.
+# Set include_maybe=true to include probabilistic calls (duck-typed code).
 
 query find_callers() {
     """Find all functions/methods that call the target (direct callers)."""
 
     param target: str required;
+    param include_maybe: bool = false;
 
     reql {
-        SELECT ?caller ?caller_name ?caller_file ?caller_line ?callee
+        SELECT ?caller ?caller_name ?caller_file ?caller_line ?callee ?call_type
         WHERE {
             { ?caller type oo:Method } UNION { ?caller type oo:Function }
-            ?caller calls ?callee .
+            {
+                ?caller calls ?callee .
+                BIND("static" AS ?call_type)
+            }
+            UNION
+            {
+                ?caller maybeCalls ?callee .
+                BIND("maybe" AS ?call_type)
+            }
             FILTER(CONTAINS(?callee, "{target}"))
             ?caller name ?caller_name .
             ?caller inFile ?caller_file .
             ?caller atLine ?caller_line
         }
     }
-    | select { caller_name, caller_file, caller_line, callee, qualified_name: caller }
+    | select { caller_name, caller_file, caller_line, callee, call_type, qualified_name: caller }
+    | when { {include_maybe} == false } filter { call_type == "static" }
     | order_by { caller_file }
     | emit { callers }
 }

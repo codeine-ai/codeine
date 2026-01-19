@@ -21,7 +21,7 @@ detector semantic_dead_code(category="maintenance", severity="medium") {
             ?e definedIn ?c .
             ?c name ?class_name .
             OPTIONAL { ?e lineCount ?line_count }
-            FILTER NOT EXISTS { ?caller calls ?e }
+            FILTER NOT EXISTS { { ?caller calls ?e } UNION { ?caller maybeCalls ?e } }
             FILTER ( !REGEX(?name, "^__") )
             FILTER ( !REGEX(?name, "^test_") )
             FILTER ( !REGEX(?file, "test_") )

@@ -2,20 +2,30 @@
 #
 # Analyzes the dependency graph to predict which files and entities
 # would be affected by changes to the target.
+# Set include_maybe=true to include probabilistic callers (conservative estimate).
 
 query predict_impact() {
     """Predict impact of changing a function/method/class."""
 
     param target: str required;
+    param include_maybe: bool = false;
     param limit: int = 500;
 
     reql {
-        SELECT ?dependent ?dep_name ?dep_file ?dep_line
+        SELECT ?dependent ?dep_name ?dep_file ?dep_line ?call_type
         WHERE {
             ?t name "{target}" .
             ?t type oo:Method .
             ?dependent type oo:Method .
-            ?dependent calls ?t .
+            {
+                ?dependent calls ?t .
+                BIND("definite" AS ?call_type)
+            }
+            UNION
+            {
+                ?dependent maybeCalls ?t .
+                BIND("possible" AS ?call_type)
+            }
             ?dependent name ?dep_name .
             ?dependent inFile ?dep_file .
             ?dependent atLine ?dep_line
@@ -23,6 +33,7 @@ query predict_impact() {
         ORDER BY ?dep_file
         LIMIT {limit}
     }
-    | select { dep_name, dep_file, dep_line, qualified_name: dependent }
+    | select { dep_name, dep_file, dep_line, call_type, qualified_name: dependent }
+    | when { {include_maybe} == false } filter { call_type == "definite" }
     | emit { affected_entities }
 }

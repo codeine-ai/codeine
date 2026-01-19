@@ -333,6 +333,16 @@ class SourceStateManager:
             for file_path in self._project_root.glob(pattern):
                 rel_path = str(file_path.relative_to(self._project_root)).replace('\\', '/')
 
+                # Check include patterns first (if set, file MUST match at least one)
+                if include_patterns:
+                    matches_include = False
+                    for incl_pattern in include_patterns:
+                        if self._matches_pattern(rel_path, incl_pattern):
+                            matches_include = True
+                            break
+                    if not matches_include:
+                        continue
+
                 # Skip excluded files
                 if is_excluded_func(file_path.relative_to(self._project_root)):
                     continue
@@ -378,6 +388,42 @@ class SourceStateManager:
             if excl in rel_path or rel_path.startswith(excl.lstrip("/")):
                 return True
         return False
+
+    def _matches_pattern(self, path: str, pattern: str) -> bool:
+        """
+        Simple glob pattern matching.
+
+        Supports:
+        - * (any characters within a path component)
+        - ** (any characters across path components)
+        - ? (single character)
+
+        Args:
+            path: Path to check
+            pattern: Glob pattern
+
+        Returns:
+            True if path matches pattern
+        """
+        from fnmatch import fnmatch
+
+        # Convert ** to match across directories
+        if "**" in pattern:
+            # For patterns like "test/**" or "**/test/*"
+            parts = pattern.split("**")
+            if len(parts) == 2:
+                prefix, suffix = parts
+                prefix = prefix.rstrip("/")
+                suffix = suffix.lstrip("/")
+
+                if prefix and not path.startswith(prefix):
+                    return False
+                if suffix and not fnmatch(path, "*" + suffix):
+                    return False
+                return True
+
+        # Regular fnmatch
+        return fnmatch(path, pattern)
 
     def mark_in_reter(self, rel_path: str, source_id: str) -> None:
         """Mark a file as loaded in RETER."""

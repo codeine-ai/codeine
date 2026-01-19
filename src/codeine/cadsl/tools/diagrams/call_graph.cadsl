@@ -2,9 +2,9 @@
 #
 # Visualizes function/method call relationships as a Mermaid flowchart.
 # Uses native graph_traverse and render_mermaid for pure declarative implementation.
+# Set include_maybe=true to include probabilistic calls (duck-typed code).
 #
 # NOTE: Uses concept instead of type to support all languages (Python, C++, C#, JS)
-# and avoids double UNION which has join issues.
 
 diagram call_graph() {
     """Generate call graph from entry point."""
@@ -12,11 +12,20 @@ diagram call_graph() {
     param target: str required;
     param max_depth: int = 10;
     param format: str = "mermaid";
+    param include_maybe: bool = false;
 
     reql {
-        SELECT ?caller ?callee ?caller_name ?callee_name ?file ?line
+        SELECT ?caller ?callee ?caller_name ?callee_name ?file ?line ?call_type
         WHERE {
-            ?caller calls ?callee .
+            {
+                ?caller calls ?callee .
+                BIND("static" AS ?call_type)
+            }
+            UNION
+            {
+                ?caller maybeCalls ?callee .
+                BIND("maybe" AS ?call_type)
+            }
             ?caller name ?caller_name .
             ?caller inFile ?file .
             ?caller atLine ?line .
@@ -30,7 +39,8 @@ diagram call_graph() {
         }
         ORDER BY ?caller_name
     }
-    | select { from_node: caller, to_node: callee, caller_name, callee_name, file, line }
+    | select { from_node: caller, to_node: callee, caller_name, callee_name, file, line, call_type }
+    | when { {include_maybe} == false } filter { call_type == "static" }
     | graph_traverse {
         from: from_node,
         to: to_node,

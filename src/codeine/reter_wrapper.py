@@ -2009,6 +2009,8 @@ class ReterWrapper:
         Must be called after begin_entity_accumulation(), even if no files were loaded.
         """
         safe_cpp_call(self.reasoner.network.end_entity_accumulation)
+        # Resolve pending maybeCalls after all files are loaded
+        safe_cpp_call(self.reasoner.network.resolve_maybe_calls)
         # Mark dirty since we've modified the network
         self._dirty = True
 
@@ -2057,6 +2059,8 @@ class ReterWrapper:
             if processed_count >= total_count:
                 break
 
+        # Resolve pending maybeCalls after all files are loaded
+        safe_cpp_call(self.reasoner.network.resolve_maybe_calls)
         # Mark dirty since we've modified the network
         self._dirty = True
         return total

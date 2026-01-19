@@ -1,19 +1,29 @@
 # find_callees - Find all functions/methods called by the target
 #
 # Returns the complete list of functions/methods called by the target.
+# Set include_maybe=true to include probabilistic calls (duck-typed code).
 
 query find_callees() {
     """Find all functions/methods called by the target (direct callees)."""
 
     param target: str required;
+    param include_maybe: bool = false;
     param limit: int = 500;
 
     reql {
-        SELECT ?callee ?callee_name ?callee_file ?callee_line
+        SELECT ?callee ?callee_name ?callee_file ?callee_line ?call_type
         WHERE {
             ?caller type oo:Method .
             ?caller name "{target}" .
-            ?caller calls ?callee .
+            {
+                ?caller calls ?callee .
+                BIND("static" AS ?call_type)
+            }
+            UNION
+            {
+                ?caller maybeCalls ?callee .
+                BIND("maybe" AS ?call_type)
+            }
             ?callee type oo:Method .
             ?callee name ?callee_name .
             ?callee inFile ?callee_file .
@@ -22,6 +32,7 @@ query find_callees() {
         ORDER BY ?callee_file
         LIMIT {limit}
     }
-    | select { callee_name, callee_file, callee_line, qualified_name: callee }
+    | select { callee_name, callee_file, callee_line, call_type, qualified_name: callee }
+    | when { {include_maybe} == false } filter { call_type == "static" }
     | emit { callees }
 }
