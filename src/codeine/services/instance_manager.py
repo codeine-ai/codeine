@@ -6,7 +6,7 @@ Extracted from LogicalThinkingServer as part of God Class refactoring.
 """
 
 import sys
-from typing import Dict, Optional, TYPE_CHECKING
+from typing import Any, Dict, Optional, TYPE_CHECKING
 from ..reter_wrapper import ReterWrapper, debug_log
 
 # Avoid circular import
@@ -74,37 +74,47 @@ class InstanceManager:
         Args:
             instance_name: Name of the RETER instance
         """
+        # Get progress callback if available
+        progress = getattr(self, '_current_progress_callback', None)
+
         # Skip if instance already exists
         if instance_name in self._instances:
             # For default instance, sync files even if already loaded
             if instance_name == "default" and self._default_manager and self._default_manager.is_configured():
-                print(f"[instance_manager] Instance '{instance_name}' already loaded, syncing...", file=sys.stderr)
-                rebuilt = self._default_manager.ensure_default_instance_synced(self._instances[instance_name])
+                if not progress:
+                    print(f"[instance_manager] Instance '{instance_name}' already loaded, syncing...", file=sys.stderr)
+                rebuilt = self._default_manager.ensure_default_instance_synced(self._instances[instance_name], progress_callback=progress)
                 if rebuilt is not None:
                     # Instance was rebuilt from scratch to compact RETE network
-                    print(f"[instance_manager] Default instance rebuilt, replacing in cache", file=sys.stderr)
+                    if not progress:
+                        print(f"[instance_manager] Default instance rebuilt, replacing in cache", file=sys.stderr)
                     self._instances[instance_name] = rebuilt
             return
 
         # Try lazy loading from snapshot if persistence service is available
         if self._persistence:
             import time
-            print(f"[instance_manager] Trying to load '{instance_name}' from snapshot...", file=sys.stderr)
+            if not progress:
+                print(f"[instance_manager] Trying to load '{instance_name}' from snapshot...", file=sys.stderr)
             start = time.time()
             self._persistence.load_snapshot_if_available(instance_name)
             if instance_name in self._instances:
-                print(f"[instance_manager] Successfully loaded '{instance_name}' from snapshot in {time.time()-start:.2f}s", file=sys.stderr)
+                if not progress:
+                    print(f"[instance_manager] Successfully loaded '{instance_name}' from snapshot in {time.time()-start:.2f}s", file=sys.stderr)
                 # For default instance: sync files after loading from snapshot (handles changed files + RAG init)
                 if instance_name == "default" and self._default_manager and self._default_manager.is_configured():
-                    print(f"[instance_manager] Syncing default instance after snapshot load...", file=sys.stderr)
-                    rebuilt = self._default_manager.ensure_default_instance_synced(self._instances[instance_name])
+                    if not progress:
+                        print(f"[instance_manager] Syncing default instance after snapshot load...", file=sys.stderr)
+                    rebuilt = self._default_manager.ensure_default_instance_synced(self._instances[instance_name], progress_callback=progress)
                     if rebuilt is not None:
                         # Instance was rebuilt from scratch to compact RETE network
-                        print(f"[instance_manager] Default instance rebuilt, replacing in cache", file=sys.stderr)
+                        if not progress:
+                            print(f"[instance_manager] Default instance rebuilt, replacing in cache", file=sys.stderr)
                         self._instances[instance_name] = rebuilt
-                    print(f"[instance_manager] Sync complete in {time.time()-start:.2f}s total", file=sys.stderr)
+                    if not progress:
+                        print(f"[instance_manager] Sync complete in {time.time()-start:.2f}s total", file=sys.stderr)
 
-    def get_or_create_instance(self, instance_name: str) -> ReterWrapper:
+    def get_or_create_instance(self, instance_name: str, progress_callback: Optional[Any] = None) -> ReterWrapper:
         """
         Get an existing RETER instance or create a new one.
 
@@ -115,16 +125,23 @@ class InstanceManager:
 
         Args:
             instance_name: Name of the RETER instance
+            progress_callback: Optional progress callback for UI updates
 
         Returns:
             ReterWrapper instance
         """
         debug_log(f"get_or_create_instance ENTER: {instance_name}")
 
+        # Store progress callback for use in ensure_instance_loaded
+        self._current_progress_callback = progress_callback
+
         # Always ensure instance is loaded/synced (critical for default instance auto-sync)
         debug_log(f"get_or_create_instance: calling ensure_instance_loaded({instance_name})")
         self.ensure_instance_loaded(instance_name)
         debug_log(f"get_or_create_instance: ensure_instance_loaded returned")
+
+        # Clear progress callback
+        self._current_progress_callback = None
 
         # Create new instance if lazy loading didn't work
         if instance_name not in self._instances:
@@ -135,7 +152,9 @@ class InstanceManager:
             # For default instance: load from project files
             if instance_name == "default" and self._default_manager and self._default_manager.is_configured():
                 debug_log("[default] Creating default instance from project files...")
-                rebuilt = self._default_manager.ensure_default_instance_synced(self._instances[instance_name])
+                rebuilt = self._default_manager.ensure_default_instance_synced(
+                    self._instances[instance_name], progress_callback=progress_callback
+                )
                 if rebuilt is not None:
                     # Instance was rebuilt from scratch to compact RETE network
                     debug_log("[default] Default instance rebuilt, replacing in cache")

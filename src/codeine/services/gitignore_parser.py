@@ -13,7 +13,7 @@ Supports:
 import os
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 from fnmatch import fnmatch
 
 
@@ -152,16 +152,18 @@ class GitignoreParser:
             # File should be ignored
     """
 
-    def __init__(self, project_root: Path):
+    def __init__(self, project_root: Path, progress_callback: Optional[Any] = None):
         """
         Initialize gitignore parser.
 
         Args:
             project_root: Root directory of the project
+            progress_callback: Optional progress callback with update_gitignore_progress(path) method
         """
         self.project_root = project_root
         self._patterns: List[GitignorePattern] = []
         self._loaded_gitignores: Set[Path] = set()
+        self._progress_callback = progress_callback
 
         # Load root .gitignore
         self._load_gitignore(project_root)
@@ -183,12 +185,13 @@ class GitignoreParser:
 
         self._loaded_gitignores.add(gitignore_path)
 
-        # Log when nested .gitignore files are discovered
+        # Report progress when nested .gitignore files are discovered
         try:
             rel_dir = directory.relative_to(self.project_root)
-            if str(rel_dir) != '.':
-                import sys
-                print(f"[gitignore] Loaded nested .gitignore from: {rel_dir}", file=sys.stderr, flush=True)
+            rel_str = str(rel_dir)
+            if rel_str != '.':
+                if self._progress_callback and hasattr(self._progress_callback, 'update_gitignore_progress'):
+                    self._progress_callback.update_gitignore_progress(rel_str)
         except ValueError:
             pass
 

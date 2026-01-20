@@ -54,7 +54,9 @@ from .services.initialization_progress import get_component_readiness
 from sentence_transformers import SentenceTransformer
 
 # Use stderr for import timing since logger might not be configured yet
-print(f"[TIMING] Module imports completed in {_import_time.time() - _import_start:.3f}s", file=sys.stderr)
+# Only print timing in non-TTY mode (MCP server mode) to avoid polluting Rich progress UI
+if not sys.stdin.isatty():
+    print(f"[TIMING] Module imports completed in {_import_time.time() - _import_start:.3f}s", file=sys.stderr)
 
 
 async def anthropic_sampling_handler(
@@ -581,12 +583,32 @@ def sync_only():
 
     Runs synchronously in the main thread - sets initialization flags
     to allow RETER operations without the background init thread.
-    """
-    import time
-    from .reter_wrapper import set_initialization_in_progress, set_initialization_complete
 
-    print("[codeine] Sync-only mode - syncing default instance and RAG...", file=sys.stderr)
-    start = time.time()
+    When run in a TTY (interactive terminal), displays a Rich progress UI
+    with multiple progress bars and component status indicators.
+    """
+    from .reter_wrapper import set_initialization_in_progress, set_initialization_complete
+    from .services.console_progress import ConsoleProgress
+    from .logging_config import suppress_stderr_logging, restore_stderr_logging
+    from rich.console import Console
+    from rich.panel import Panel
+
+    # Show STARTING banner immediately before any other output
+    console = Console()
+    console.print()
+    console.print(Panel(
+        "[bold cyan]CODEINE[/bold cyan] - Code Intelligence Engine\n\n"
+        "[dim]Initializing semantic analysis engine...[/dim]",
+        border_style="cyan",
+    ))
+    console.print()
+
+    # Suppress stderr logging - logs still go to file but not console
+    suppress_stderr_logging()
+
+    # Create progress UI for interactive mode
+    progress = ConsoleProgress()
+    progress.start()
 
     # CRITICAL: Set initialization flag to allow RETER operations in main thread
     # This bypasses the check_initialization() guard that normally blocks
@@ -595,12 +617,14 @@ def sync_only():
 
     try:
         # Initialize services
+        progress.set_phase("Initializing services...")
         load_config()
         instance_manager = InstanceManager()
         persistence = StatePersistenceService(instance_manager)
         instance_manager.set_persistence_service(persistence)
-        default_manager = DefaultInstanceManager(persistence)
+        default_manager = DefaultInstanceManager(persistence, progress_callback=progress)
         instance_manager.set_default_manager(default_manager)
+        progress.set_component_ready("SQLite")
 
         # Initialize RAG manager
         rag_config = get_config_loader().get_rag_config()
@@ -609,49 +633,69 @@ def sync_only():
             try:
                 rag_manager = RAGIndexManager(persistence, rag_config)
                 default_manager.set_rag_manager(rag_manager, rag_config)
-                print("[codeine] RAG manager created", file=sys.stderr)
             except Exception as e:
-                print(f"[codeine] RAG manager creation failed: {e}", file=sys.stderr)
+                progress.set_component_error("RAG")
+                logger.warning("RAG manager creation failed: %s", e)
 
-        # Get or create the default instance and sync it
+        # Get or create the default instance (syncs files via get_or_create_instance)
         if default_manager.is_configured():
-            reter = instance_manager.get_or_create_instance("default")
+            progress.set_phase("Loading RETER instance...")
+            # Pass progress callback - sync happens inside get_or_create_instance
+            reter = instance_manager.get_or_create_instance("default", progress_callback=progress)
             if reter:
-                default_manager.ensure_default_instance_synced(reter)
-                print(f"[codeine] RETER sync complete in {time.time() - start:.2f}s", file=sys.stderr)
+                progress.set_component_ready("RETER")
 
                 # Load embedding model and sync RAG
                 if rag_manager is not None and rag_config.get("rag_enabled", True):
                     model_name = rag_config.get('rag_embedding_model', 'all-MiniLM-L6-v2')
-                    print(f"[codeine] Loading embedding model '{model_name}'...", file=sys.stderr)
-                    model_start = time.time()
+                    progress.start_embedding_loading(model_name)
                     try:
                         cache_dir = os.environ.get('TRANSFORMERS_CACHE', None)
                         preloaded_model = SentenceTransformer(model_name, cache_folder=cache_dir)
                         rag_manager.set_preloaded_model(preloaded_model)
-                        print(f"[codeine] Embedding model loaded in {time.time() - model_start:.1f}s", file=sys.stderr)
+                        progress.end_embedding_loading()
 
                         # Initialize and sync RAG index
-                        print("[codeine] Building RAG index...", file=sys.stderr)
-                        rag_start = time.time()
-                        rag_manager.initialize(default_manager._project_root)
-                        rag_manager.sync_sources(
-                            reter=reter,
-                            project_root=default_manager._project_root
-                        )
-                        print(f"[codeine] RAG index built in {time.time() - rag_start:.1f}s", file=sys.stderr)
-                    except Exception as e:
-                        print(f"[codeine] RAG initialization failed: {e}", file=sys.stderr)
+                        # Progress bar is created lazily when embeddings actually start
+                        def rag_progress_callback(current: int, total: int, phase: str):
+                            progress.update_rag_progress(current, total)
 
-                print(f"[codeine] Total sync complete in {time.time() - start:.2f}s", file=sys.stderr)
+                        rag_manager.initialize(default_manager._project_root)
+
+                        rag_stats = rag_manager.sync_sources(
+                            reter=reter,
+                            project_root=default_manager._project_root,
+                            progress_callback=rag_progress_callback
+                        )
+                        vectors_indexed = rag_stats.get('total_vectors', 0) if rag_stats else 0
+                        progress.end_rag_indexing(vectors_indexed)
+                    except Exception as e:
+                        progress.set_component_error("RAG")
+                        logger.warning("RAG initialization failed: %s", e)
+                else:
+                    # RAG disabled - mark as ready
+                    progress.set_component_ready("Embedding")
+                    progress.set_component_ready("RAG")
+
+                progress.stop(success=True)
             else:
-                print("[codeine] Failed to create default instance", file=sys.stderr)
+                progress.stop(success=False)
         else:
-            print("[codeine] No project root configured (set RETER_PROJECT_ROOT or run from project dir)", file=sys.stderr)
+            # No project configured
+            progress.set_component_ready("RETER")
+            progress.set_component_ready("Embedding")
+            progress.set_component_ready("RAG")
+            progress.stop(success=True)
+    except Exception as e:
+        logger.exception("Sync failed: %s", e)
+        progress.stop(success=False)
+        raise
     finally:
         # Mark initialization complete (sync finished)
         set_initialization_in_progress(False)
         set_initialization_complete(True)
+        # Restore stderr logging
+        restore_stderr_logging()
 
 
 def main():

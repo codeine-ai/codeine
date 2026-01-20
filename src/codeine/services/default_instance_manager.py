@@ -102,12 +102,13 @@ class DefaultInstanceManager:
 
     INSTANCE_NAME = "default"
 
-    def __init__(self, persistence: "StatePersistenceService"):
+    def __init__(self, persistence: "StatePersistenceService", progress_callback: Optional[Any] = None):
         """
         Initialize the default instance manager.
 
         Args:
             persistence: StatePersistenceService for snapshot management
+            progress_callback: Optional ConsoleProgress for UI updates during initialization
         """
         self._persistence = persistence
         self._project_root: Optional[Path] = None
@@ -115,6 +116,8 @@ class DefaultInstanceManager:
         self._exclude_patterns: List[str] = []
         self._initialized = False
         self._syncing = False  # Re-entrancy guard to prevent recursive sync calls
+        self._progress_callback: Optional[Any] = None  # ConsoleProgress for UI updates
+        self._init_progress_callback = progress_callback  # Used during __init__ for gitignore loading
 
         # Gitignore support (patterns pre-loaded for performance)
         self._gitignore_parser: Optional[GitignoreParser] = None
@@ -157,7 +160,9 @@ class DefaultInstanceManager:
             # Only auto-detect if CWD looks like a Python project
             # (has .py files, pyproject.toml, setup.py, or .git)
             root = str(cwd)
-            print(f"[default] Auto-detected project root from CWD: {root}", file=sys.stderr, flush=True)
+            # Only print if no progress UI is active
+            if not self._init_progress_callback:
+                print(f"[default] Auto-detected project root from CWD: {root}", file=sys.stderr, flush=True)
 
         if root:
             self._project_root = Path(root).resolve()
@@ -168,9 +173,16 @@ class DefaultInstanceManager:
 
             # Initialize gitignore parser and pre-load ALL .gitignore files
             # This is more efficient than lazy loading during file scans
-            self._gitignore_parser = GitignoreParser(self._project_root)
+            if self._init_progress_callback and hasattr(self._init_progress_callback, 'start_gitignore_loading'):
+                self._init_progress_callback.start_gitignore_loading()
+
+            self._gitignore_parser = GitignoreParser(self._project_root, progress_callback=self._init_progress_callback)
             self._gitignore_parser.load_all_gitignores()
             pattern_count = self._gitignore_parser.get_pattern_count()
+
+            if self._init_progress_callback and hasattr(self._init_progress_callback, 'end_gitignore_loading'):
+                self._init_progress_callback.end_gitignore_loading(pattern_count)
+
             if pattern_count > 0:
                 debug_log(f"[default] Pre-loaded {pattern_count} gitignore patterns from {len(self._gitignore_parser.get_loaded_gitignores())} files")
 
@@ -297,10 +309,13 @@ class DefaultInstanceManager:
             self._observer.schedule(handler, str(self._project_root), recursive=True)
             self._observer.start()
             self._watcher_started = True
-            print(f"[FileWatcher] Started watching {self._project_root}", file=sys.stderr)
+            # Only print if no progress UI is active
+            if not self._progress_callback:
+                print(f"[FileWatcher] Started watching {self._project_root}", file=sys.stderr)
             return True
         except Exception as e:
-            print(f"[FileWatcher] Failed to start: {e}", file=sys.stderr)
+            if not self._progress_callback:
+                print(f"[FileWatcher] Failed to start: {e}", file=sys.stderr)
             self._observer = None
             return False
 
@@ -347,7 +362,11 @@ class DefaultInstanceManager:
 
         return "configured"
 
-    def ensure_default_instance_synced(self, reter: ReterWrapper) -> Optional[ReterWrapper]:
+    def ensure_default_instance_synced(
+        self,
+        reter: ReterWrapper,
+        progress_callback: Optional[Any] = None,
+    ) -> Optional[ReterWrapper]:
         """
         Ensure default instance is synced with project files.
 
@@ -360,6 +379,7 @@ class DefaultInstanceManager:
 
         Args:
             reter: The default ReterWrapper instance to sync
+            progress_callback: Optional ConsoleProgress instance for UI updates
 
         Returns:
             None if sync completed in-place (no changes to instance)
@@ -372,14 +392,17 @@ class DefaultInstanceManager:
         # This can happen when RAG sync triggers REQL queries that somehow
         # trigger another sync request
         if self._syncing:
-            print(f"[default] Sync already in progress, skipping recursive call", file=sys.stderr, flush=True)
+            if progress_callback is None:
+                print(f"[default] Sync already in progress, skipping recursive call", file=sys.stderr, flush=True)
             return None
 
         self._syncing = True
+        self._progress_callback = progress_callback
         try:
             return self._do_sync(reter)
         finally:
             self._syncing = False
+            self._progress_callback = None
 
     def _do_sync(self, reter: ReterWrapper) -> Optional[ReterWrapper]:
         """
@@ -396,25 +419,34 @@ class DefaultInstanceManager:
         """
         import time
         start = time.time()
-        print(f"[default] Syncing... (initialized={self._initialized})", file=sys.stderr, flush=True)
-        if self._include_patterns:
-            print(f"[default] Include patterns: {self._include_patterns}", file=sys.stderr, flush=True)
-        if self._exclude_patterns:
-            print(f"[default] Exclude patterns: {self._exclude_patterns}", file=sys.stderr, flush=True)
+        if self._progress_callback is None:
+            print(f"[default] Syncing... (initialized={self._initialized})", file=sys.stderr, flush=True)
+            if self._include_patterns:
+                print(f"[default] Include patterns: {self._include_patterns}", file=sys.stderr, flush=True)
+            if self._exclude_patterns:
+                print(f"[default] Exclude patterns: {self._exclude_patterns}", file=sys.stderr, flush=True)
+        else:
+            self._progress_callback.set_phase("Initializing sync...")
 
         # Load source state from JSON (single source of truth)
         state_loaded = self._source_state.load() if self._source_state else False
 
         # If no state file exists, build initial state from RETER (migration)
         if not state_loaded and self._source_state:
-            print(f"[default] No state file found, building from RETER...", file=sys.stderr, flush=True)
+            if self._progress_callback is None:
+                print(f"[default] No state file found, building from RETER...", file=sys.stderr, flush=True)
+            else:
+                self._progress_callback.set_phase("Building initial state...")
             all_sources, _ = reter.get_all_sources()
             self._source_state.build_from_reter(all_sources)
 
         # Check if we should do a full rebuild instead of incremental sync
         # This compacts the RETE network which bloats ~20% per modify cycle
         if self._modification_count >= self.REBUILD_THRESHOLD:
-            print(f"[default] Modification threshold exceeded ({self._modification_count} >= {self.REBUILD_THRESHOLD})", file=sys.stderr, flush=True)
+            if self._progress_callback is None:
+                print(f"[default] Modification threshold exceeded ({self._modification_count} >= {self.REBUILD_THRESHOLD})", file=sys.stderr, flush=True)
+            else:
+                self._progress_callback.set_phase("Rebuilding (compacting)...")
             # For rebuild, we need to scan all files
             current_files = self._scan_project_files()
             fresh_reter = self._force_rebuild(current_files)
@@ -439,11 +471,15 @@ class DefaultInstanceManager:
             # Save the fresh (compacted) snapshot
             self._persistence.snapshots_dir.mkdir(parents=True, exist_ok=True)
             snapshot_path = self._persistence.snapshots_dir / ".default.reter"
-            print(f"[default] Saving compacted snapshot to {snapshot_path}...", file=sys.stderr, flush=True)
+            if self._progress_callback is None:
+                print(f"[default] Saving compacted snapshot to {snapshot_path}...", file=sys.stderr, flush=True)
+            else:
+                self._progress_callback.set_phase("Saving snapshot...")
             save_start = time.time()
             fresh_reter.save_network(str(snapshot_path))
             fresh_reter.mark_clean()
-            print(f"[default] Compacted snapshot saved in {time.time()-save_start:.2f}s (total: {time.time()-start:.2f}s)", file=sys.stderr, flush=True)
+            if self._progress_callback is None:
+                print(f"[default] Compacted snapshot saved in {time.time()-save_start:.2f}s (total: {time.time()-start:.2f}s)", file=sys.stderr, flush=True)
 
             self._initialized = True
             self._dirty = False  # Just rebuilt, everything is clean
@@ -459,16 +495,27 @@ class DefaultInstanceManager:
             # Check if we can skip the scan (no changes detected by watcher)
             if not self._dirty and self._watcher_started and self._initialized:
                 debug_log(f"[default] No changes detected by watcher, skipping scan")
-                print(f"[default] No changes (watcher), skipping scan (total: {time.time()-start:.2f}s)", file=sys.stderr, flush=True)
+                if self._progress_callback is None:
+                    print(f"[default] No changes (watcher), skipping scan (total: {time.time()-start:.2f}s)", file=sys.stderr, flush=True)
                 return None
 
-            print(f"[default] Quick scanning with mtime-first check...", file=sys.stderr, flush=True)
+            if self._progress_callback is None:
+                print(f"[default] Quick scanning with mtime-first check...", file=sys.stderr, flush=True)
+            else:
+                self._progress_callback.set_phase("Scanning for changes...")
+                self._progress_callback.start_scan("Scanning files")
+
             changes = self._source_state.scan_and_diff(
                 include_patterns=self._include_patterns,
                 exclude_patterns=self._exclude_patterns,
                 is_excluded_func=self._is_excluded_for_scan,
             )
-            print(f"[default] Quick scan found +{len(changes.to_add)} ~{len(changes.to_modify)} -{len(changes.to_delete)} in {time.time()-start:.2f}s", file=sys.stderr, flush=True)
+
+            total_changes = len(changes.to_add) + len(changes.to_modify) + len(changes.to_delete)
+            if self._progress_callback is None:
+                print(f"[default] Quick scan found +{len(changes.to_add)} ~{len(changes.to_modify)} -{len(changes.to_delete)} in {time.time()-start:.2f}s", file=sys.stderr, flush=True)
+            else:
+                self._progress_callback.end_scan(total_changes)
 
             # Clear dirty flag after successful scan
             self._dirty = False
@@ -477,36 +524,47 @@ class DefaultInstanceManager:
             changes_made = self._apply_sync_changes(reter, changes)
         else:
             # Fallback to old method if no state manager
-            print(f"[default] Scanning filesystem (fallback)...", file=sys.stderr, flush=True)
+            if self._progress_callback is None:
+                print(f"[default] Scanning filesystem (fallback)...", file=sys.stderr, flush=True)
             current_files = self._scan_project_files()
-            print(f"[default] Found {len(current_files)} code files in {time.time()-start:.2f}s", file=sys.stderr, flush=True)
+            if self._progress_callback is None:
+                print(f"[default] Found {len(current_files)} code files in {time.time()-start:.2f}s", file=sys.stderr, flush=True)
 
-            print(f"[default] Querying existing sources...", file=sys.stderr, flush=True)
+            if self._progress_callback is None:
+                print(f"[default] Querying existing sources...", file=sys.stderr, flush=True)
             existing_sources = self._get_existing_sources(reter)
-            print(f"[default] Found {len(existing_sources)} sources already loaded in {time.time()-start:.2f}s", file=sys.stderr, flush=True)
+            if self._progress_callback is None:
+                print(f"[default] Found {len(existing_sources)} sources already loaded in {time.time()-start:.2f}s", file=sys.stderr, flush=True)
 
-            print(f"[default] Syncing files...", file=sys.stderr, flush=True)
+            if self._progress_callback is None:
+                print(f"[default] Syncing files...", file=sys.stderr, flush=True)
             changes_made = self._sync_files(reter, current_files, existing_sources)
 
             # Clear dirty flag after fallback scan too
             self._dirty = False
 
-        print(f"[default] Sync completed in {time.time()-start:.2f}s", file=sys.stderr, flush=True)
+        if self._progress_callback is None:
+            print(f"[default] Sync completed in {time.time()-start:.2f}s", file=sys.stderr, flush=True)
 
         # Auto-save snapshot if any changes were made
         if changes_made:
             self._persistence.snapshots_dir.mkdir(parents=True, exist_ok=True)
             snapshot_path = self._persistence.snapshots_dir / ".default.reter"
-            print(f"[default] Saving snapshot to {snapshot_path}...", file=sys.stderr, flush=True)
+            if self._progress_callback is None:
+                print(f"[default] Saving snapshot to {snapshot_path}...", file=sys.stderr, flush=True)
+            else:
+                self._progress_callback.set_phase("Saving snapshot...")
             save_start = time.time()
             reter.save_network(str(snapshot_path))
             reter.mark_clean()
             # Also save source state
             if self._source_state:
                 self._source_state.save()
-            print(f"[default] Snapshot saved in {time.time()-save_start:.2f}s (total: {time.time()-start:.2f}s)", file=sys.stderr, flush=True)
+            if self._progress_callback is None:
+                print(f"[default] Snapshot saved in {time.time()-save_start:.2f}s (total: {time.time()-start:.2f}s)", file=sys.stderr, flush=True)
         else:
-            print(f"[default] No changes detected, skipping snapshot save (total: {time.time()-start:.2f}s)", file=sys.stderr, flush=True)
+            if self._progress_callback is None:
+                print(f"[default] No changes detected, skipping snapshot save (total: {time.time()-start:.2f}s)", file=sys.stderr, flush=True)
 
         self._initialized = True
 
@@ -516,21 +574,36 @@ class DefaultInstanceManager:
 
         # Initialize RAG index if configured (lazy initialization)
         if self._rag_manager and self._rag_manager.is_enabled and not self._rag_manager.is_initialized:
-            print(f"[default] Initializing RAG index...", file=sys.stderr, flush=True)
+            if self._progress_callback is None:
+                print(f"[default] Initializing RAG index...", file=sys.stderr, flush=True)
+            else:
+                self._progress_callback.start_rag_indexing()
+
+            # Create progress callback for RAG sync
+            def rag_progress_callback(current: int, total: int, phase: str):
+                if self._progress_callback:
+                    self._progress_callback.update_rag_progress(current, total)
+
             try:
                 rag_start = time.time()
                 rag_stats = self._rag_manager.sync_sources(
                     reter=reter,
                     project_root=self._project_root,
+                    progress_callback=rag_progress_callback,
                 )
-                print(
-                    f"[default] RAG initialized: {rag_stats.get('total_vectors', 0)} vectors "
-                    f"in {time.time() - rag_start:.2f}s",
-                    file=sys.stderr, flush=True
-                )
+                total_vectors = rag_stats.get('total_vectors', 0)
+                if self._progress_callback is None:
+                    print(
+                        f"[default] RAG initialized: {total_vectors} vectors "
+                        f"in {time.time() - rag_start:.2f}s",
+                        file=sys.stderr, flush=True
+                    )
+                else:
+                    self._progress_callback.end_rag_indexing(total_vectors)
             except Exception as e:
                 import traceback
-                print(f"[default] RAG initialization error: {e}", file=sys.stderr, flush=True)
+                if self._progress_callback is None:
+                    print(f"[default] RAG initialization error: {e}", file=sys.stderr, flush=True)
                 debug_log(f"[default] RAG initialization error: {traceback.format_exc()}")
 
         return None  # No rebuild needed, sync completed in-place
@@ -601,7 +674,8 @@ class DefaultInstanceManager:
         # Process deletions first (before entity accumulation)
         for file_info in changes.to_delete:
             if file_info.reter_source_id:
-                print(f"[default] Forgetting deleted file: {file_info.rel_path}", file=sys.stderr, flush=True)
+                if self._progress_callback is None:
+                    print(f"[default] Forgetting deleted file: {file_info.rel_path}", file=sys.stderr, flush=True)
                 try:
                     reter.forget_source(file_info.reter_source_id)
                     deleted_count += 1
@@ -611,7 +685,8 @@ class DefaultInstanceManager:
                         self._source_state.remove_file(file_info.rel_path)
                 except Exception as e:
                     error_msg = f"Error forgetting {file_info.rel_path}: {type(e).__name__}: {e}"
-                    print(f"[default]   ✗ {error_msg}", file=sys.stderr, flush=True)
+                    if self._progress_callback is None:
+                        print(f"[default]   ✗ {error_msg}", file=sys.stderr, flush=True)
                     errors.append(error_msg)
 
         # Enable entity accumulation for batch loading of new/modified files
@@ -621,9 +696,22 @@ class DefaultInstanceManager:
             reter.begin_entity_accumulation()
 
         try:
+            # Calculate total files for progress
+            total_files = len(changes.to_modify) + len(changes.to_add)
+            current_file_idx = 0
+
+            # Start file loading progress if we have a progress callback
+            if self._progress_callback is not None and total_files > 0:
+                self._progress_callback.set_phase("Loading code files...")
+                self._progress_callback.start_file_loading(total_files)
+
             # Process modifications (forget then reload)
             for new_info, old_info in changes.to_modify:
-                print(f"[default] Reloading modified file: {new_info.rel_path}", file=sys.stderr, flush=True)
+                current_file_idx += 1
+                if self._progress_callback is None:
+                    print(f"[default] Reloading modified file: {new_info.rel_path}", file=sys.stderr, flush=True)
+                else:
+                    self._progress_callback.update_file_progress(current_file_idx, total_files, new_info.rel_path)
                 try:
                     # Forget old version
                     if old_info.reter_source_id:
@@ -644,12 +732,17 @@ class DefaultInstanceManager:
 
                 except Exception as e:
                     error_msg = f"Error reloading {new_info.rel_path}: {type(e).__name__}: {e}"
-                    print(f"[default]   ✗ {error_msg}", file=sys.stderr, flush=True)
+                    if self._progress_callback is None:
+                        print(f"[default]   ✗ {error_msg}", file=sys.stderr, flush=True)
                     errors.append(error_msg)
 
             # Process additions
             for file_info in changes.to_add:
-                print(f"[default] Adding new file: {file_info.rel_path}", file=sys.stderr, flush=True)
+                current_file_idx += 1
+                if self._progress_callback is None:
+                    print(f"[default] Adding new file: {file_info.rel_path}", file=sys.stderr, flush=True)
+                else:
+                    self._progress_callback.update_file_progress(current_file_idx, total_files, file_info.rel_path)
                 try:
                     self._load_code_file(reter, file_info.abs_path, file_info.rel_path)
                     added_count += 1
@@ -664,20 +757,25 @@ class DefaultInstanceManager:
 
                 except Exception as e:
                     error_msg = f"Error loading {file_info.rel_path}: {type(e).__name__}: {e}"
-                    print(f"[default]   ✗ {error_msg}", file=sys.stderr, flush=True)
+                    if self._progress_callback is None:
+                        print(f"[default]   ✗ {error_msg}", file=sys.stderr, flush=True)
                     errors.append(error_msg)
+
+            # End file loading progress
+            if self._progress_callback is not None and total_files > 0:
+                self._progress_callback.end_file_loading()
 
         finally:
             # Finalize entity accumulation - merges duplicate entities
             if use_accumulation:
                 self._finalize_entity_accumulation_with_progress(reter)
 
-        if errors:
+        if errors and self._progress_callback is None:
             print(f"[default] Sync completed with {len(errors)} errors", file=sys.stderr, flush=True)
 
         changes_made = added_count > 0 or modified_count > 0 or deleted_count > 0
 
-        if changes_made:
+        if changes_made and self._progress_callback is None:
             print(f"[default] Sync complete: +{added_count} ~{modified_count} -{deleted_count}", file=sys.stderr)
 
         # Track modifications for compaction
@@ -696,7 +794,8 @@ class DefaultInstanceManager:
                 changed_cpp_sources or deleted_cpp_sources
             )
             if has_changes:
-                print(f"[default] Syncing RAG index...", file=sys.stderr, flush=True)
+                if self._progress_callback is None:
+                    print(f"[default] Syncing RAG index...", file=sys.stderr, flush=True)
                 try:
                     rag_stats = self._rag_manager.sync(
                         reter=reter,
@@ -719,11 +818,12 @@ class DefaultInstanceManager:
                         rag_stats.get('csharp_vectors_added', 0) +
                         rag_stats.get('cpp_vectors_added', 0)
                     )
-                    print(
-                        f"[default] RAG sync: +{total_added} vectors "
-                        f"in {rag_stats.get('time_ms', 0)}ms",
-                        file=sys.stderr, flush=True
-                    )
+                    if self._progress_callback is None:
+                        print(
+                            f"[default] RAG sync: +{total_added} vectors "
+                            f"in {rag_stats.get('time_ms', 0)}ms",
+                            file=sys.stderr, flush=True
+                        )
 
                     # Mark files as indexed in RAG
                     if self._source_state:
@@ -733,7 +833,8 @@ class DefaultInstanceManager:
                                 self._source_state.mark_in_rag(rel_path)
 
                 except Exception as e:
-                    print(f"[default] RAG sync error: {e}", file=sys.stderr, flush=True)
+                    if self._progress_callback is None:
+                        print(f"[default] RAG sync error: {e}", file=sys.stderr, flush=True)
 
         return changes_made
 
@@ -1014,20 +1115,31 @@ class DefaultInstanceManager:
             reter.end_entity_accumulation()
             return 0
 
-        # Print initial progress line (will be updated in-place)
-        print(f"\r[default] Inserting entities: 0/{accumulated} (0%)", end="", file=sys.stderr, flush=True)
+        # Start entity processing progress
+        if self._progress_callback:
+            self._progress_callback.start_entity_processing(accumulated)
+        else:
+            # Print initial progress line (will be updated in-place)
+            print(f"\r[default] Inserting entities: 0/{accumulated} (0%)", end="", file=sys.stderr, flush=True)
 
         def on_progress(processed: int, total: int) -> None:
-            pct = 100 * processed // total if total > 0 else 0
-            print(f"\r[default] Inserting entities: {processed}/{total} ({pct}%)", end="", file=sys.stderr, flush=True)
+            if self._progress_callback:
+                self._progress_callback.update_entity_progress(processed, total)
+            else:
+                pct = 100 * processed // total if total > 0 else 0
+                print(f"\r[default] Inserting entities: {processed}/{total} ({pct}%)", end="", file=sys.stderr, flush=True)
 
         total = reter.end_entity_accumulation_with_progress(
             batch_size=batch_size,
             progress_callback=on_progress
         )
 
-        # Print final newline to complete the progress line
-        print(f"\r[default] Entity accumulation: {total} unique entities merged    ", file=sys.stderr, flush=True)
+        # End entity processing progress
+        if self._progress_callback:
+            self._progress_callback.end_entity_processing()
+        else:
+            # Print final newline to complete the progress line
+            print(f"\r[default] Entity accumulation: {total} unique entities merged    ", file=sys.stderr, flush=True)
 
         return total
 
@@ -1115,35 +1227,55 @@ class DefaultInstanceManager:
             reter.begin_entity_accumulation()
 
         try:
+            # Count files to process for progress reporting
+            files_to_process = list(current_files.items())
+            total_files = len(files_to_process)
+            processed_files = 0
+
+            # Start file loading progress if callback is provided
+            if self._progress_callback:
+                self._progress_callback.start_file_loading(total_files)
+
             # Find new and modified files
-            for rel_path, (abs_path, current_md5) in current_files.items():
+            for rel_path, (abs_path, current_md5) in files_to_process:
+                processed_files += 1
+
+                # Update progress callback
+                if self._progress_callback:
+                    self._progress_callback.update_file_progress(processed_files, total_files, rel_path)
+
                 if rel_path not in existing_sources:
                     # New file - load it using the appropriate loader
                     debug_log(f"[default] NEW file (not in existing): {rel_path}")
-                    print(f"[default] Adding new file: {rel_path}", file=sys.stderr, flush=True)
+                    if self._progress_callback is None:
+                        print(f"[default] Adding new file: {rel_path}", file=sys.stderr, flush=True)
                     try:
                         self._load_code_file(reter, abs_path, rel_path)
                         added_count += 1
-                        print(f"[default]   ✓ Added {rel_path}", file=sys.stderr, flush=True)
+                        if self._progress_callback is None:
+                            print(f"[default]   ✓ Added {rel_path}", file=sys.stderr, flush=True)
                         # Track for RAG: construct source_id from md5 and rel_path
                         new_source_id = f"{current_md5}|{rel_path}"
                         track_changed_source(rel_path, new_source_id)
                     except Exception as e:
                         # Log error but continue with other files (don't re-raise)
                         error_msg = f"Error loading {rel_path}: {type(e).__name__}: {e}"
-                        print(f"[default]   ✗ {error_msg}", file=sys.stderr, flush=True)
+                        if self._progress_callback is None:
+                            print(f"[default]   ✗ {error_msg}", file=sys.stderr, flush=True)
                         errors.append(error_msg)
                 else:
                     old_md5, old_source_id = existing_sources[rel_path]
                     if old_md5 != current_md5:
                         # Modified file - forget and reload
                         debug_log(f"[default] MD5 MISMATCH: {rel_path} old={old_md5[:8]}... new={current_md5[:8]}...")
-                        print(f"[default] Reloading modified file: {rel_path}", file=sys.stderr, flush=True)
+                        if self._progress_callback is None:
+                            print(f"[default] Reloading modified file: {rel_path}", file=sys.stderr, flush=True)
                         try:
                             reter.forget_source(old_source_id)
                             self._load_code_file(reter, abs_path, rel_path)
                             modified_count += 1
-                            print(f"[default]   ✓ Reloaded {rel_path}", file=sys.stderr, flush=True)
+                            if self._progress_callback is None:
+                                print(f"[default]   ✓ Reloaded {rel_path}", file=sys.stderr, flush=True)
                             # Track for RAG: old source deleted, new source added
                             track_deleted_source(rel_path, old_source_id)
                             new_source_id = f"{current_md5}|{rel_path}"
@@ -1151,8 +1283,13 @@ class DefaultInstanceManager:
                         except Exception as e:
                             # Log error but continue with other files (don't re-raise)
                             error_msg = f"Error reloading {rel_path}: {type(e).__name__}: {e}"
-                            print(f"[default]   ✗ {error_msg}", file=sys.stderr, flush=True)
+                            if self._progress_callback is None:
+                                print(f"[default]   ✗ {error_msg}", file=sys.stderr, flush=True)
                             errors.append(error_msg)
+
+            # End file loading progress
+            if self._progress_callback:
+                self._progress_callback.end_file_loading()
 
         finally:
             # Finalize entity accumulation - merges duplicate entities
@@ -1163,25 +1300,28 @@ class DefaultInstanceManager:
         for rel_path, (old_md5, old_source_id) in existing_sources.items():
             if rel_path not in current_files:
                 # Deleted file - forget it
-                print(f"[default] Forgetting deleted file: {rel_path}", file=sys.stderr, flush=True)
+                if self._progress_callback is None:
+                    print(f"[default] Forgetting deleted file: {rel_path}", file=sys.stderr, flush=True)
                 try:
                     reter.forget_source(old_source_id)
                     deleted_count += 1
-                    print(f"[default]   ✓ Forgot {rel_path}", file=sys.stderr, flush=True)
+                    if self._progress_callback is None:
+                        print(f"[default]   ✓ Forgot {rel_path}", file=sys.stderr, flush=True)
                     # Track for RAG
                     track_deleted_source(rel_path, old_source_id)
                 except Exception as e:
                     # Log error but continue with other files (don't re-raise)
                     error_msg = f"Error forgetting {rel_path}: {type(e).__name__}: {e}"
-                    print(f"[default]   ✗ {error_msg}", file=sys.stderr, flush=True)
+                    if self._progress_callback is None:
+                        print(f"[default]   ✗ {error_msg}", file=sys.stderr, flush=True)
                     errors.append(error_msg)
 
-        if errors:
+        if errors and self._progress_callback is None:
             print(f"[default] Sync completed with {len(errors)} errors", file=sys.stderr, flush=True)
 
         changes_made = added_count > 0 or modified_count > 0 or deleted_count > 0
 
-        if changes_made:
+        if changes_made and self._progress_callback is None:
             print(f"[default] Sync complete: +{added_count} ~{modified_count} -{deleted_count}", file=sys.stderr)
 
         # Sync with RAG index if configured
@@ -1196,7 +1336,8 @@ class DefaultInstanceManager:
                 changed_cpp_sources or deleted_cpp_sources
             )
             if has_changes:
-                print(f"[default] Syncing RAG index...", file=sys.stderr, flush=True)
+                if self._progress_callback is None:
+                    print(f"[default] Syncing RAG index...", file=sys.stderr, flush=True)
                 try:
                     rag_stats = self._rag_manager.sync(
                         reter=reter,
@@ -1219,13 +1360,15 @@ class DefaultInstanceManager:
                         rag_stats.get('csharp_vectors_added', 0) +
                         rag_stats.get('cpp_vectors_added', 0)
                     )
-                    print(
-                        f"[default] RAG sync: +{total_added} vectors "
-                        f"in {rag_stats.get('time_ms', 0)}ms",
-                        file=sys.stderr, flush=True
-                    )
+                    if self._progress_callback is None:
+                        print(
+                            f"[default] RAG sync: +{total_added} vectors "
+                            f"in {rag_stats.get('time_ms', 0)}ms",
+                            file=sys.stderr, flush=True
+                        )
                 except Exception as e:
-                    print(f"[default] RAG sync error: {e}", file=sys.stderr, flush=True)
+                    if self._progress_callback is None:
+                        print(f"[default] RAG sync error: {e}", file=sys.stderr, flush=True)
 
         # Track modifications for compaction (only forget operations cause bloat)
         modification_ops = modified_count + deleted_count

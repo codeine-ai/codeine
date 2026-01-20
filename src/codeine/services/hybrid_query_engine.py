@@ -21,6 +21,12 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from ..logging_config import nlq_debug_logger as debug_log
+from .agent_sdk_client import (
+    is_agent_sdk_available,
+    generate_reql_query,
+    generate_cadsl_query,
+    classify_query as classify_query_sdk,
+)
 
 
 # ============================================================
@@ -629,11 +635,11 @@ async def classify_query_with_llm(question: str, ctx) -> QueryClassification:
 
     First checks for keywords that MUST use RAG (duplicate/similar detection),
     then performs case-based reasoning to find similar CADSL tools,
-    then passes them to the classifier as context to improve routing.
+    then uses Agent SDK (or sampling fallback) to classify.
 
     Args:
         question: The natural language question
-        ctx: MCP context for LLM sampling
+        ctx: MCP context for LLM sampling (used as fallback)
 
     Returns:
         QueryClassification with type, reasoning, and similar tools
@@ -644,48 +650,39 @@ async def classify_query_with_llm(question: str, ctx) -> QueryClassification:
         return keyword_classification
 
     # Case-based reasoning: find similar CADSL tools FIRST
-    # This helps the classifier make better routing decisions
     similar_tools = find_similar_cadsl_tools(question, max_results=3)
     if similar_tools:
         tool_names = [t.name for t in similar_tools]
         debug_log.debug(f"CASE-BASED REASONING: Found similar tools: {tool_names}")
 
+    # Use Agent SDK for classification
+    if not is_agent_sdk_available():
+        debug_log.debug("Agent SDK not available, defaulting to REQL")
+        return QueryClassification(
+            query_type=QueryType.REQL,
+            confidence=0.5,
+            reasoning="Agent SDK not available, defaulting to REQL",
+            similar_tools=similar_tools,
+        )
+
     try:
-        # Build prompt with similar tools context
-        prompt = f"Classify this code analysis question:\n\n{question}"
-        classification_context = build_classification_context(similar_tools)
-        if classification_context:
-            prompt = prompt + classification_context
-
-        response = await ctx.sample(prompt, system_prompt=CLASSIFICATION_SYSTEM_PROMPT)
-        response_text = response.text if hasattr(response, 'text') else str(response)
-
-        debug_log.debug(f"CLASSIFICATION RESPONSE: {response_text}")
-
-        # Parse JSON response
-        json_match = re.search(r'\{[^{}]*\}', response_text, re.DOTALL)
-        if json_match:
-            result = json.loads(json_match.group())
-        else:
-            result = json.loads(response_text)
-
+        debug_log.debug("Using Agent SDK for classification")
+        result = await classify_query_sdk(question)
         query_type = QueryType(result.get("type", "reql"))
-
         return QueryClassification(
             query_type=query_type,
             confidence=float(result.get("confidence", 0.8)),
-            reasoning=result.get("reasoning", "LLM classification"),
+            reasoning=result.get("reasoning", "Agent SDK classification"),
             suggested_cadsl_tool=result.get("suggested_tool"),
-            similar_tools=similar_tools,  # Always include similar tools
+            similar_tools=similar_tools,
         )
-
     except Exception as e:
-        debug_log.debug(f"LLM classification failed: {e}, falling back to REQL")
+        debug_log.debug(f"Agent SDK classification failed: {e}, defaulting to REQL")
         return QueryClassification(
             query_type=QueryType.REQL,
             confidence=0.5,
             reasoning=f"Fallback to REQL (classification error: {e})",
-            similar_tools=similar_tools,  # Still include similar tools
+            similar_tools=similar_tools,
         )
 
 
@@ -700,53 +697,96 @@ You have tools available to help you:
 - list_examples: See available query examples
 - get_example: View a specific example
 
-CRITICAL SYNTAX RULES:
-1. Type patterns MUST use `type` predicate: `?x type oo:Class` NOT `?x oo:Class`
-2. Use `oo:` prefix ONLY for types after `type`: oo:Class, oo:Method, oo:Function, oo:Module
-3. Predicates have NO prefix: `name`, `inFile`, `definedIn`, `calls`, `inheritsFrom`, `atLine`
-4. FILTER needs parentheses: `FILTER(?count > 5)`
-5. Separate patterns with dots: `?x type oo:Class . ?x name ?n`
+## CRITICAL: UNDERSTAND THE INTENT
 
-NOT SUPPORTED - DO NOT USE:
-- BIND(...AS ?var) - NOT available in REQL
-- VALUES ?var { ... } - NOT available in REQL
-- If you need labels, just omit them or use separate queries per type
+Before generating a query, understand what the user is ACTUALLY asking for:
+- "entry points" = functions named main, run, start, serve, app, execute, handle, etc.
+- "server classes" = classes named Server, Service, Handler, Controller, API, App, etc.
+- "utility classes" = classes named Utils, Helper, Common, Shared, etc.
+- "test classes" = classes named Test*, *Test, *Spec, etc.
+- "data classes" = classes named *Model, *Entity, *DTO, *Schema, etc.
+- "configuration" = classes/functions with Config, Settings, Options in name
 
-BOOLEAN PREDICATES (for code quality queries):
-Many boolean predicates exist for code analysis. Use them directly with `true`:
-- Exception handling: `?handler isSilentSwallow true`, `?handler bodyIsEmpty true`
-- Code patterns: `?literal isMagicNumber true`, `?method isAsync true`
-- Example: Find silent exception handlers:
-  SELECT ?handler ?file ?line WHERE {
-      ?handler type oo:CatchClause .
-      ?handler isSilentSwallow true .
-      ?handler inFile ?file .
-      ?handler atLine ?line
-  }
+Use REGEX with case-insensitive flag "i" to match semantic concepts:
+  FILTER(REGEX(?name, "main|run|start|serve|execute", "i"))
 
-AGGREGATION PATTERNS (for counting, finding "more than N", etc.):
+## ENTITY TYPES (oo: prefix for cross-language)
+- oo:Class, oo:Method, oo:Function, oo:Module
+- oo:Constructor, oo:Field, oo:Parameter
+- oo:Import, oo:CatchClause, oo:Decorator
+
+## COMMON PREDICATES (NO prefix)
+- `name` - Entity name
+- `inFile` - Source file path
+- `atLine` - Line number
+- `definedIn` - Parent class/module
+- `inheritsFrom` - Class inheritance
+- `calls` - Function calls another
+- `docstring` - Documentation string
+
+## SYNTAX RULES
+1. Type patterns: `?x type oo:Class` (NOT `?x oo:Class`)
+2. Predicates have NO prefix: `name`, `inFile`, `definedIn`
+3. FILTER needs parentheses: `FILTER(?count > 5)`
+4. Separate patterns with dots: `?x type oo:Class . ?x name ?n`
+
+## SEMANTIC QUERY PATTERNS
+
+Find entry points and main functions:
+```
+SELECT ?func ?name ?file ?line WHERE {
+    ?func type oo:Function .
+    ?func name ?name .
+    ?func inFile ?file .
+    ?func atLine ?line .
+    FILTER(REGEX(?name, "main|run|start|entry|serve|execute|handle|app", "i"))
+}
+```
+
+Find server/service classes:
+```
+SELECT ?class ?name ?file WHERE {
+    ?class type oo:Class .
+    ?class name ?name .
+    ?class inFile ?file .
+    FILTER(REGEX(?name, "server|service|handler|controller|api|app|endpoint|router", "i"))
+}
+```
+
+Find test classes:
+```
+SELECT ?class ?name ?file WHERE {
+    ?class type oo:Class .
+    ?class name ?name .
+    ?class inFile ?file .
+    FILTER(REGEX(?name, "^Test|Test$|Spec$|_test", "i"))
+}
+```
+
+## AGGREGATION PATTERNS
 - Use (COUNT(?var) AS ?alias) in SELECT clause
-- Use GROUP BY for the variables you want to group by
-- Use HAVING (?alias > N) to filter by count (NOT FILTER!)
-- Example: "Find classes with more than 10 methods":
-  SELECT ?class ?name (COUNT(?method) AS ?method_count) WHERE {
-      ?class type oo:Class . ?class name ?name .
-      ?method type oo:Method . ?method definedIn ?class
-  }
-  GROUP BY ?class ?name
-  HAVING (?method_count > 10)
-  ORDER BY DESC(?method_count)
+- Use GROUP BY + HAVING for filtering aggregates (NOT FILTER!)
 
-COMMON MISTAKES:
-  WRONG: `?x oo:Class .`           <- missing `type` predicate!
-  RIGHT: `?x type oo:Class .`      <- always include `type`
+Example - Find large classes:
+```
+SELECT ?class ?name (COUNT(?method) AS ?method_count) WHERE {
+    ?class type oo:Class . ?class name ?name .
+    ?method type oo:Method . ?method definedIn ?class
+}
+GROUP BY ?class ?name
+HAVING (?method_count > 10)
+ORDER BY DESC(?method_count)
+```
 
-  WRONG: FILTER(?count > 5) for aggregation  <- FILTER is for row-level filtering
-  RIGHT: HAVING (?count > 5) for aggregation <- HAVING filters after GROUP BY
+## UNION RULES (CRITICAL)
+- UNION must be INSIDE WHERE clause
+- ALL UNION arms MUST bind the SAME variables!
+  WRONG: `{ ?x name ?n } UNION { ?x parent ?p }` <- different vars!
+  RIGHT: `{ ?x name ?n } UNION { ?x name ?n }` <- same vars
 
-  WRONG: BIND("label" AS ?type)    <- BIND not supported!
-  WRONG: VALUES ?type { "label" }  <- VALUES not supported!
-  RIGHT: Just query without labels, or run separate queries per type
+## NOT SUPPORTED
+- BIND(...AS ?var) - NOT available
+- VALUES ?var { ... } - NOT available
 
 When ready, return ONLY the REQL query (no explanation).
 """
@@ -812,98 +852,63 @@ def build_similar_tools_section(similar_tools: List[SimilarTool]) -> str:
 async def generate_query_with_tools(
     question: str,
     query_type: QueryType,
-    ctx,
+    ctx,  # Kept for backwards compatibility but not used
     max_iterations: int = 5,
-    similar_tools: Optional[List[SimilarTool]] = None
+    similar_tools: Optional[List[SimilarTool]] = None,
+    reter_instance=None,
+    schema_info: str = "",
+    rag_manager=None
 ) -> str:
     """
-    Generate a query using tool-augmented LLM with case-based reasoning.
-
-    The LLM can call tools to fetch grammars and examples before generating.
-    If similar tools are provided from case-based reasoning, they are included
-    as templates that the LLM can adapt.
+    Generate a query using Agent SDK with case-based reasoning.
 
     Args:
         question: Natural language question
         query_type: REQL or CADSL
-        ctx: MCP context for sampling
-        max_iterations: Maximum tool-use iterations
+        ctx: Unused (kept for backwards compatibility)
+        max_iterations: Maximum iterations for Agent SDK
         similar_tools: Similar CADSL tools from case-based reasoning
+        reter_instance: Optional Reter instance for query validation
+        schema_info: Schema information for REQL queries
 
     Returns:
         Generated query string
     """
-    system_prompt = REQL_GENERATION_PROMPT if query_type == QueryType.REQL else CADSL_GENERATION_PROMPT
+    if not is_agent_sdk_available():
+        raise RuntimeError("Claude Agent SDK not available. Install with: pip install claude-agent-sdk")
 
-    # Build user message with similar tools if available
-    user_content = f"Generate a query for: {question}"
-
+    # Build similar tools context
+    similar_tools_context = None
     if similar_tools:
-        similar_section = build_similar_tools_section(similar_tools)
-        user_content = f"{user_content}\n{similar_section}"
+        similar_tools_context = build_similar_tools_section(similar_tools)
         debug_log.debug(f"Including {len(similar_tools)} similar tools as templates")
 
-    messages = [
-        {"role": "user", "content": user_content}
-    ]
+    debug_log.debug(f"Using Agent SDK for {query_type.value} generation")
 
-    for iteration in range(max_iterations):
-        debug_log.debug(f"Query generation iteration {iteration + 1}")
-
-        # Call LLM with tools
-        response = await ctx.sample(
-            messages[-1]["content"] if iteration == 0 else None,
-            system_prompt=system_prompt,
-            tools=QUERY_TOOLS,
-            messages=messages if iteration > 0 else None
+    if query_type == QueryType.REQL:
+        result = await generate_reql_query(
+            question=question,
+            schema_info=schema_info,
+            reter_instance=reter_instance,
+            max_iterations=max_iterations,
+            similar_tools_context=similar_tools_context,
+            rag_manager=rag_manager
+        )
+    else:  # CADSL
+        result = await generate_cadsl_query(
+            question=question,
+            schema_info=schema_info,
+            max_iterations=max_iterations,
+            similar_tools_context=similar_tools_context,
+            reter_instance=reter_instance,
+            rag_manager=rag_manager
         )
 
-        response_text = response.text if hasattr(response, 'text') else str(response)
-        debug_log.debug(f"LLM response: {response_text[:500]}...")
-
-        # Check if response contains tool calls
-        tool_calls = getattr(response, 'tool_calls', None) or []
-
-        # Also check for tool_use in content blocks (Claude format)
-        if hasattr(response, 'content'):
-            for block in response.content:
-                if hasattr(block, 'type') and block.type == 'tool_use':
-                    tool_calls.append({
-                        'name': block.name,
-                        'input': block.input,
-                        'id': getattr(block, 'id', f'tool_{iteration}')
-                    })
-
-        if not tool_calls:
-            # No tool calls - LLM returned the final query
-            return extract_query_from_response(response_text, query_type)
-
-        # Handle tool calls
-        for tool_call in tool_calls:
-            tool_name = tool_call.get('name') or getattr(tool_call, 'name', '')
-            tool_input = tool_call.get('input') or getattr(tool_call, 'input', {})
-            tool_id = tool_call.get('id') or getattr(tool_call, 'id', f'tool_{iteration}')
-
-            debug_log.debug(f"Tool call: {tool_name}({tool_input})")
-
-            # Execute tool
-            tool_result = handle_tool_call(tool_name, tool_input)
-
-            # Add to conversation
-            messages.append({
-                "role": "assistant",
-                "content": response_text,
-                "tool_calls": [{"id": tool_id, "name": tool_name, "input": tool_input}]
-            })
-            messages.append({
-                "role": "tool",
-                "tool_call_id": tool_id,
-                "content": tool_result
-            })
-
-    # Max iterations reached
-    debug_log.warning("Max iterations reached in query generation")
-    return extract_query_from_response(response_text, query_type)
+    if result.success and result.query:
+        debug_log.debug(f"Agent SDK generated query: {result.query[:200]}...")
+        return result.query
+    else:
+        raise RuntimeError(f"Query generation failed: {result.error}")
 
 
 def extract_query_from_response(response_text: str, query_type: QueryType) -> str:

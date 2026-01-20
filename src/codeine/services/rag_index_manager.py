@@ -32,7 +32,9 @@ if TYPE_CHECKING:
     from ..reter_wrapper import ReterWrapper
     from .state_persistence import StatePersistenceService
 
-logger = logging.getLogger(__name__)
+from ..logging_config import configure_logger_for_debug_trace
+
+logger = configure_logger_for_debug_trace(__name__)
 
 
 class RAGSearchResult:
@@ -1131,7 +1133,16 @@ class RAGIndexManager:
         )
 
         debug_log(f"[RAG] sync_sources: {total_changes} changes detected")
-        print(f"[RAG] sync_sources: {total_changes} changes detected, initializing...", file=sys.stderr, flush=True)
+
+        # Estimate total files to index for progress reporting
+        total_files_to_index = (
+            len(python_to_add) + len(javascript_to_add) + len(html_to_add) +
+            len(csharp_to_add) + len(cpp_to_add) + len(markdown_to_add)
+        )
+        if progress_callback:
+            progress_callback(0, total_files_to_index, "initializing")
+        else:
+            print(f"[RAG] sync_sources: {total_changes} changes detected, {total_files_to_index} files to index", file=sys.stderr, flush=True)
 
         # ALWAYS initialize fully (loads embedding model + FAISS index)
         self.initialize(project_root)
@@ -1432,8 +1443,22 @@ class RAGIndexManager:
         # --- Phase 5: Generate embeddings for ALL texts in ONE batch ---
         if all_texts:
             debug_log(f"[RAG] sync_sources: Generating embeddings for {len(all_texts)} texts in ONE batch...")
+            if progress_callback:
+                progress_callback(0, len(all_texts), "generating_embeddings")
+
             batch_size = self._config.get("rag_batch_size", 32)
-            embeddings = self._embedding_service.generate_embeddings_batch(all_texts, batch_size=batch_size)
+
+            # Create embedding progress callback wrapper
+            def embedding_progress(current: int, total: int):
+                if progress_callback:
+                    progress_callback(current, total, "generating_embeddings")
+
+            embeddings = self._embedding_service.generate_embeddings_batch(
+                all_texts, batch_size=batch_size, progress_callback=embedding_progress
+            )
+
+            if progress_callback:
+                progress_callback(len(all_texts), len(all_texts), "embeddings_complete")
 
             # Assign vector IDs
             vector_ids = list(range(self._next_vector_id, self._next_vector_id + len(all_texts)))

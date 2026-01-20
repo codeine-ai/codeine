@@ -2,17 +2,15 @@
 Tool Registrar Service
 
 Handles registration and management of MCP tools.
-Extracted from LogicalThinkingServer as part of Extract Class refactoring (Fowler Ch. 7).
+Uses Claude Agent SDK for query generation (no sampling fallback).
 """
 
 import asyncio
 from typing import Dict, Any, Optional, TYPE_CHECKING
-from fastmcp import FastMCP, Context  # Use fastmcp for proper Context injection
+from fastmcp import FastMCP, Context
 
-from ..logging_config import nlq_debug_logger as debug_log
-from ..reter_wrapper import is_initialization_complete
+from ..logging_config import nlq_debug_logger as debug_log, ensure_nlq_logger_configured
 from .initialization_progress import (
-    get_initializing_response,
     require_default_instance,
     ComponentNotReadyError,
 )
@@ -22,28 +20,20 @@ from .state_persistence import StatePersistenceService
 from .instance_manager import InstanceManager
 from .tools_service import ToolsRegistrar
 from .registrars.system_tools import SystemToolsRegistrar
-from .nlq_helpers import (
-    query_instance_schema,
-    execute_reql_query,
-    is_retryable_error
-)
+from .nlq_helpers import query_instance_schema
 from .response_truncation import truncate_response
 from .hybrid_query_engine import (
-    classify_query_with_llm,
     QueryType,
     QueryClassification,
-    SimilarTool,
-    build_cadsl_prompt,
-    extract_cadsl_from_response,
-    extract_query_from_response,
     build_rag_query_params,
     build_similar_tools_section,
-    HybridQueryResult,
-    generate_query_with_tools,
-    QUERY_TOOLS,
-    handle_tool_call,
-    REQL_GENERATION_PROMPT,
-    CADSL_GENERATION_PROMPT,
+    classify_query_with_llm,
+)
+from .agent_sdk_client import (
+    is_agent_sdk_available,
+    generate_reql_query,
+    generate_cadsl_query,
+    classify_query,
 )
 
 if TYPE_CHECKING:
@@ -225,7 +215,7 @@ class ToolRegistrar:
         async def natural_language_query(
             question: str,
             max_retries: int = 5,
-            timeout: int = 30,
+            timeout: int = 600,
             max_results: int = 500,
             ctx: Context = None
         ) -> Dict[str, Any]:
@@ -255,7 +245,7 @@ class ToolRegistrar:
             Args:
                 question: Natural language question about code structure (plain English)
                 max_retries: Maximum retry attempts on syntax errors (default: 5)
-                timeout: Query timeout in seconds (default: 30)
+                timeout: Query timeout in seconds (default: 600)
                 max_results: Maximum results to return (default: 500)
                 ctx: MCP context (injected automatically)
 
@@ -273,11 +263,11 @@ class ToolRegistrar:
             except ComponentNotReadyError as e:
                 return e.to_response()
 
+            # Ensure logger is configured with correct directory
+            ensure_nlq_logger_configured()
+
             debug_log.debug(f"\n{'#'*60}\nNEW NLQ REQUEST\n{'#'*60}")
             debug_log.debug(f"Question: {question}, Instance: default")
-
-            if ctx is None:
-                return self._nlq_error_response("Context not available for LLM sampling")
 
             try:
                 reter = self.instance_manager.get_or_create_instance("default")
@@ -289,8 +279,8 @@ class ToolRegistrar:
             # Execute with timeout protection
             try:
                 async with asyncio.timeout(timeout):
-                    return await self._execute_nlq_with_retries(
-                        reter, question, schema_info, max_retries, max_results, ctx
+                    return await self._execute_nlq_with_agent_sdk(
+                        reter, question, schema_info, max_retries, max_results
                     )
             except asyncio.TimeoutError:
                 debug_log.debug(f"Query timed out after {timeout} seconds")
@@ -310,344 +300,222 @@ class ToolRegistrar:
             "error": error
         }
 
-    async def _execute_nlq_with_retries(
+    async def _execute_nlq_with_agent_sdk(
         self,
         reter,
         question: str,
         schema_info: str,
         max_retries: int,
         max_results: int,
-        ctx,
         similar_tools: Optional[list] = None
     ) -> Dict[str, Any]:
-        """Execute NLQ with retry logic for syntax errors using tool-augmented generation."""
-        attempts = 0
-        last_error = None
-        generated_query = None
-        tools_used = []
+        """Execute NLQ using Agent SDK for query generation."""
+        debug_log.debug(f"\n{'='*60}\nNLQ EXECUTION (Agent SDK)\n{'='*60}")
 
-        while attempts < max_retries:
-            attempts += 1
-            try:
-                debug_log.debug(f"\n{'='*60}\nREQL ATTEMPT {attempts}/{max_retries}\n{'='*60}")
+        if not is_agent_sdk_available():
+            return {
+                "success": False,
+                "results": [],
+                "count": 0,
+                "error": "Claude Agent SDK not available. Install with: pip install claude-agent-sdk"
+            }
 
-                # Build prompt - include error feedback if retrying
-                if last_error and attempts > 1:
-                    prompt = f"""Previous REQL query failed with error:
-{last_error}
+        # Build similar tools context if provided
+        similar_tools_context = None
+        if similar_tools:
+            similar_tools_context = build_similar_tools_section(similar_tools)
 
-Previous query was:
-```reql
-{generated_query}
-```
+        try:
+            # Generate and validate query using Agent SDK
+            result = await generate_reql_query(
+                question=question,
+                schema_info=schema_info,
+                reter_instance=reter,
+                max_iterations=max_retries,
+                similar_tools_context=similar_tools_context
+            )
 
-Please fix the syntax error and regenerate. Original question: {question}
-
-Schema info: {schema_info}"""
-                else:
-                    prompt = f"{schema_info}\n\nQuestion: {question}"
-
-                # Use tool-augmented generation with case-based reasoning
-                # Only pass similar tools on first attempt
-                tools_for_attempt = similar_tools if attempts == 1 else None
-                generated_query, new_tools = await self._generate_with_tools(
-                    prompt, QueryType.REQL, ctx, max_tool_iterations=5,
-                    similar_tools=tools_for_attempt
-                )
-                tools_used.extend(new_tools)
-                debug_log.debug(f"GENERATED REQL QUERY:\n{generated_query}")
-                debug_log.debug(f"TOOLS USED: {tools_used}")
-
-                results = execute_reql_query(reter, generated_query)
-                total_count = len(results)
-                debug_log.debug(f"QUERY SUCCESS: {total_count} results")
-
-                # Check for potential cross-join (excessive results)
-                # Only warn if results exceed threshold AND query lacks aggregation
-                # Aggregation queries (GROUP BY, COUNT) legitimately return many results
-                cross_join_threshold = 5000
-                has_aggregation = any(kw in generated_query.upper() for kw in ['GROUP BY', 'COUNT(', 'SUM(', 'AVG(', 'MIN(', 'MAX('])
-
-                if total_count > cross_join_threshold and not has_aggregation:
-                    debug_log.debug(f"POSSIBLE CROSS-JOIN: {total_count} results exceeds threshold (no aggregation)")
-                    # Return results with warning instead of failing - let user decide
-                    results_sample = results[:max_results]
-                    return truncate_response({
-                        "success": True,  # Changed from False - return results with warning
-                        "results": results_sample,
-                        "count": total_count,
-                        "reql_query": generated_query,
-                        "attempts": attempts,
-                        "tools_used": tools_used,
-                        "error": None,
-                        "warning": f"Large result set ({total_count} rows). If unexpected, the query may have a cross-join. "
-                                   f"Showing first {len(results_sample)} results.",
-                        "truncated": True
-                    })
-
-                # Apply result truncation
-                truncated = False
-                if total_count > max_results:
-                    results = results[:max_results]
-                    truncated = True
-                    debug_log.debug(f"Results truncated from {total_count} to {max_results}")
-
-                response_dict = {
-                    "success": True,
-                    "results": results,
-                    "count": total_count,
-                    "reql_query": generated_query,
-                    "attempts": attempts,
-                    "tools_used": tools_used,
-                    "error": None
+            if not result.success:
+                return {
+                    "success": False,
+                    "results": [],
+                    "count": 0,
+                    "reql_query": result.query,
+                    "attempts": result.attempts,
+                    "tools_used": result.tools_used,
+                    "error": result.error or "Query generation failed"
                 }
 
-                if truncated:
-                    response_dict["truncated"] = True
-                    response_dict["warning"] = f"Results truncated. Showing {max_results} of {total_count}. Use more specific queries for full results."
+            # Query was already validated by Agent SDK, get results
+            generated_query = result.query
+            query_result = reter.reql(generated_query)
+            results = query_result.to_pandas().to_dict('records')
+            total_count = len(results)
 
-                return truncate_response(response_dict)
+            debug_log.debug(f"QUERY SUCCESS: {total_count} results")
 
-            except Exception as e:
-                last_error = str(e)
-                debug_log.debug(f"QUERY ERROR: {last_error}")
+            # Apply result truncation
+            truncated = total_count > max_results
+            if truncated:
+                results = results[:max_results]
 
-                if is_retryable_error(last_error):
-                    debug_log.debug(f"Retryable error (attempt {attempts}/{max_retries})")
-                    continue
-                else:
-                    debug_log.debug("Non-retryable error, aborting")
-                    return {
-                        "success": False,
-                        "results": [],
-                        "count": 0,
-                        "reql_query": generated_query,
-                        "attempts": attempts,
-                        "tools_used": tools_used,
-                        "error": last_error
-                    }
+            response_dict = {
+                "success": True,
+                "results": results,
+                "count": total_count,
+                "reql_query": generated_query,
+                "attempts": result.attempts,
+                "tools_used": result.tools_used,
+                "error": None
+            }
 
-        debug_log.debug(f"MAX RETRIES EXHAUSTED after {attempts} attempts")
-        return {
-            "success": False,
-            "results": [],
-            "count": 0,
-            "reql_query": generated_query,
-            "attempts": attempts,
-            "tools_used": tools_used,
-            "error": f"Failed after {max_retries} attempts. Last error: {last_error}"
-        }
+            if truncated:
+                response_dict["truncated"] = True
+                response_dict["warning"] = f"Results truncated. Showing {max_results} of {total_count}."
+
+            return truncate_response(response_dict)
+
+        except Exception as e:
+            debug_log.debug(f"Agent SDK error: {e}")
+            return {
+                "success": False,
+                "results": [],
+                "count": 0,
+                "error": str(e)
+            }
 
     async def _execute_cadsl_query(
         self,
         question: str,
         schema_info: str,
         max_retries: int,
-        ctx,
         similar_tools: Optional[list] = None
     ) -> Dict[str, Any]:
-        """Execute a CADSL query using tool-augmented LLM generation."""
+        """Execute a CADSL query using Agent SDK for generation."""
         from ..cadsl.parser import parse_cadsl
         from ..cadsl.transformer import CADSLTransformer
         from ..cadsl.loader import build_pipeline_factory
 
-        attempts = 0
-        last_error = None
-        generated_query = None
-        tools_used = []
+        debug_log.debug(f"\n{'='*60}\nCADSL EXECUTION (Agent SDK)\n{'='*60}")
 
-        while attempts < max_retries:
-            attempts += 1
-            try:
-                debug_log.debug(f"\n{'='*60}\nCADSL ATTEMPT {attempts}/{max_retries}\n{'='*60}")
+        if not is_agent_sdk_available():
+            return {
+                "success": False,
+                "results": [],
+                "count": 0,
+                "query_type": "cadsl",
+                "error": "Claude Agent SDK not available. Install with: pip install claude-agent-sdk"
+            }
 
-                # Build prompt - include error feedback if retrying
-                if last_error and attempts > 1:
-                    prompt = f"""Previous CADSL query failed with error:
-{last_error}
-
-Previous query was:
-```cadsl
-{generated_query}
-```
-
-Please fix the syntax error and regenerate. Original question: {question}"""
-                else:
-                    prompt = question
-
-                # Use tool-augmented generation with case-based reasoning
-                # Only pass similar tools on first attempt
-                tools_for_attempt = similar_tools if attempts == 1 else None
-                generated_query, new_tools = await self._generate_with_tools(
-                    prompt, QueryType.CADSL, ctx, max_tool_iterations=5,
-                    similar_tools=tools_for_attempt
-                )
-                tools_used.extend(new_tools)
-                debug_log.debug(f"GENERATED CADSL QUERY:\n{generated_query}")
-                debug_log.debug(f"TOOLS USED: {tools_used}")
-
-                # Parse and execute CADSL
-                parse_result = parse_cadsl(generated_query)
-                if not parse_result.success:
-                    raise Exception(f"Parse error: {parse_result.errors}")
-
-                transformer = CADSLTransformer()
-                tool_specs = transformer.transform(parse_result.tree)
-
-                if not tool_specs:
-                    raise Exception("No tool spec generated from CADSL")
-
-                # Build and execute pipeline
-                reter = self.instance_manager.get_or_create_instance("default")
-                rag_manager = self.default_manager.get_rag_manager() if self.default_manager else None
-
-                from ..dsl.core import Context as PipelineContext
-                pipeline_ctx = PipelineContext(reter=reter, params={"rag_manager": rag_manager})
-
-                tool_spec = tool_specs[0]
-                pipeline_factory = build_pipeline_factory(tool_spec)
-                pipeline = pipeline_factory(pipeline_ctx)
-
-                result = pipeline.execute(pipeline_ctx)
-
-                # Result is already {"success": True/False, "results": [...], ...}
-                # Add our metadata without double-wrapping
-                if isinstance(result, dict) and "success" in result:
-                    result["cadsl_query"] = generated_query
-                    result["query_type"] = "cadsl"
-                    result["attempts"] = attempts
-                    result["tools_used"] = tools_used
-                    return result
-                else:
-                    return {
-                        "success": True,
-                        "results": result if isinstance(result, list) else [result],
-                        "count": len(result) if isinstance(result, list) else 1,
-                        "cadsl_query": generated_query,
-                        "query_type": "cadsl",
-                        "attempts": attempts,
-                        "tools_used": tools_used,
-                        "error": None
-                    }
-
-            except Exception as e:
-                last_error = str(e)
-                debug_log.debug(f"CADSL ERROR: {last_error}")
-
-                if is_retryable_error(last_error):
-                    continue
-                else:
-                    return {
-                        "success": False,
-                        "results": [],
-                        "count": 0,
-                        "cadsl_query": generated_query,
-                        "query_type": "cadsl",
-                        "attempts": attempts,
-                        "tools_used": tools_used,
-                        "error": last_error
-                    }
-
-        return {
-            "success": False,
-            "results": [],
-            "count": 0,
-            "cadsl_query": generated_query,
-            "query_type": "cadsl",
-            "attempts": attempts,
-            "tools_used": tools_used,
-            "error": f"Failed after {max_retries} attempts. Last error: {last_error}"
-        }
-
-    async def _generate_with_tools(
-        self,
-        question: str,
-        query_type: QueryType,
-        ctx,
-        max_tool_iterations: int = 5,
-        similar_tools: Optional[list] = None
-    ) -> tuple:
-        """
-        Generate a query using tool-augmented LLM with case-based reasoning.
-
-        Uses a text-based tool calling pattern where LLM can request tools via
-        structured output like: TOOL_CALL: get_reql_grammar()
-
-        If similar tools are provided from case-based reasoning, they are included
-        in the prompt as templates the LLM can adapt.
-
-        Returns:
-            Tuple of (generated_query, list_of_tools_used)
-        """
-        import re
-
-        system_prompt = REQL_GENERATION_PROMPT if query_type == QueryType.REQL else CADSL_GENERATION_PROMPT
-
-        # Add tool calling instructions
-        tool_instructions = """
-You have these tools available. To use a tool, output EXACTLY this format on its own line:
-TOOL_CALL: tool_name(arg="value")
-
-Available tools:
-- TOOL_CALL: get_reql_grammar()  - Get REQL grammar
-- TOOL_CALL: get_cadsl_grammar() - Get CADSL grammar
-- TOOL_CALL: list_examples(category="smells") - List examples (categories: smells, diagrams, rag, testing, inspection, refactoring, patterns, exceptions, dependencies)
-- TOOL_CALL: get_example(name="god_class") - Get a specific example
-
-When you have enough information, output the final query in a code block.
-"""
-        full_system = system_prompt + "\n" + tool_instructions
-
-        # Build user message with similar tools from case-based reasoning
-        conversation = f"Generate a query for: {question}"
-
+        # Build similar tools context if provided
+        similar_tools_context = None
         if similar_tools:
-            similar_section = build_similar_tools_section(similar_tools)
-            conversation = f"{conversation}\n{similar_section}"
-            debug_log.debug(f"CASE-BASED: Including {len(similar_tools)} similar tools as templates")
-        tools_used = []
+            similar_tools_context = build_similar_tools_section(similar_tools)
 
-        for iteration in range(max_tool_iterations):
-            debug_log.debug(f"Tool iteration {iteration + 1}")
+        # Get reter instance and rag_manager for query tools
+        try:
+            reter = self.instance_manager.get_or_create_instance("default")
+        except Exception:
+            reter = None
 
-            response = await ctx.sample(conversation, system_prompt=full_system)
-            response_text = response.text if hasattr(response, 'text') else str(response)
+        rag_manager = self.default_manager.get_rag_manager() if self.default_manager else None
 
-            debug_log.debug(f"LLM response (first 500): {response_text[:500]}")
+        try:
+            # Generate CADSL using Agent SDK
+            result = await generate_cadsl_query(
+                question=question,
+                schema_info=schema_info,
+                max_iterations=max_retries,
+                similar_tools_context=similar_tools_context,
+                reter_instance=reter,
+                rag_manager=rag_manager
+            )
 
-            # Check for tool calls
-            tool_pattern = r'TOOL_CALL:\s*(\w+)\((.*?)\)'
-            tool_matches = re.findall(tool_pattern, response_text)
+            if not result.success:
+                return {
+                    "success": False,
+                    "results": [],
+                    "count": 0,
+                    "cadsl_query": result.query,
+                    "query_type": "cadsl",
+                    "attempts": result.attempts,
+                    "tools_used": result.tools_used,
+                    "error": result.error or "Query generation failed"
+                }
 
-            if not tool_matches:
-                # No tool calls - extract the query
-                query = extract_query_from_response(response_text, query_type)
-                return query, tools_used
+            generated_query = result.query
+            debug_log.debug(f"GENERATED CADSL QUERY:\n{generated_query}")
 
-            # Process tool calls
-            tool_results = []
-            for tool_name, args_str in tool_matches:
-                debug_log.debug(f"Tool call: {tool_name}({args_str})")
-                tools_used.append(tool_name)
+            # Parse and execute CADSL
+            parse_result = parse_cadsl(generated_query)
+            if not parse_result.success:
+                return {
+                    "success": False,
+                    "results": [],
+                    "count": 0,
+                    "cadsl_query": generated_query,
+                    "query_type": "cadsl",
+                    "attempts": result.attempts,
+                    "tools_used": result.tools_used,
+                    "error": f"Parse error: {parse_result.errors}"
+                }
 
-                # Parse arguments
-                tool_input = {}
-                if args_str:
-                    # Parse key="value" patterns
-                    arg_pattern = r'(\w+)\s*=\s*"([^"]*)"'
-                    for key, value in re.findall(arg_pattern, args_str):
-                        tool_input[key] = value
+            transformer = CADSLTransformer()
+            tool_specs = transformer.transform(parse_result.tree)
 
-                # Execute tool
-                result = handle_tool_call(tool_name, tool_input)
-                tool_results.append(f"Result of {tool_name}:\n{result}")
+            if not tool_specs:
+                return {
+                    "success": False,
+                    "results": [],
+                    "count": 0,
+                    "cadsl_query": generated_query,
+                    "query_type": "cadsl",
+                    "attempts": result.attempts,
+                    "tools_used": result.tools_used,
+                    "error": "No tool spec generated from CADSL"
+                }
 
-            # Add tool results to conversation and continue
-            conversation = response_text + "\n\n" + "\n\n".join(tool_results) + "\n\nNow generate the final query:"
+            # Build and execute pipeline
+            reter = self.instance_manager.get_or_create_instance("default")
+            rag_manager = self.default_manager.get_rag_manager() if self.default_manager else None
 
-        # Max iterations reached - try to extract query anyway
-        query = extract_query_from_response(response_text, query_type)
-        return query, tools_used
+            from ..dsl.core import Context as PipelineContext
+            pipeline_ctx = PipelineContext(reter=reter, params={"rag_manager": rag_manager})
+
+            tool_spec = tool_specs[0]
+            pipeline_factory = build_pipeline_factory(tool_spec)
+            pipeline = pipeline_factory(pipeline_ctx)
+
+            pipeline_result = pipeline.execute(pipeline_ctx)
+
+            # Add our metadata
+            if isinstance(pipeline_result, dict) and "success" in pipeline_result:
+                pipeline_result["cadsl_query"] = generated_query
+                pipeline_result["query_type"] = "cadsl"
+                pipeline_result["attempts"] = result.attempts
+                pipeline_result["tools_used"] = result.tools_used
+                return pipeline_result
+            else:
+                return {
+                    "success": True,
+                    "results": pipeline_result if isinstance(pipeline_result, list) else [pipeline_result],
+                    "count": len(pipeline_result) if isinstance(pipeline_result, list) else 1,
+                    "cadsl_query": generated_query,
+                    "query_type": "cadsl",
+                    "attempts": result.attempts,
+                    "tools_used": result.tools_used,
+                    "error": None
+                }
+
+        except Exception as e:
+            debug_log.debug(f"CADSL ERROR: {e}")
+            return {
+                "success": False,
+                "results": [],
+                "count": 0,
+                "query_type": "cadsl",
+                "error": str(e)
+            }
 
     def _execute_rag_query(self, question: str) -> Dict[str, Any]:
         """Execute a RAG query - semantic search, duplicate detection, or clustering."""
@@ -754,7 +622,7 @@ When you have enough information, output the final query in a code block.
             question: str,
             force_type: str = None,
             max_retries: int = 5,
-            timeout: int = 60,
+            timeout: int = 1800,
             max_results: int = 500,
             ctx: Context = None
         ) -> Dict[str, Any]:
@@ -772,7 +640,7 @@ When you have enough information, output the final query in a code block.
                 question: Natural language question about code
                 force_type: Force a specific query type: "reql", "cadsl", "rag", or None for auto
                 max_retries: Maximum retry attempts on errors (default: 5)
-                timeout: Query timeout in seconds (default: 60)
+                timeout: Query timeout in seconds (default: 1800)
                 max_results: Maximum results to return (default: 500)
                 ctx: MCP context (injected automatically)
 
@@ -799,6 +667,12 @@ When you have enough information, output the final query in a code block.
                 require_default_instance()
             except ComponentNotReadyError as e:
                 return e.to_response()
+
+            # Ensure logger is configured with correct directory
+            ensure_nlq_logger_configured()
+
+            debug_log.debug(f"\n{'#'*60}\nNEW HYBRID QUERY REQUEST\n{'#'*60}")
+            debug_log.debug(f"Question: {question}, force_type: {force_type}")
 
             if ctx is None:
                 return {
@@ -850,14 +724,14 @@ When you have enough information, output the final query in a code block.
                     elif classification.query_type == QueryType.CADSL:
                         # CADSL pipeline query with case-based reasoning
                         result = await self._execute_cadsl_query(
-                            question, schema_info, max_retries, ctx,
+                            question, schema_info, max_retries,
                             similar_tools=classification.similar_tools
                         )
 
                     else:  # QueryType.REQL
                         # Standard REQL query with case-based reasoning
-                        result = await self._execute_nlq_with_retries(
-                            reter, question, schema_info, max_retries, max_results, ctx,
+                        result = await self._execute_nlq_with_agent_sdk(
+                            reter, question, schema_info, max_retries, max_results,
                             similar_tools=classification.similar_tools
                         )
 

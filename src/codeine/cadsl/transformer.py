@@ -1034,6 +1034,10 @@ class CADSLTransformer:
             "attributes": None,
             "inheritance_from": None,
             "inheritance_to": None,
+            "composition_from": None,
+            "composition_to": None,
+            "association_from": None,
+            "association_to": None,
             # Pie chart
             "labels": None,
             "values": None,
@@ -1081,6 +1085,12 @@ class CADSLTransformer:
                         elif param.data == "mermaid_inheritance":
                             result["inheritance_from"] = str(param.children[0])
                             result["inheritance_to"] = str(param.children[1])
+                        elif param.data == "mermaid_composition":
+                            result["composition_from"] = str(param.children[0])
+                            result["composition_to"] = str(param.children[1])
+                        elif param.data == "mermaid_association":
+                            result["association_from"] = str(param.children[0])
+                            result["association_to"] = str(param.children[1])
                         # Pie chart
                         elif param.data == "mermaid_labels":
                             result["labels"] = str(param.children[0])
@@ -1699,6 +1709,10 @@ class PipelineBuilder:
                         attributes=step_spec.get("attributes"),
                         inheritance_from=step_spec.get("inheritance_from"),
                         inheritance_to=step_spec.get("inheritance_to"),
+                        composition_from=step_spec.get("composition_from"),
+                        composition_to=step_spec.get("composition_to"),
+                        association_from=step_spec.get("association_from"),
+                        association_to=step_spec.get("association_to"),
                         # Pie chart
                         labels=step_spec.get("labels"),
                         values=step_spec.get("values"),
@@ -2714,6 +2728,7 @@ class RenderMermaidStep:
     def __init__(self, mermaid_type, nodes=None, edges_from=None, edges_to=None, direction="TB",
                  title=None, participants=None, messages_from=None, messages_to=None, messages_label=None,
                  classes=None, methods=None, attributes=None, inheritance_from=None, inheritance_to=None,
+                 composition_from=None, composition_to=None, association_from=None, association_to=None,
                  labels=None, values=None, states=None, transitions_from=None, transitions_to=None,
                  entities=None, relationships=None):
         self.mermaid_type = mermaid_type
@@ -2732,6 +2747,10 @@ class RenderMermaidStep:
         self.attributes = attributes
         self.inheritance_from = inheritance_from
         self.inheritance_to = inheritance_to
+        self.composition_from = composition_from
+        self.composition_to = composition_to
+        self.association_from = association_from
+        self.association_to = association_to
         # Pie chart
         self.labels = labels
         self.values = values
@@ -2833,12 +2852,14 @@ class RenderMermaidStep:
         return "\n".join(lines)
 
     def _render_class(self, data):
-        """Render a class diagram with methods and attributes."""
+        """Render a class diagram with methods, attributes, and relationships."""
         lines = ["classDiagram"]
 
         # Aggregate class data
         class_info = {}
-        relationships = set()
+        inheritance_rels = set()  # parent <|-- child
+        composition_rels = set()  # owner *-- owned (strong ownership)
+        association_rels = set()  # from --> to (uses/references)
 
         for row in data:
             class_name = row.get(self.classes) if self.classes else row.get("class_name") or row.get("name")
@@ -2865,18 +2886,42 @@ class RenderMermaidStep:
                 parent = row.get(self.inheritance_from)
                 child = row.get(self.inheritance_to)
                 if parent and child:
-                    relationships.add((parent, child))
+                    inheritance_rels.add((parent, child))
             elif row.get("parent_name") or row.get("inherits_from"):
                 parent = row.get("parent_name") or row.get("inherits_from")
                 if parent:
-                    relationships.add((parent, class_name))
+                    inheritance_rels.add((parent, class_name))
+
+            # Collect composition (owner *-- owned)
+            if self.composition_from and self.composition_to:
+                owner = row.get(self.composition_from)
+                owned = row.get(self.composition_to)
+                if owner and owned:
+                    composition_rels.add((owner, owned))
+            elif row.get("composition_from") and row.get("composition_to"):
+                owner = row.get("composition_from")
+                owned = row.get("composition_to")
+                if owner and owned:
+                    composition_rels.add((owner, owned))
+
+            # Collect associations (from --> to)
+            if self.association_from and self.association_to:
+                from_cls = row.get(self.association_from)
+                to_cls = row.get(self.association_to)
+                if from_cls and to_cls:
+                    association_rels.add((from_cls, to_cls))
+            elif row.get("assoc_from") and row.get("assoc_to"):
+                from_cls = row.get("assoc_from")
+                to_cls = row.get("assoc_to")
+                if from_cls and to_cls:
+                    association_rels.add((from_cls, to_cls))
 
         # Render classes with members
         LBRACE = "{"
         RBRACE = "}"
         for cls_name in sorted(class_info.keys()):
             info = class_info[cls_name]
-            safe_name = str(cls_name).replace(" ", "_").replace("-", "_")
+            safe_name = str(cls_name).replace(" ", "_").replace("-", "_").replace(".", "_")
             lines.append(f"    class {safe_name} {LBRACE}")
             for attr in sorted(info["attributes"]):
                 lines.append(f"        +{attr}")
@@ -2884,11 +2929,23 @@ class RenderMermaidStep:
                 lines.append(f"        +{method}()")
             lines.append(f"    {RBRACE}")
 
-        # Render relationships
-        for parent, child in sorted(relationships):
-            safe_parent = str(parent).replace(" ", "_").replace("-", "_")
-            safe_child = str(child).replace(" ", "_").replace("-", "_")
+        # Render inheritance relationships (parent <|-- child)
+        for parent, child in sorted(inheritance_rels):
+            safe_parent = str(parent).replace(" ", "_").replace("-", "_").replace(".", "_")
+            safe_child = str(child).replace(" ", "_").replace("-", "_").replace(".", "_")
             lines.append(f"    {safe_parent} <|-- {safe_child}")
+
+        # Render composition relationships (owner *-- owned)
+        for owner, owned in sorted(composition_rels):
+            safe_owner = str(owner).replace(" ", "_").replace("-", "_").replace(".", "_")
+            safe_owned = str(owned).replace(" ", "_").replace("-", "_").replace(".", "_")
+            lines.append(f"    {safe_owner} *-- {safe_owned}")
+
+        # Render association relationships (from --> to)
+        for from_cls, to_cls in sorted(association_rels):
+            safe_from = str(from_cls).replace(" ", "_").replace("-", "_").replace(".", "_")
+            safe_to = str(to_cls).replace(" ", "_").replace("-", "_").replace(".", "_")
+            lines.append(f"    {safe_from} --> {safe_to}")
 
         return "\n".join(lines)
 

@@ -12,7 +12,7 @@ Configuration via reter.json or environment variables.
 import hashlib
 import logging
 import os
-from typing import List, Dict, Optional, Any
+from typing import Callable, List, Dict, Optional, Any
 from collections import OrderedDict
 
 import numpy as np
@@ -319,7 +319,8 @@ class EmbeddingService:
         self,
         texts: List[str],
         batch_size: int = 32,
-        show_progress: bool = False
+        show_progress: bool = False,
+        progress_callback: Optional[Callable[[int, int], None]] = None
     ) -> np.ndarray:
         """
         Generate embeddings for multiple texts efficiently.
@@ -328,6 +329,7 @@ class EmbeddingService:
             texts: List of texts to encode
             batch_size: Batch size for encoding
             show_progress: Whether to show progress bar (local only)
+            progress_callback: Optional callback(current, total) for progress updates
 
         Returns:
             Numpy array of shape (len(texts), embedding_dim)
@@ -361,7 +363,7 @@ class EmbeddingService:
 
             if self.provider == "local":
                 new_embeddings = self._embed_local_batch(
-                    uncached_texts, batch_size, show_progress
+                    uncached_texts, batch_size, show_progress, progress_callback
                 )
             elif self.provider == "voyage":
                 new_embeddings = self._embed_voyage(uncached_texts, batch_size)
@@ -389,7 +391,8 @@ class EmbeddingService:
         self,
         texts: List[str],
         batch_size: int,
-        show_progress: bool
+        show_progress: bool,
+        progress_callback: Optional[Callable[[int, int], None]] = None
     ) -> np.ndarray:
         """Generate embeddings using local sentence-transformers with progress logging."""
         import time
@@ -398,6 +401,8 @@ class EmbeddingService:
 
         # For small batches, just encode directly
         if total <= batch_size * 2:
+            if progress_callback:
+                progress_callback(total, total)
             return self._model.encode(
                 texts,
                 convert_to_numpy=True,
@@ -424,15 +429,21 @@ class EmbeddingService:
             )
             all_embeddings.append(embeddings)
 
+            completed = i + len(batch_texts)
+
+            # Call progress callback every batch
+            if progress_callback:
+                progress_callback(completed, total)
+
             # Log progress every 10 batches or at end
             if batch_num % 10 == 0 or batch_num == num_batches:
                 elapsed = time.time() - start_time
-                rate = (i + len(batch_texts)) / elapsed if elapsed > 0 else 0
-                remaining = (total - i - len(batch_texts)) / rate if rate > 0 else 0
+                rate = completed / elapsed if elapsed > 0 else 0
+                remaining = (total - completed) / rate if rate > 0 else 0
                 logger.info(
                     "Embedding progress: %d/%d (%.0f%%) - %.0f texts/s, ~%.0fs remaining",
-                    i + len(batch_texts), total,
-                    100 * (i + len(batch_texts)) / total,
+                    completed, total,
+                    100 * completed / total,
                     rate, remaining
                 )
 

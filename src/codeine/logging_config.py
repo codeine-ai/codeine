@@ -11,19 +11,20 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-# Snapshot directory priority:
+# Snapshot directory priority (same as state_persistence.py):
 # 1. RETER_SNAPSHOTS_DIR (explicit)
 # 2. RETER_PROJECT_ROOT/.codeine (if set)
-# 3. CWD/.codeine (auto-detection from Claude Code)
+# 3. CWD/.codeine (fallback)
+# This ensures logs go to the same directory as .default.reter
 def _get_log_directory() -> Path:
-    """Get the log directory path."""
+    """Get the log directory path (same as snapshots_dir in state_persistence)."""
     log_dir = os.getenv("RETER_SNAPSHOTS_DIR")
     if not log_dir:
         project_root = os.getenv("RETER_PROJECT_ROOT")
         if project_root:
-            log_dir = os.path.join(project_root, ".codeine")
+            log_dir = str(Path(project_root) / ".codeine")
         else:
-            log_dir = os.path.join(os.getcwd(), ".codeine")
+            log_dir = str(Path.cwd() / ".codeine")
     return Path(log_dir)
 
 
@@ -117,7 +118,7 @@ def get_nlq_debug_logger() -> logging.Logger:
     Get the NLQ debug logger for natural language query operations.
 
     This logger is used for tracing NLQ query generation and execution.
-    Output goes to .codeine/nlq_debug.log
+    Output goes to .codeine/nlq_debug.log and stderr.
 
     Returns:
         Configured logger instance
@@ -129,9 +130,57 @@ def get_nlq_debug_logger() -> logging.Logger:
         logger.setLevel(logging.DEBUG)
         logger.propagate = False  # Don't propagate to root logger
 
-        handler = _create_file_handler("nlq_debug.log")
-        if handler:
-            logger.addHandler(handler)
+        # File handler
+        file_handler = _create_file_handler("nlq_debug.log")
+        if file_handler:
+            logger.addHandler(file_handler)
+
+        # Stderr handler for real-time visibility
+        stderr_handler = _create_stderr_handler()
+        logger.addHandler(stderr_handler)
+
+    return logger
+
+
+# Track configured log directory for reconfiguration
+_configured_log_dir: Optional[Path] = None
+
+
+def ensure_nlq_logger_configured() -> logging.Logger:
+    """
+    Ensure NLQ logger is configured with the correct directory.
+
+    Call this before logging to ensure the logger points to the right directory,
+    especially after RETER_PROJECT_ROOT is set.
+
+    Returns:
+        Configured logger instance
+    """
+    global _configured_log_dir
+
+    current_dir = _get_log_directory()
+    logger = logging.getLogger("reter.nlq_debug")
+
+    # Reconfigure if directory changed or no handlers
+    if _configured_log_dir != current_dir or not logger.handlers:
+        # Remove old handlers
+        for handler in logger.handlers[:]:
+            handler.close()
+            logger.removeHandler(handler)
+
+        logger.setLevel(logging.DEBUG)
+        logger.propagate = False
+
+        # File handler
+        file_handler = _create_file_handler("nlq_debug.log")
+        if file_handler:
+            logger.addHandler(file_handler)
+
+        # Stderr handler for real-time visibility
+        stderr_handler = _create_stderr_handler()
+        logger.addHandler(stderr_handler)
+
+        _configured_log_dir = current_dir
 
     return logger
 
@@ -157,3 +206,28 @@ def configure_logger_for_debug_trace(logger_name: str) -> logging.Logger:
         if handler not in logger.handlers:
             logger.addHandler(handler)
     return logger
+
+
+def suppress_stderr_logging():
+    """
+    Suppress stderr logging for all debug loggers.
+
+    Call this when using Rich progress UI to avoid log spam in the console.
+    File logging continues to work normally.
+    """
+    for logger in [debug_trace_logger, nlq_debug_logger]:
+        for handler in logger.handlers:
+            if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
+                handler.setLevel(logging.CRITICAL + 1)  # Effectively disable
+
+
+def restore_stderr_logging():
+    """
+    Restore stderr logging for all debug loggers.
+
+    Call this after Rich progress UI is done.
+    """
+    for logger in [debug_trace_logger, nlq_debug_logger]:
+        for handler in logger.handlers:
+            if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
+                handler.setLevel(logging.DEBUG)

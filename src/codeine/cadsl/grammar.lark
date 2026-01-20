@@ -275,6 +275,8 @@ mermaid_param: "type" ":" mermaid_type      -> mermaid_type_spec
              | "methods" ":" NAME           -> mermaid_methods
              | "attributes" ":" NAME        -> mermaid_attributes
              | "inheritance" ":" NAME "->" NAME -> mermaid_inheritance
+             | "composition" ":" NAME "*->" NAME -> mermaid_composition
+             | "association" ":" NAME "-->" NAME -> mermaid_association
              // Pie chart specific
              | "labels" ":" NAME            -> mermaid_labels
              | "values" ":" NAME            -> mermaid_values
