@@ -323,6 +323,11 @@ class ToolRegistrar:
         if similar_tools:
             similar_tools_context = build_similar_tools_section(similar_tools)
 
+        # Get project root for file path context in Agent SDK
+        project_root = None
+        if hasattr(self.instance_manager, '_project_root') and self.instance_manager._project_root:
+            project_root = str(self.instance_manager._project_root)
+
         try:
             # Generate and validate query using Agent SDK
             result = await generate_reql_query(
@@ -330,7 +335,8 @@ class ToolRegistrar:
                 schema_info=schema_info,
                 reter_instance=reter,
                 max_iterations=max_retries,
-                similar_tools_context=similar_tools_context
+                similar_tools_context=similar_tools_context,
+                project_root=project_root
             )
 
             if not result.success:
@@ -417,6 +423,11 @@ class ToolRegistrar:
             reter = None
 
         rag_manager = self.default_manager.get_rag_manager() if self.default_manager else None
+
+        # Get project root for file path context in Agent SDK
+        project_root = None
+        if hasattr(self.instance_manager, '_project_root') and self.instance_manager._project_root:
+            project_root = str(self.instance_manager._project_root)
 
         # Track total attempts across retries
         total_attempts = 0
@@ -531,7 +542,8 @@ class ToolRegistrar:
                 max_iterations=max_retries,
                 similar_tools_context=similar_tools_context,
                 reter_instance=reter,
-                rag_manager=rag_manager
+                rag_manager=rag_manager,
+                project_root=project_root
             )
 
             if not result.success:

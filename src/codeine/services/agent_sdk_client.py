@@ -180,12 +180,23 @@ def search_examples(query: str, max_results: int = 10) -> str:
 # SYSTEM PROMPTS
 # ============================================================
 
-REQL_SYSTEM_PROMPT = """You are a REQL query generator. Generate valid REQL queries for code analysis.
+REQL_SYSTEM_PROMPT_TEMPLATE = """You are a REQL query generator. Generate valid REQL queries for code analysis.
+
+## PROJECT ROOT
+{project_root}
 
 ## AVAILABLE TOOLS
+
+**Example Tools:**
 - `search_examples` - Find similar CADSL examples (many contain REQL blocks you can reference)
 - `get_example` - Get full code. Use 'category/name' format (e.g., 'smells/god_class')
+
+**Testing Tools (MANDATORY):**
 - `run_reql` - Test your REQL query before final output
+
+**Verification Tools:**
+- `Read` - Read source files to verify results are valid. IMPORTANT: Use paths relative to PROJECT ROOT above.
+- `Grep` - Search codebase to cross-check findings. IMPORTANT: Use paths relative to PROJECT ROOT above.
 
 ## ENTITY TYPES (oo: prefix)
 - oo:Class, oo:Method, oo:Function, oo:Module, oo:Import
@@ -212,13 +223,25 @@ REQL_SYSTEM_PROMPT = """You are a REQL query generator. Generate valid REQL quer
 ALL UNION arms MUST bind the EXACT SAME variables!
 Use BIND(null AS ?var) to ensure all arms have the same variables.
 
+## WORKFLOW (MANDATORY)
+1. Generate REQL query
+2. **ALWAYS test with `run_reql`** before emitting final answer
+3. **VERIFY results**: Use `Read` or `Grep` to spot-check 2-3 sample results
+   - Check that reported files/lines actually exist
+   - Check that the code matches what the query claims to find
+4. If verification fails, refine the query and re-test
+5. Only emit final query after successful test AND verification
+
 ## OUTPUT FORMAT - CRITICAL
 Your ONLY job is to generate a REQL query. You MUST output the query in a ```reql code block.
 Do NOT write descriptions, summaries, or explanations - ONLY output the query.
 Do NOT answer the question yourself - generate a query that will answer it.
 """
 
-CADSL_SYSTEM_PROMPT = """You are a CADSL query generator. Your ONLY job is to generate valid CADSL pipelines.
+CADSL_SYSTEM_PROMPT_TEMPLATE = """You are a CADSL query generator. Your ONLY job is to generate valid CADSL pipelines.
+
+## PROJECT ROOT
+{project_root}
 
 ## AVAILABLE TOOLS
 
@@ -227,11 +250,16 @@ CADSL_SYSTEM_PROMPT = """You are a CADSL query generator. Your ONLY job is to ge
 - `get_example` - Get full working CADSL code. Use 'category/name' format (e.g., 'smells/god_class').
 - `list_examples` - Browse all examples by category.
 
-**Testing Tools:**
+**Testing Tools (MANDATORY):**
+- `run_cadsl` - Test full CADSL pipelines before final output. **ALWAYS USE THIS!**
 - `run_reql` - Test REQL queries to verify data exists
 - `run_rag_search` - Test semantic search
 - `run_rag_duplicates` - Test duplicate detection
 - `run_rag_clusters` - Test clustering
+
+**Verification Tools:**
+- `Read` - Read source files to verify results are valid. IMPORTANT: Use paths relative to PROJECT ROOT above.
+- `Grep` - Search codebase to cross-check findings. IMPORTANT: Use paths relative to PROJECT ROOT above.
 
 ## EXAMPLE CATEGORIES (for search_examples / get_example)
 - `smells/` - Code smell detectors (god_class, long_methods, dead_code, magic_numbers...)
@@ -246,12 +274,22 @@ CADSL_SYSTEM_PROMPT = """You are a CADSL query generator. Your ONLY job is to ge
 - `inheritance/` - Class hierarchy (extract_superclass, collapse_hierarchy...)
 
 ## CRITICAL SYNTAX RULES
-1. REQL blocks do NOT support # comments - use NO comments inside reql {}
+1. REQL blocks do NOT support # comments - use NO comments inside reql {{ ... }} blocks
 2. Use REGEX() not MATCHES: `FILTER(REGEX(?name, "pattern", "i"))`
 3. Entity types use `oo:` prefix: `oo:Class`, `oo:Method`
 4. Predicates have NO prefix: `name`, `inFile`, `definedIn`
 5. Pipeline steps use `|` operator
-6. **NEVER use `when { {param} == true }`** - use simple filter steps instead
+6. **NEVER use `when {{ {{param}} == true }}`** - use simple filter steps instead
+
+## WORKFLOW (MANDATORY)
+1. Generate CADSL query based on examples and syntax rules
+2. **ALWAYS test with `run_cadsl`** before emitting final answer
+3. **VERIFY results**: Use `Read` or `Grep` to spot-check 2-3 sample results
+   - Check that reported files/lines actually exist
+   - Check that the code matches what the query claims to find
+   - Example: if query finds "methods with 5+ params", Read the file and count params
+4. If verification fails (false positives), refine the query and re-test
+5. Only emit final query after successful test AND verification
 
 ## OUTPUT FORMAT - CRITICAL
 Your ONLY job is to generate a CADSL query. You MUST output the query in a ```cadsl code block.
@@ -542,6 +580,107 @@ def _create_query_tools(reter_instance=None, rag_manager=None):
             debug_log.debug(f"run_rag_clusters error: {e}")
             return {"content": [{"type": "text", "text": f"RAG clusters error: {str(e)}"}], "is_error": True}
 
+    @tool("run_cadsl", "Execute a CADSL script and return results. Use to test CADSL pipelines before final output. Returns parsed results or error messages.", {"script": str, "limit": int})
+    async def run_cadsl_tool(args):
+        """Execute a CADSL script and return results."""
+        debug_log.debug(f"run_cadsl called with args: {args}")
+
+        script = args.get("script", "")
+        limit = args.get("limit", 20)
+
+        if not script.strip():
+            return {"content": [{"type": "text", "text": "Error: Empty CADSL script"}], "is_error": True}
+
+        try:
+            # Import CADSL components
+            from ..cadsl.parser import parse_cadsl
+            from ..cadsl.transformer import CADSLTransformer
+            from ..cadsl.loader import build_pipeline_factory
+            from ..dsl.core import Context as PipelineContext
+            from ..dsl.catpy import Ok, Err
+
+            debug_log.debug(f"run_cadsl parsing: {script[:200]}...")
+
+            # Parse CADSL
+            parse_result = parse_cadsl(script)
+            if not parse_result.success:
+                error_msg = f"Parse error: {parse_result.errors}"
+                debug_log.debug(f"run_cadsl parse error: {error_msg}")
+                return {"content": [{"type": "text", "text": error_msg}], "is_error": True}
+
+            # Transform AST to tool spec
+            transformer = CADSLTransformer()
+            tool_specs = transformer.transform(parse_result.tree)
+
+            if not tool_specs:
+                return {"content": [{"type": "text", "text": "Error: No tool spec generated from CADSL"}], "is_error": True}
+
+            tool_spec = tool_specs[0]
+            debug_log.debug(f"run_cadsl tool_spec: {tool_spec.name}")
+
+            # Build pipeline context
+            params = {"rag_manager": rag_manager}
+            for param in tool_spec.params:
+                if param.default is not None:
+                    params[param.name] = param.default
+
+            pipeline_ctx = PipelineContext(reter=reter_instance, params=params)
+
+            # Build and execute pipeline
+            pipeline_factory = build_pipeline_factory(tool_spec)
+            pipeline = pipeline_factory(pipeline_ctx)
+
+            pipeline_result = pipeline.execute(pipeline_ctx)
+
+            # Handle Result monad
+            if isinstance(pipeline_result, Err):
+                error_msg = f"Pipeline error: {pipeline_result.value}"
+                debug_log.debug(f"run_cadsl pipeline error: {error_msg}")
+                return {"content": [{"type": "text", "text": error_msg}], "is_error": True}
+
+            if isinstance(pipeline_result, Ok):
+                pipeline_result = pipeline_result.value
+
+            # Format results
+            if isinstance(pipeline_result, dict):
+                results = pipeline_result.get("results", pipeline_result.get("findings", []))
+                count = pipeline_result.get("count", len(results) if isinstance(results, list) else 0)
+            elif isinstance(pipeline_result, list):
+                results = pipeline_result
+                count = len(results)
+            else:
+                results = [pipeline_result]
+                count = 1
+
+            debug_log.debug(f"run_cadsl result: {count} items")
+
+            # Build output
+            content = f"CADSL executed successfully. {count} total results.\n\n"
+
+            if isinstance(results, list):
+                content += f"First {min(limit, len(results))} results:\n"
+                for i, row in enumerate(results[:limit]):
+                    if isinstance(row, dict):
+                        # Format dict nicely
+                        row_str = ", ".join(f"{k}={v}" for k, v in list(row.items())[:5])
+                        if len(row) > 5:
+                            row_str += f", ... ({len(row)} fields)"
+                    else:
+                        row_str = str(row)
+                    content += f"{i+1}. {row_str}\n"
+
+                if len(results) > limit:
+                    content += f"\n... and {len(results) - limit} more results"
+            else:
+                content += f"Result: {results}"
+
+            return {"content": [{"type": "text", "text": content}]}
+
+        except Exception as e:
+            error_msg = f"CADSL execution error: {str(e)}"
+            debug_log.debug(f"run_cadsl error: {e}", exc_info=True)
+            return {"content": [{"type": "text", "text": error_msg}], "is_error": True}
+
     tools = [get_grammar_tool, list_examples_tool, search_examples_tool, get_example_tool]
     if reter_instance is not None:
         tools.append(run_reql_tool)
@@ -549,6 +688,9 @@ def _create_query_tools(reter_instance=None, rag_manager=None):
         tools.append(run_rag_search_tool)
         tools.append(run_rag_duplicates_tool)
         tools.append(run_rag_clusters_tool)
+    # CADSL needs both reter and rag for full functionality
+    if reter_instance is not None and rag_manager is not None:
+        tools.append(run_cadsl_tool)
 
     return create_sdk_mcp_server(
         name="query_helpers",
@@ -557,23 +699,9 @@ def _create_query_tools(reter_instance=None, rag_manager=None):
     )
 
 
-async def _call_agent(prompt: str, system_prompt: str, max_turns: int = 15, reter_instance=None, rag_manager=None) -> str:
-    """Call Agent SDK using ClaudeSDKClient and return the text response.
-
-    Args:
-        prompt: The prompt to send to the agent
-        system_prompt: System prompt for the agent
-        max_turns: Maximum conversation turns (default 15)
-        reter_instance: Optional RETER instance for running test REQL queries
-        rag_manager: Optional RAG manager for running semantic search
-    """
-    if not is_agent_sdk_available():
-        raise ImportError("Claude Agent SDK not installed. Run: pip install claude-agent-sdk")
-
-    from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, AssistantMessage, TextBlock, ToolUseBlock, ToolResultBlock
-
-    result_text = ""
-    tools_used = []
+def _build_agent_options(system_prompt: str, max_turns: int, reter_instance, rag_manager):
+    """Build ClaudeAgentOptions with query helper tools."""
+    from claude_agent_sdk import ClaudeAgentOptions
 
     # Create custom MCP server with query helper tools
     query_tools_server = _create_query_tools(reter_instance, rag_manager)
@@ -591,10 +719,13 @@ async def _call_agent(prompt: str, system_prompt: str, max_turns: int = 15, rete
         base_tools.append("mcp__query_helpers__run_rag_search")
         base_tools.append("mcp__query_helpers__run_rag_duplicates")
         base_tools.append("mcp__query_helpers__run_rag_clusters")
+    # CADSL needs both reter and rag for full functionality
+    if reter_instance is not None and rag_manager is not None:
+        base_tools.append("mcp__query_helpers__run_cadsl")
 
-    # Only use custom MCP tools - disable Read, Grep, Glob
-    allowed_tools = base_tools
-    disallowed_tools = ["Read", "Grep", "Glob", "Bash", "Edit", "Write", "WebSearch", "WebFetch"]
+    # Allow custom MCP tools plus Read and Grep for code exploration
+    allowed_tools = base_tools + ["Read", "Grep"]
+    disallowed_tools = ["Glob", "Bash", "Edit", "Write", "WebSearch", "WebFetch"]
     permission_mode = "bypassPermissions"
 
     options = ClaudeAgentOptions(
@@ -606,24 +737,58 @@ async def _call_agent(prompt: str, system_prompt: str, max_turns: int = 15, rete
         mcp_servers={"query_helpers": query_tools_server}
     )
 
-    debug_log.debug(f"Starting agent with allowed_tools: {allowed_tools}, disallowed_tools: {disallowed_tools}")
+    debug_log.debug(f"Built agent options with allowed_tools: {allowed_tools}")
+    return options
+
+
+async def _process_agent_response(client, tools_used: List[str]) -> str:
+    """Process agent response and return the final text output."""
+    from claude_agent_sdk import AssistantMessage, TextBlock, ToolUseBlock, ToolResultBlock
+
+    result_text = ""
+    async for message in client.receive_response():
+        if isinstance(message, AssistantMessage):
+            for block in message.content:
+                if isinstance(block, TextBlock):
+                    result_text = block.text
+                elif isinstance(block, ToolUseBlock):
+                    tool_name = block.name
+                    tool_input = block.input
+                    tools_used.append(tool_name)
+                    debug_log.debug(f"TOOL CALL: {tool_name} with input: {str(tool_input)[:200]}")
+                elif isinstance(block, ToolResultBlock):
+                    result_preview = str(block.content)[:200] if block.content else "(empty)"
+                    debug_log.debug(f"TOOL RESULT: {result_preview}...")
+
+    return result_text
+
+
+async def _call_agent(prompt: str, system_prompt: str, max_turns: int = 15, reter_instance=None, rag_manager=None) -> str:
+    """Call Agent SDK using ClaudeSDKClient and return the text response.
+
+    NOTE: This creates a new session. For multi-turn with retries, use the session-based
+    generate_reql_query or generate_cadsl_query functions instead.
+
+    Args:
+        prompt: The prompt to send to the agent
+        system_prompt: System prompt for the agent
+        max_turns: Maximum conversation turns (default 15)
+        reter_instance: Optional RETER instance for running test REQL queries
+        rag_manager: Optional RAG manager for running semantic search
+    """
+    if not is_agent_sdk_available():
+        raise ImportError("Claude Agent SDK not installed. Run: pip install claude-agent-sdk")
+
+    from claude_agent_sdk import ClaudeSDKClient
+
+    tools_used = []
+    options = _build_agent_options(system_prompt, max_turns, reter_instance, rag_manager)
+
+    debug_log.debug(f"Starting single-turn agent session")
 
     async with ClaudeSDKClient(options=options) as client:
         await client.query(prompt)
-
-        async for message in client.receive_response():
-            if isinstance(message, AssistantMessage):
-                for block in message.content:
-                    if isinstance(block, TextBlock):
-                        result_text = block.text
-                    elif isinstance(block, ToolUseBlock):
-                        tool_name = block.name
-                        tool_input = block.input
-                        tools_used.append(tool_name)
-                        debug_log.debug(f"TOOL CALL: {tool_name} with input: {str(tool_input)[:200]}")
-                    elif isinstance(block, ToolResultBlock):
-                        result_preview = str(block.content)[:200] if block.content else "(empty)"
-                        debug_log.debug(f"TOOL RESULT: {result_preview}...")
+        result_text = await _process_agent_response(client, tools_used)
 
     debug_log.debug(f"Agent finished. Tools used: {tools_used}")
     return result_text
@@ -635,16 +800,19 @@ async def generate_reql_query(
     reter_instance,
     max_iterations: int = 5,
     similar_tools_context: Optional[str] = None,
-    rag_manager=None
+    rag_manager=None,
+    project_root: Optional[str] = None
 ) -> QueryGenerationResult:
     """
     Generate and validate a REQL query using Agent SDK.
 
-    Orchestration loop:
+    Uses a SINGLE agentic session for all retries, maintaining conversation context.
+
+    Orchestration loop (within one session):
     1. Send question to Agent
-    2. If Agent requests resources, provide them
+    2. Agent uses tools to explore grammars/examples
     3. If Agent outputs query, execute and validate
-    4. If error, feed back to Agent
+    4. If error, send follow-up message with error feedback
     5. Repeat until success or max iterations
     """
     if not is_agent_sdk_available():
@@ -656,96 +824,106 @@ async def generate_reql_query(
             error="Claude Agent SDK not available"
         )
 
+    from claude_agent_sdk import ClaudeSDKClient
+
     tools_used = []
     attempts = 0
     last_error = None
     last_query = None
 
     # Build initial prompt
-    prompt = f"{schema_info}\n\nQuestion: {question}"
+    initial_prompt = f"{schema_info}\n\nQuestion: {question}"
     if similar_tools_context:
-        prompt = f"{prompt}\n\n{similar_tools_context}"
+        initial_prompt = f"{initial_prompt}\n\n{similar_tools_context}"
 
-    for iteration in range(max_iterations):
-        attempts += 1
-        debug_log.debug(f"\n{'='*60}\nREQL ITERATION {iteration + 1}/{max_iterations}\n{'='*60}")
+    # Format system prompt with project root
+    if project_root is None:
+        import os
+        project_root = os.environ.get("RETER_PROJECT_ROOT", os.getcwd())
+    system_prompt = REQL_SYSTEM_PROMPT_TEMPLATE.format(project_root=project_root)
 
-        # If we have an error from previous iteration, add it to prompt
-        if last_error and last_query:
-            prompt = f"""Previous query failed with error:
+    # Build agent options once for the session
+    options = _build_agent_options(system_prompt, max_iterations * 3, reter_instance, rag_manager)
+
+    debug_log.debug(f"Starting REQL generation session with max_iterations={max_iterations}")
+
+    try:
+        async with ClaudeSDKClient(options=options) as client:
+            # Send initial query
+            await client.query(initial_prompt)
+            response_text = await _process_agent_response(client, tools_used)
+            attempts += 1
+            debug_log.debug(f"\n{'='*60}\nREQL ITERATION {attempts}/{max_iterations}\n{'='*60}")
+            debug_log.debug(f"Agent response: {response_text[:500]}...")
+
+            for iteration in range(max_iterations):
+                # Try to extract query from response
+                query = _extract_query(response_text, QueryType.REQL)
+
+                if not query:
+                    # No query found, ask again within same session
+                    debug_log.debug("No query found in response, asking again")
+                    await client.query("Please output the REQL query in a ```reql code block.")
+                    response_text = await _process_agent_response(client, tools_used)
+                    attempts += 1
+                    debug_log.debug(f"Retry response: {response_text[:500]}...")
+                    continue
+
+                last_query = query
+                debug_log.debug(f"Generated query: {query}")
+
+                # Execute and validate
+                try:
+                    result = reter_instance.reql(query)
+                    row_count = result.num_rows
+                    debug_log.debug(f"Query executed successfully: {row_count} rows")
+
+                    return QueryGenerationResult(
+                        success=True,
+                        query=query,
+                        tools_used=tools_used,
+                        attempts=attempts
+                    )
+
+                except Exception as e:
+                    last_error = str(e)
+                    debug_log.debug(f"Query execution error: {last_error}")
+
+                    # Send error feedback within same session
+                    error_feedback = f"""Your query failed with error:
 {last_error}
 
 Previous query:
 ```reql
-{last_query}
+{query}
 ```
 
-Please fix the query. Original question: {question}
+Please fix the query and output the corrected version in a ```reql code block."""
 
-{schema_info}"""
+                    await client.query(error_feedback)
+                    response_text = await _process_agent_response(client, tools_used)
+                    attempts += 1
+                    debug_log.debug(f"\n{'='*60}\nREQL RETRY {attempts}/{max_iterations}\n{'='*60}")
+                    debug_log.debug(f"Retry response: {response_text[:500]}...")
 
-        try:
-            # Call Agent SDK
-            response_text = await _call_agent(prompt, REQL_SYSTEM_PROMPT, reter_instance=reter_instance, rag_manager=rag_manager)
-            debug_log.debug(f"Agent response: {response_text[:500]}...")
-
-            # Check for resource requests
-            requests = _parse_requests(response_text)
-            if requests:
-                debug_log.debug(f"Agent requested: {requests}")
-                tools_used.extend([r["type"] for r in requests])
-
-                # Provide requested resources and continue
-                resources = _handle_requests(requests)
-                prompt = f"Here are the requested resources:\n\n{resources}\n\nNow generate the REQL query for: {question}"
-                continue
-
-            # Try to extract query
-            query = _extract_query(response_text, QueryType.REQL)
-            if not query:
-                debug_log.debug("No query found in response, asking again")
-                prompt = f"Please output the REQL query in a ```reql code block. Question: {question}"
-                continue
-
-            last_query = query
-            debug_log.debug(f"Generated query: {query}")
-
-            # Execute and validate
-            try:
-                result = reter_instance.reql(query)
-                row_count = result.num_rows
-                debug_log.debug(f"Query executed successfully: {row_count} rows")
-
-                return QueryGenerationResult(
-                    success=True,
-                    query=query,
-                    tools_used=tools_used,
-                    attempts=attempts
-                )
-
-            except Exception as e:
-                last_error = str(e)
-                debug_log.debug(f"Query execution error: {last_error}")
-                # Continue to next iteration with error feedback
-
-        except Exception as e:
-            debug_log.debug(f"Agent SDK error: {e}")
+            # Max iterations reached
             return QueryGenerationResult(
                 success=False,
                 query=last_query,
                 tools_used=tools_used,
                 attempts=attempts,
-                error=str(e)
+                error=f"Max iterations reached. Last error: {last_error}"
             )
 
-    # Max iterations reached
-    return QueryGenerationResult(
-        success=False,
-        query=last_query,
-        tools_used=tools_used,
-        attempts=attempts,
-        error=f"Max iterations reached. Last error: {last_error}"
-    )
+    except Exception as e:
+        debug_log.debug(f"Agent SDK error: {e}")
+        return QueryGenerationResult(
+            success=False,
+            query=last_query,
+            tools_used=tools_used,
+            attempts=attempts,
+            error=str(e)
+        )
 
 
 async def generate_cadsl_query(
@@ -754,9 +932,21 @@ async def generate_cadsl_query(
     max_iterations: int = 5,
     similar_tools_context: Optional[str] = None,
     reter_instance=None,
-    rag_manager=None
+    rag_manager=None,
+    project_root: Optional[str] = None
 ) -> QueryGenerationResult:
-    """Generate a CADSL query using Agent SDK."""
+    """
+    Generate a CADSL query using Agent SDK.
+
+    Uses a SINGLE agentic session for all retries, maintaining conversation context.
+
+    Orchestration loop (within one session):
+    1. Send question to Agent with similar tools context
+    2. Agent uses tools to explore grammars/examples
+    3. If Agent outputs query, return it for caller to execute
+    4. If no query found, send follow-up message asking for cadsl block
+    5. Repeat until success or max iterations
+    """
     if not is_agent_sdk_available():
         return QueryGenerationResult(
             success=False,
@@ -766,65 +956,90 @@ async def generate_cadsl_query(
             error="Claude Agent SDK not available"
         )
 
+    from claude_agent_sdk import ClaudeSDKClient
+
     tools_used = []
     attempts = 0
 
     # Build initial prompt
-    prompt = f"Question: {question}"
+    initial_prompt = f"Question: {question}"
     if similar_tools_context:
-        prompt = f"{prompt}\n\n{similar_tools_context}"
+        initial_prompt = f"{initial_prompt}\n\n{similar_tools_context}"
 
-    for iteration in range(max_iterations):
-        attempts += 1
-        debug_log.debug(f"\n{'='*60}\nCADSL ITERATION {iteration + 1}/{max_iterations}\n{'='*60}")
+    # Format system prompt with project root
+    if project_root is None:
+        import os
+        project_root = os.environ.get("RETER_PROJECT_ROOT", os.getcwd())
+    system_prompt = CADSL_SYSTEM_PROMPT_TEMPLATE.format(project_root=project_root)
 
-        try:
-            response_text = await _call_agent(prompt, CADSL_SYSTEM_PROMPT, reter_instance=reter_instance, rag_manager=rag_manager)
+    # Build agent options once for the session
+    options = _build_agent_options(system_prompt, max_iterations * 3, reter_instance, rag_manager)
+
+    debug_log.debug(f"Starting CADSL generation session with max_iterations={max_iterations}")
+
+    try:
+        async with ClaudeSDKClient(options=options) as client:
+            # Send initial query
+            await client.query(initial_prompt)
+            response_text = await _process_agent_response(client, tools_used)
+            attempts += 1
+            debug_log.debug(f"\n{'='*60}\nCADSL ITERATION {attempts}/{max_iterations}\n{'='*60}")
             debug_log.debug(f"Agent response: {response_text[:500]}...")
 
-            # Check for resource requests
-            requests = _parse_requests(response_text)
-            if requests:
-                debug_log.debug(f"Agent requested: {requests}")
-                tools_used.extend([r["type"] for r in requests])
+            for iteration in range(max_iterations):
+                # Check for resource requests (legacy pattern - now handled by tools)
+                requests = _parse_requests(response_text)
+                if requests:
+                    debug_log.debug(f"Agent requested: {requests}")
+                    tools_used.extend([r["type"] for r in requests])
 
-                resources = _handle_requests(requests)
-                prompt = f"Here are the requested resources:\n\n{resources}\n\nNow generate the CADSL query for: {question}"
-                continue
+                    resources = _handle_requests(requests)
+                    await client.query(f"Here are the requested resources:\n\n{resources}\n\nNow generate the CADSL query for: {question}")
+                    response_text = await _process_agent_response(client, tools_used)
+                    attempts += 1
+                    debug_log.debug(f"Retry response: {response_text[:500]}...")
+                    continue
 
-            # Try to extract query
-            query = _extract_query(response_text, QueryType.CADSL)
-            if not query:
-                prompt = f"Please output the CADSL query in a ```cadsl code block. Question: {question}"
-                continue
+                # Try to extract query
+                query = _extract_query(response_text, QueryType.CADSL)
 
-            debug_log.debug(f"Generated query: {query}")
+                if not query:
+                    # No query found, ask again within same session
+                    debug_log.debug("No query found in response, asking again")
+                    await client.query("Please output the CADSL query in a ```cadsl code block.")
+                    response_text = await _process_agent_response(client, tools_used)
+                    attempts += 1
+                    debug_log.debug(f"Retry response: {response_text[:500]}...")
+                    continue
 
-            # For CADSL, we return the query and let the caller execute/validate
-            return QueryGenerationResult(
-                success=True,
-                query=query,
-                tools_used=tools_used,
-                attempts=attempts
-            )
+                debug_log.debug(f"Generated query: {query}")
 
-        except Exception as e:
-            debug_log.debug(f"Agent SDK error: {e}")
+                # For CADSL, we return the query and let the caller execute/validate
+                return QueryGenerationResult(
+                    success=True,
+                    query=query,
+                    tools_used=tools_used,
+                    attempts=attempts
+                )
+
+            # Max iterations reached
             return QueryGenerationResult(
                 success=False,
                 query=None,
                 tools_used=tools_used,
                 attempts=attempts,
-                error=str(e)
+                error="Max iterations reached"
             )
 
-    return QueryGenerationResult(
-        success=False,
-        query=None,
-        tools_used=tools_used,
-        attempts=attempts,
-        error="Max iterations reached"
-    )
+    except Exception as e:
+        debug_log.debug(f"Agent SDK error: {e}")
+        return QueryGenerationResult(
+            success=False,
+            query=None,
+            tools_used=tools_used,
+            attempts=attempts,
+            error=str(e)
+        )
 
 
 async def retry_cadsl_query(

@@ -34,13 +34,24 @@ from .source_state_manager import SourceStateManager, SyncChanges, FileInfo
 
 try:
     from watchdog.observers import Observer
-    from watchdog.events import FileSystemEventHandler, FileSystemEvent
+    from watchdog.events import (
+        FileSystemEventHandler,
+        FileSystemEvent,
+        FileCreatedEvent,
+        FileDeletedEvent,
+        FileModifiedEvent,
+        FileMovedEvent,
+    )
     WATCHDOG_AVAILABLE = True
 except ImportError:
     WATCHDOG_AVAILABLE = False
     Observer = None
     FileSystemEventHandler = object
     FileSystemEvent = None
+    FileCreatedEvent = None
+    FileDeletedEvent = None
+    FileModifiedEvent = None
+    FileMovedEvent = None
 
 if TYPE_CHECKING:
     from .state_persistence import StatePersistenceService
@@ -53,14 +64,22 @@ class _FileChangeHandler(FileSystemEventHandler):
 
     Only triggers on supported code file extensions and respects
     gitignore/exclude patterns.
+
+    NOTE: We use specific event handlers (on_created, on_deleted, on_modified,
+    on_moved) instead of on_any_event to avoid false positives from file access
+    events on Windows. Reading a file can update atime which triggers events.
+
+    We also track mtime to filter out false "modified" events that don't
+    actually change file content (e.g., antivirus scanners, indexers).
     """
 
     def __init__(self, manager: "DefaultInstanceManager"):
         super().__init__()
         self._manager = manager
+        self._last_mtime: Dict[str, float] = {}  # Track mtime to filter false positives
 
-    def on_any_event(self, event: "FileSystemEvent") -> None:
-        """Handle any filesystem event."""
+    def _handle_file_event(self, event: "FileSystemEvent", check_mtime: bool = False) -> None:
+        """Common handler for file create/delete/modify/move events."""
         if event.is_directory:
             return
 
@@ -82,10 +101,41 @@ class _FileChangeHandler(FileSystemEventHandler):
         if self._manager._is_excluded_for_scan(rel_path):
             return
 
+        # For "modified" events, check if mtime actually changed
+        # This filters out false positives from antivirus, indexers, etc.
+        if check_mtime:
+            try:
+                current_mtime = src_path.stat().st_mtime
+                path_key = str(src_path)
+                last_mtime = self._last_mtime.get(path_key, 0)
+                if current_mtime == last_mtime:
+                    # mtime unchanged - likely a false positive (read, not write)
+                    return
+                self._last_mtime[path_key] = current_mtime
+            except (OSError, IOError):
+                # File might have been deleted, let it through
+                pass
+
         # Set dirty flag
         if not self._manager._dirty:
             debug_log(f"[FileWatcher] Change detected: {rel_path} ({event.event_type})")
             self._manager._dirty = True
+
+    def on_created(self, event: "FileSystemEvent") -> None:
+        """Handle file creation."""
+        self._handle_file_event(event)
+
+    def on_deleted(self, event: "FileSystemEvent") -> None:
+        """Handle file deletion."""
+        self._handle_file_event(event)
+
+    def on_modified(self, event: "FileSystemEvent") -> None:
+        """Handle file modification - with mtime check to filter false positives."""
+        self._handle_file_event(event, check_mtime=True)
+
+    def on_moved(self, event: "FileSystemEvent") -> None:
+        """Handle file move/rename."""
+        self._handle_file_event(event)
 
 
 class DefaultInstanceManager:

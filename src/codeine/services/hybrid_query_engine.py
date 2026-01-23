@@ -945,7 +945,7 @@ def build_similar_tools_section(similar_tools: List[SimilarTool]) -> str:
 
     sections.append("**TIP**: If one of these tools closely matches what you need,")
     sections.append("you can adapt it with minor modifications instead of starting from scratch.")
-    sections.append("For REQL queries, extract the reql {} block and simplify as needed.\n")
+    sections.append("For REQL queries, extract the reql {{ ... }} block and simplify as needed.\n")
 
     return "\n".join(sections)
 
@@ -958,7 +958,8 @@ async def generate_query_with_tools(
     similar_tools: Optional[List[SimilarTool]] = None,
     reter_instance=None,
     schema_info: str = "",
-    rag_manager=None
+    rag_manager=None,
+    project_root: Optional[str] = None
 ) -> str:
     """
     Generate a query using Agent SDK with case-based reasoning.
@@ -971,6 +972,7 @@ async def generate_query_with_tools(
         similar_tools: Similar CADSL tools from case-based reasoning
         reter_instance: Optional Reter instance for query validation
         schema_info: Schema information for REQL queries
+        project_root: Project root path for file verification tools
 
     Returns:
         Generated query string
@@ -993,7 +995,8 @@ async def generate_query_with_tools(
             reter_instance=reter_instance,
             max_iterations=max_iterations,
             similar_tools_context=similar_tools_context,
-            rag_manager=rag_manager
+            rag_manager=rag_manager,
+            project_root=project_root
         )
     else:  # CADSL
         result = await generate_cadsl_query(
@@ -1002,7 +1005,8 @@ async def generate_query_with_tools(
             max_iterations=max_iterations,
             similar_tools_context=similar_tools_context,
             reter_instance=reter_instance,
-            rag_manager=rag_manager
+            rag_manager=rag_manager,
+            project_root=project_root
         )
 
     if result.success and result.query:

@@ -504,7 +504,9 @@ class ArrowMapStep(ArrowStep):
                                 row.update(ctx.params)
                             try:
                                 values.append(expr.format(**row))
-                            except KeyError:
+                            except (KeyError, IndexError):
+                                # KeyError: missing named placeholder
+                                # IndexError: positional placeholder {0} with no positional args
                                 values.append(expr)
                         columns[out_name] = pa.array(values)
                     else:
