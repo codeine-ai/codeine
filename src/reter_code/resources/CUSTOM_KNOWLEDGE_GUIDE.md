@@ -24,7 +24,7 @@
 ### 1. Add Your First Knowledge
 
 ```python
-from logical_thinking_server import add_knowledge, quick_query
+from logical_thinking_server import add_knowledge, reql
 
 # Step 1: Define your domain
 ontology = """
@@ -54,7 +54,7 @@ print(f"Added {result['items_added']} facts")
 
 ```python
 # Find all tasks
-result = quick_query(
+result = reql(
     query="SELECT ?task WHERE { ?task type Task }",
     type="reql"
 )
@@ -62,7 +62,7 @@ print(f"Found {result['count']} tasks")
 print(result['results'])
 
 # Find who's assigned to each task
-result = quick_query(
+result = reql(
     query="SELECT ?task ?person WHERE { ?task assignedTo ?person }",
     type="reql"
 )
@@ -109,7 +109,7 @@ add_knowledge("Alice is_a Person")
 # Creates: subsumption relationship
 
 # Why your query fails:
-quick_query("SELECT ?p WHERE { ?p type Person }")
+reql("SELECT ?p WHERE { ?p type Person }")
 # Looking for INSTANCES of Person
 # But Alice is stored as a SUBCLASS, not an instance
 # Result: 0 rows ❌
@@ -122,7 +122,7 @@ add_knowledge("Person(Alice)")
 # Creates: instance_of relationship
 
 # Now your query works:
-quick_query("SELECT ?p WHERE { ?p type Person }")
+reql("SELECT ?p WHERE { ?p type Person }")
 # Result: Alice ✅
 ```
 
@@ -162,7 +162,7 @@ Person(Bob)
 """)
 
 # Verify with query
-result = quick_query("SELECT ?p WHERE { ?p type Person }")
+result = reql("SELECT ?p WHERE { ?p type Person }")
 # Should return: [["Alice"], ["Bob"]]
 ```
 
@@ -208,13 +208,13 @@ status(proj:WebApp, "active")
 
 ```python
 # Find all people and what they work on
-quick_query("SELECT ?person ?project WHERE { ?person worksOn ?project }")
+reql("SELECT ?person ?project WHERE { ?person worksOn ?project }")
 
 # Find people with specific age
-quick_query("SELECT ?person WHERE { ?person age 30 }")
+reql("SELECT ?person WHERE { ?person age 30 }")
 
 # Find all properties of Alice
-quick_query("SELECT ?property ?value WHERE { Alice ?property ?value }")
+reql("SELECT ?property ?value WHERE { Alice ?property ?value }")
 ```
 
 ---
@@ -257,7 +257,7 @@ Dog(Fido)
 """)
 
 # Query for animals
-result = quick_query("SELECT ?x WHERE { ?x type Animal }")
+result = reql("SELECT ?x WHERE { ?x type Animal }")
 # Returns: Fido
 # Why? Because:
 #   Fido is a Dog
@@ -389,7 +389,7 @@ print(subclasses[['sub', 'sup']])
 
 ```python
 # List all classes
-result = quick_query("""
+result = reql("""
     SELECT DISTINCT ?class WHERE { ?x type ?class }
 """)
 print("Classes:", result['results'])
@@ -398,7 +398,7 @@ print("Classes:", result['results'])
 # (This requires iterating through facts - use Method 1)
 
 # Count instances per class
-result = quick_query("""
+result = reql("""
     SELECT ?class (COUNT(?instance) AS ?count)
     WHERE { ?instance type ?class }
     GROUP BY ?class
@@ -406,7 +406,7 @@ result = quick_query("""
 print("Instance counts:", result['results'])
 
 # Sample instances of each class
-result = quick_query("""
+result = reql("""
     SELECT ?class ?instance
     WHERE { ?instance type ?class }
     LIMIT 100
@@ -668,7 +668,7 @@ version(arch:PostgreSQL, "15.2")
 """
 
 # Query: Find all Python services
-result = quick_query('''
+result = reql('''
     SELECT ?service WHERE {
         ?service type Service .
         ?service language "Python"
@@ -676,7 +676,7 @@ result = quick_query('''
 ''')
 
 # Query: Find service dependencies
-result = quick_query('''
+result = reql('''
     SELECT ?service ?dep WHERE {
         ?service type Service .
         ?service dependsOn ?dep
@@ -684,7 +684,7 @@ result = quick_query('''
 ''')
 
 # Query: Count services per language
-result = quick_query('''
+result = reql('''
     SELECT ?lang (COUNT(?service) AS ?count)
     WHERE {
         ?service type Service .
@@ -735,7 +735,7 @@ phase(task:ExtractValidation, "decomposition")
 """
 
 # Query: Find high-severity smells
-result = quick_query('''
+result = reql('''
     SELECT ?smell ?class ?count WHERE {
         ?smell type CodeSmell .
         ?smell severity "high" .
@@ -745,7 +745,7 @@ result = quick_query('''
 ''')
 
 # Query: Sum hours per phase
-result = quick_query('''
+result = reql('''
     SELECT ?phase (SUM(?hours) AS ?total)
     WHERE {
         ?task type Task .
@@ -756,7 +756,7 @@ result = quick_query('''
 ''')
 
 # Query: Find tasks addressing each smell
-result = quick_query('''
+result = reql('''
     SELECT ?smell (COUNT(?task) AS ?taskCount)
     WHERE {
         ?task addresses ?smell
@@ -811,7 +811,7 @@ venue(paper:TransformerArch2024, "ACL")
 """
 
 # Query: Find co-authors (people who wrote together)
-result = quick_query('''
+result = reql('''
     SELECT DISTINCT ?author1 ?author2 WHERE {
         ?paper writtenBy ?author1 .
         ?paper writtenBy ?author2 .
@@ -820,7 +820,7 @@ result = quick_query('''
 ''')
 
 # Query: Most prolific authors
-result = quick_query('''
+result = reql('''
     SELECT ?author (COUNT(?paper) AS ?count)
     WHERE { ?paper writtenBy ?author }
     GROUP BY ?author
@@ -828,7 +828,7 @@ result = quick_query('''
 ''')
 
 # Query: Papers per topic
-result = quick_query('''
+result = reql('''
     SELECT ?topic (COUNT(?paper) AS ?count)
     WHERE { ?paper hasTopic ?topic }
     GROUP BY ?topic
@@ -911,7 +911,7 @@ result = add_knowledge(ontology)
 assert result['items_added'] > 0, "No items added!"
 
 # Test a query immediately
-test_result = quick_query("SELECT ?x WHERE { ?x type Task }")
+test_result = reql("SELECT ?x WHERE { ?x type Task }")
 assert test_result['count'] > 0, "No tasks found!"
 ```
 

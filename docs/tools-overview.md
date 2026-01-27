@@ -22,8 +22,8 @@ Reter Code provides 19 MCP tools organized into functional categories. This docu
 | `analyze_documentation_relevance` | RAG | Analyze doc-code relevance |
 | `add_knowledge` | Knowledge | Add knowledge to RETER |
 | `add_external_directory` | Knowledge | Load external code directories |
-| `quick_query` | Query | Execute REQL queries |
-| `natural_language_query` | Query | Natural language to REQL |
+| `reql` | Query | Execute REQL queries |
+| `natural_language_query` | Query | Natural language to CADSL |
 | `instance_manager` | Management | Manage RETER instances |
 | `reter_info` | Info | Version and diagnostic info |
 | `initialize_project` | Init | Re-initialize project (background task) |
@@ -83,7 +83,7 @@ Different tools require different components to be ready:
 | Component | Required By |
 |-----------|-------------|
 | SQLite | `thinking`, `session`, `items`, `project`, session diagrams |
-| RETER | `code_inspection`, `recommender`, `quick_query`, UML diagrams |
+| RETER | `code_inspection`, `recommender`, `reql`, `natural_language_query`, UML diagrams |
 | RAG Code Index | `semantic_search` (code), `find_similar_clusters`, `find_duplicate_candidates` |
 | RAG Docs Index | `semantic_search` (docs), `analyze_documentation_relevance` |
 

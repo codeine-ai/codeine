@@ -983,7 +983,8 @@ class ThinkingSession:
                 "diagram": "Visualize: gantt, class_hierarchy, sequence, design_doc",
                 "code_inspection": "Python/JS/C#/C++ analysis",
                 "recommender": "Code quality: refactoring, test_coverage",
-                "natural_language_query": "RECOMMENDED - Plain English queries",
+                "natural_language_query": "RECOMMENDED - Natural language to CADSL",
+                "reql": "Execute REQL queries directly",
                 "instance_manager": "Manage instances/sources"
             },
             "design_doc_sections": {

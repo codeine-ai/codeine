@@ -385,7 +385,7 @@ class ComponentReadiness:
 
     Tools check appropriate flags before executing:
     - session, items, project → require_sql()
-    - code_inspection, quick_query → require_default_instance()
+    - code_inspection, reql, natural_language_query → require_default_instance()
     - semantic_search (code) → require_rag_code_index()
     - semantic_search (docs) → require_rag_document_index()
 

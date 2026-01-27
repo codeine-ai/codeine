@@ -47,12 +47,14 @@ RECOMMENDER_TYPES = {
 class RecommenderToolsRegistrar(ToolRegistrarBase):
     """Registers the unified recommender tool with FastMCP."""
 
-    def __init__(self, instance_manager, persistence_service, default_manager=None):
-        super().__init__(instance_manager, persistence_service)
+    def __init__(self, instance_manager, persistence_service, default_manager=None, tools_filter=None):
+        super().__init__(instance_manager, persistence_service, tools_filter)
         self._default_manager = default_manager
 
     def register(self, app: FastMCP) -> None:
-        """Register the recommender tool."""
+        """Register the recommender tool (respects tools_filter)."""
+        if not self._should_register("recommender"):
+            return
         from ...dsl.core import Context
         from ...dsl.registry import Registry
 

@@ -69,6 +69,10 @@ class EmbeddingService:
         model_name: Name of the embedding model
         provider: Provider type ("local", "voyage", "openai")
         embedding_dim: Dimension of embeddings produced
+
+    @reter: InfrastructureLayer(self)
+    @reter: MLComponent(self)
+    @reter: hasProvider(self, "sentence-transformers")
     """
 
     # Model configurations

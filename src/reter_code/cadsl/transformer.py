@@ -70,6 +70,11 @@ class CADSLTransformer:
     Transforms CADSL parse trees into ToolSpec objects.
 
     The ToolSpec can then be converted to executable Pipeline objects.
+
+    @reter: DSLLayer(self)
+    @reter: ASTTransformer(self)
+    @reter: dependsOn(self, reter_code.cadsl.ExpressionCompiler)
+    @reter: partOf(self, reter_code.cadsl)
     """
 
     def __init__(self):
@@ -552,6 +557,8 @@ class CADSLTransformer:
             return self._transform_string_match_step(node)
         elif step_type == "rag_enrich":
             return self._transform_rag_enrich_step(node)
+        elif step_type == "create_task":
+            return self._transform_create_task_step(node)
 
         return None
 
@@ -1536,6 +1543,59 @@ class CADSLTransformer:
                                     for t in entity_list.children
                                     if isinstance(t, Token) and t.type == "STRING"
                                 ]
+
+        return result
+
+    def _transform_create_task_step(self, node: Tree) -> Dict[str, Any]:
+        """Transform create_task step: create_task { name: "template {field}", category: "annotation", priority: "medium" }"""
+        result = {
+            "type": "create_task",
+            "name_template": "",
+            "category": "annotation",
+            "priority": "medium",
+            "description_template": None,
+            "affects_field": None,
+            "batch_size": 50,
+            "dry_run": False,
+        }
+
+        for child in node.children:
+            if isinstance(child, Tree) and child.data == "create_task_spec":
+                for param in child.children:
+                    if isinstance(param, Tree):
+                        if param.data == "ct_name":
+                            result["name_template"] = self._unquote(str(param.children[0]))
+                        elif param.data == "ct_name_param":
+                            result["name_template_param"] = str(param.children[0].children[0])
+                        elif param.data == "ct_category":
+                            result["category"] = self._unquote(str(param.children[0]))
+                        elif param.data == "ct_category_param":
+                            result["category_param"] = str(param.children[0].children[0])
+                        elif param.data == "ct_priority":
+                            prio_node = param.children[0]
+                            if isinstance(prio_node, Tree):
+                                if prio_node.data == "ct_prio_critical":
+                                    result["priority"] = "critical"
+                                elif prio_node.data == "ct_prio_high":
+                                    result["priority"] = "high"
+                                elif prio_node.data == "ct_prio_medium":
+                                    result["priority"] = "medium"
+                                elif prio_node.data == "ct_prio_low":
+                                    result["priority"] = "low"
+                        elif param.data == "ct_priority_param":
+                            result["priority_param"] = str(param.children[0].children[0])
+                        elif param.data == "ct_description":
+                            result["description_template"] = self._unquote(str(param.children[0]))
+                        elif param.data == "ct_description_param":
+                            result["description_template_param"] = str(param.children[0].children[0])
+                        elif param.data == "ct_affects":
+                            result["affects_field"] = str(param.children[0])
+                        elif param.data == "ct_batch_size":
+                            result["batch_size"] = int(str(param.children[0]))
+                        elif param.data == "ct_dry_run":
+                            dry_run_node = param.children[0]
+                            if isinstance(dry_run_node, Tree):
+                                result["dry_run"] = dry_run_node.data == "bool_true"
 
         return result
 
@@ -4031,6 +4091,195 @@ class RagEnrichStep:
                 results.append([])
 
         return results
+
+
+# ============================================================
+# CREATE TASK STEP
+# ============================================================
+
+class CreateTaskStep:
+    """
+    Creates tasks in RETER session from pipeline data.
+
+    Syntax: create_task { name: "Add annotation to {class_name}", category: "annotation", priority: medium }
+
+    Template placeholders like {field} are replaced with row values.
+
+    Parameters:
+    - name: Task name template (required)
+    - category: Task category (feature, bug, refactor, test, docs, annotation, research)
+    - priority: critical, high, medium, low
+    - description: Task description template
+    - affects: Field name containing file path to mark as affected
+    - batch_size: Number of tasks to create per batch
+    - dry_run: If true, returns task data without creating tasks
+    """
+
+    def __init__(self, name_template, category="annotation", priority="medium",
+                 description_template=None, affects_field=None, batch_size=50, dry_run=False):
+        self.name_template = name_template
+        self.category = category
+        self.priority = priority
+        self.description_template = description_template
+        self.affects_field = affects_field
+        self.batch_size = batch_size
+        self.dry_run = dry_run
+
+    def execute(self, data, ctx=None):
+        """Execute task creation."""
+        from reter_code.dsl.core import pipeline_ok, pipeline_err
+        import logging
+        import re
+
+        logger = logging.getLogger(__name__)
+
+        try:
+            # Convert to list if Arrow table
+            if hasattr(data, 'to_pylist'):
+                data = data.to_pylist()
+
+            if not data:
+                return pipeline_ok({"tasks_created": 0, "tasks": []})
+
+            # Validate template fields against first row
+            template_fields = re.findall(r'\{(\w+)\}', self.name_template)
+            if self.description_template:
+                template_fields.extend(re.findall(r'\{(\w+)\}', self.description_template))
+
+            if data and template_fields:
+                missing = [f for f in template_fields if f not in data[0]]
+                if missing:
+                    # Check for ?-prefixed versions (REQL output)
+                    still_missing = []
+                    for f in missing:
+                        if f"?{f}" not in data[0]:
+                            still_missing.append(f)
+                    if still_missing:
+                        return pipeline_err(
+                            "create_task",
+                            f"Template field(s) not found in row: {still_missing}. "
+                            f"Available fields: {list(data[0].keys())}"
+                        )
+
+            # Get session store from context or default instance
+            store = None
+            session_id = None
+            if ctx and hasattr(ctx, 'get'):
+                store = ctx.get("session_store")
+                session_id = ctx.get("session_id")
+
+            if store is None:
+                try:
+                    from reter_code.tools.unified.store import UnifiedStore
+                    store = UnifiedStore()
+                except Exception as e:
+                    logger.debug(f"Could not get unified store: {e}")
+
+            if session_id is None:
+                # Try to get active session by instance name
+                if store:
+                    try:
+                        session = store.get_session_by_instance("default")
+                        if session:
+                            session_id = session.get("session_id")
+                    except Exception as e:
+                        logger.debug(f"Could not get session: {e}")
+
+            # Create tasks
+            tasks_created = []
+            for batch_start in range(0, len(data), self.batch_size):
+                batch_end = min(batch_start + self.batch_size, len(data))
+                batch = data[batch_start:batch_end]
+
+                for row in batch:
+                    task_data = self._create_task_data(row)
+
+                    if self.dry_run:
+                        tasks_created.append(task_data)
+                    else:
+                        # Actually create the task
+                        if store and session_id:
+                            try:
+                                # Use add_item with content as the task name
+                                # and additional fields as kwargs
+                                task_id = store.add_item(
+                                    session_id=session_id,
+                                    item_type="task",
+                                    content=task_data["name"],
+                                    description=task_data.get("description", ""),
+                                    category=task_data["category"],
+                                    priority=task_data["priority"],
+                                    status="pending",
+                                )
+                                task_data["id"] = task_id
+                                task_data["created"] = True
+
+                                # Add affects relation if specified
+                                if task_data.get("affects"):
+                                    store.add_relation(
+                                        source_id=task_id,
+                                        target_id=task_data["affects"],
+                                        target_type="file",
+                                        relation_type="affects"
+                                    )
+                            except Exception as e:
+                                logger.warning(f"Failed to create task: {e}")
+                                task_data["error"] = str(e)
+                                task_data["created"] = False
+                        else:
+                            task_data["created"] = False
+                            task_data["error"] = "No active session"
+
+                        tasks_created.append(task_data)
+
+            result = {
+                "tasks_created": sum(1 for t in tasks_created if t.get("created", False) or self.dry_run),
+                "tasks_failed": sum(1 for t in tasks_created if t.get("error")),
+                "dry_run": self.dry_run,
+                "tasks": tasks_created,
+            }
+
+            return pipeline_ok(result)
+
+        except Exception as e:
+            logger.error(f"Create task step failed: {e}", exc_info=True)
+            return pipeline_err("create_task", str(e))
+
+    def _create_task_data(self, row):
+        """Create task data from a row using templates."""
+        import re
+
+        def expand_template(template, row):
+            """Expand {field} placeholders with row values."""
+            if not template:
+                return template
+
+            result = template
+            for match in re.finditer(r'\{(\w+)\}', template):
+                field = match.group(1)
+                # Try both with and without ? prefix (REQL output)
+                value = row.get(field, row.get(f"?{field}", ""))
+                result = result.replace(match.group(0), str(value) if value else "")
+            return result
+
+        task_data = {
+            "name": expand_template(self.name_template, row),
+            "category": self.category,
+            "priority": self.priority,
+        }
+
+        if self.description_template:
+            task_data["description"] = expand_template(self.description_template, row)
+
+        if self.affects_field:
+            affects_value = row.get(self.affects_field, row.get(f"?{self.affects_field}"))
+            if affects_value:
+                task_data["affects"] = str(affects_value)
+
+        # Include original row data for reference
+        task_data["source_row"] = dict(row)
+
+        return task_data
 
 
 # ============================================================

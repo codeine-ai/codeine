@@ -5,7 +5,7 @@ Common functionality for all tool registrars.
 """
 
 import sys
-from typing import Dict, Any, Optional, Callable, TypeVar
+from typing import Dict, Any, Optional, Callable, TypeVar, Set
 from pathlib import Path
 from functools import wraps
 
@@ -85,11 +85,34 @@ def truncate_mcp_response_async(func: Callable[..., Any]) -> Callable[..., Any]:
 class ToolRegistrarBase:
     """Base class with common functionality for tool registrars."""
 
-    def __init__(self, instance_manager, persistence_service):
+    def __init__(self, instance_manager, persistence_service, tools_filter: Optional[Set[str]] = None):
+        """
+        Initialize the base tool registrar.
+
+        Args:
+            instance_manager: RETER instance manager
+            persistence_service: State persistence service
+            tools_filter: Optional set of tool names to register. If None, all tools are registered.
+        """
         self.instance_manager = instance_manager
         self.persistence = persistence_service
         self.tools_dir = Path(__file__).parent.parent.parent / "tools"
         self._ontology_loaded: Dict[str, Dict[str, bool]] = {}
+        self._tools_filter = tools_filter
+
+    def _should_register(self, tool_name: str) -> bool:
+        """
+        Check if a tool should be registered based on the tools_filter.
+
+        Args:
+            tool_name: Name of the tool to check
+
+        Returns:
+            True if the tool should be registered, False otherwise
+        """
+        if self._tools_filter is None:
+            return True  # No filter = register all tools
+        return tool_name in self._tools_filter
 
     def _get_reter(self, instance_name: str):
         """Get or create a RETER instance."""

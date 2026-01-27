@@ -158,6 +158,12 @@ class ReterCodeServer:
     - DocumentationProvider: Provides documentation content
     - ReterOperations: Handles RETER operations
     - StatePersistenceService: Manages state persistence
+
+    @reter: PresentationLayer(self)
+    @reter: MCPServer(self)
+    @reter: dependsOn(self, reter_code.services.InstanceManager)
+    @reter: dependsOn(self, reter_code.services.ToolRegistrar)
+    @reter: dependsOn(self, reter_code.services.ResourceRegistrar)
     """
 
     def __init__(self):

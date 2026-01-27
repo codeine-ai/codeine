@@ -88,7 +88,7 @@ Tools are organized into registrar classes:
 | `CodeInspectionToolsRegistrar` | `code_inspection` (26 actions) |
 | `RAGToolsRegistrar` | `semantic_search`, `rag_status`, `rag_reindex`, `init_status`, `find_similar_clusters`, `find_duplicate_candidates`, `analyze_documentation_relevance` |
 | `RecommenderToolsRegistrar` | `recommender` (58 detectors) |
-| `ToolRegistrar` | `add_knowledge`, `quick_query`, `instance_manager`, `natural_language_query`, `reter_info`, `add_external_directory` |
+| `ToolRegistrar` | `add_knowledge`, `reql`, `natural_language_query`, `instance_manager`, `reter_info`, `add_external_directory` |
 
 ## Class Hierarchies
 

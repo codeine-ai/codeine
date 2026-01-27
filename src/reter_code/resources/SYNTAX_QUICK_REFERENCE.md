@@ -9,13 +9,13 @@
 ### ❌ WRONG (Creates Subclass, Not Instance)
 ```python
 add_knowledge("task:Task1 is_a task:Task")
-quick_query("SELECT ?t WHERE { ?t type task:Task }")  # Returns 0 results!
+reql("SELECT ?t WHERE { ?t type task:Task }")  # Returns 0 results!
 ```
 
 ### ✅ CORRECT (Creates Instance)
 ```python
 add_knowledge("task:Task(task:Task1)")
-quick_query("SELECT ?t WHERE { ?t type task:Task }")  # Returns Task1 ✅
+reql("SELECT ?t WHERE { ?t type task:Task }")  # Returns Task1 ✅
 ```
 
 ---
@@ -89,23 +89,23 @@ add_knowledge(source=ontology, type="ontology")
 ### Queries (REQL Syntax)
 ```python
 # Query 1: Find all tasks
-quick_query("SELECT ?t WHERE { ?t type task:Task }", type="reql")
+reql("SELECT ?t WHERE { ?t type task:Task }", type="reql")
 # Result: task:RefactorDatabase
 
 # Query 2: Find task priority
-quick_query("SELECT ?t ?p WHERE { ?t priority ?p }", type="reql")
+reql("SELECT ?t ?p WHERE { ?t priority ?p }", type="reql")
 # Result: task:RefactorDatabase, "high"
 
 # Query 3: Find steps in planning phase
-quick_query("SELECT ?s WHERE { ?s phase \"planning\" }", type="reql")
+reql("SELECT ?s WHERE { ?s phase \"planning\" }", type="reql")
 # Result: task:Step1
 
 # Query 4: Count steps
-quick_query("SELECT (COUNT(?s) AS ?count) WHERE { ?s type task:Step }", type="reql")
+reql("SELECT (COUNT(?s) AS ?count) WHERE { ?s type task:Step }", type="reql")
 # Result: 2
 
 # Query 5: Sum hours by phase
-quick_query("""
+reql("""
     SELECT ?phase (SUM(?hours) AS ?total)
     WHERE { ?s phase ?phase . ?s estimatedHours ?hours }
     GROUP BY ?phase
@@ -160,11 +160,11 @@ If you use namespaces, **be consistent**:
 ```python
 # ✅ CORRECT: Namespaces match
 add_knowledge("task:Task(task:Task1)")
-quick_query("SELECT ?t WHERE { ?t type task:Task }")
+reql("SELECT ?t WHERE { ?t type task:Task }")
 
 # ❌ WRONG: Namespace mismatch
 add_knowledge("task:Task(task:Task1)")
-quick_query("SELECT ?t WHERE { ?t type Task }")  # Missing task: prefix!
+reql("SELECT ?t WHERE { ?t type Task }")  # Missing task: prefix!
 ```
 
 ---
@@ -176,13 +176,13 @@ quick_query("SELECT ?t WHERE { ?t type Task }")  # Missing task: prefix!
 add_knowledge(source="path/to/file.py", type="python")
 
 # Query for classes
-quick_query("SELECT ?class WHERE { ?class type py:Class }", type="reql")
+reql("SELECT ?class WHERE { ?class type py:Class }", type="reql")
 
 # Query for methods
-quick_query("SELECT ?method WHERE { ?method type py:Method }", type="reql")
+reql("SELECT ?method WHERE { ?method type py:Method }", type="reql")
 
 # Find methods in a class
-quick_query("""
+reql("""
     SELECT ?method WHERE { ?method definedIn 'MyClass' }
 """, type="reql")
 ```

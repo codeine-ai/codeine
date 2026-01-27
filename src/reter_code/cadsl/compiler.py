@@ -70,6 +70,10 @@ class ExpressionCompiler:
     - Literals (strings, numbers, booleans, null)
     - Function calls
     - Arithmetic operations
+
+    @reter: DSLLayer(self)
+    @reter: Compiler(self)
+    @reter: partOf(self, reter_code.cadsl)
     """
 
     def __init__(self):

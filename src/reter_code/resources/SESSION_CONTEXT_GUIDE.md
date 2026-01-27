@@ -117,8 +117,8 @@ After calling `session(action="context")`, you have access to:
 |------|---------|
 | `add_knowledge` | Add facts/rules to RETER |
 | `add_external_python_directory` | Load external Python files |
-| `quick_query` | Execute REQL queries |
-| `natural_language_query` | **RECOMMENDED** - Plain English queries |
+| `reql` | Execute REQL queries directly |
+| `natural_language_query` | **RECOMMENDED** - Natural language to CADSL |
 
 ### Analysis Tools
 | Tool | Purpose |

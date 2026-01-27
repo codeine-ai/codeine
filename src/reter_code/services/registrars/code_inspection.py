@@ -63,8 +63,13 @@ class CodeInspectionToolsRegistrar(ToolRegistrarBase):
     UML diagrams are available via the 'diagram' tool.
     """
 
+    def __init__(self, instance_manager, persistence_service, tools_filter=None):
+        super().__init__(instance_manager, persistence_service, tools_filter)
+
     def register(self, app: FastMCP) -> None:
-        """Register the code_inspection tool."""
+        """Register the code_inspection tool (respects tools_filter)."""
+        if not self._should_register("code_inspection"):
+            return
         from ...dsl.core import Context
         from ...cadsl.tools_bridge import inspection
 

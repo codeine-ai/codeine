@@ -501,6 +501,37 @@ def build_pipeline_factory(spec: CADSLToolSpec,
                     entity_types=step_spec.get("entity_types"),
                 )
 
+            elif step_type == "create_task":
+                # Create tasks in RETER session from pipeline data
+                from .transformer import CreateTaskStep
+
+                # Resolve parameter references
+                name_template = step_spec.get("name_template", "")
+                if "name_template_param" in step_spec:
+                    name_template = ctx.params.get(step_spec["name_template_param"], name_template)
+
+                category = step_spec.get("category", "annotation")
+                if "category_param" in step_spec:
+                    category = ctx.params.get(step_spec["category_param"], category)
+
+                priority = step_spec.get("priority", "medium")
+                if "priority_param" in step_spec:
+                    priority = ctx.params.get(step_spec["priority_param"], priority)
+
+                description_template = step_spec.get("description_template")
+                if "description_template_param" in step_spec:
+                    description_template = ctx.params.get(step_spec["description_template_param"], description_template)
+
+                pipeline = pipeline >> CreateTaskStep(
+                    name_template=name_template,
+                    category=category,
+                    priority=priority,
+                    description_template=description_template,
+                    affects_field=step_spec.get("affects_field"),
+                    batch_size=step_spec.get("batch_size", 50),
+                    dry_run=step_spec.get("dry_run", False),
+                )
+
         if emit_key:
             pipeline = pipeline.emit(emit_key)
 

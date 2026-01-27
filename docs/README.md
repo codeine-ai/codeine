@@ -36,8 +36,8 @@ Reter Code is an AI-powered MCP (Model Context Protocol) server for code reasoni
 - [Knowledge Tools](./tools/knowledge-tools.md)
   - `add_knowledge` - Add knowledge to RETER
   - `add_external_directory` - Load external code
-  - `quick_query` - Execute REQL queries
-  - `natural_language_query` - NL to REQL
+  - `reql` - Execute REQL queries
+  - `natural_language_query` - Natural language to CADSL
 
 #### Visualization
 - [diagram](./tools/diagram.md) - UML and project diagrams
@@ -123,7 +123,7 @@ Or use environment variables:
 | Semantic Search (semantic_search) | - | - | Required | Required |
 | Duplication (find_similar_clusters) | - | - | Required | - |
 | Documentation (analyze_documentation_relevance) | - | - | Required | Required |
-| Knowledge (add_knowledge, quick_query) | - | Required | - | - |
+| Knowledge (add_knowledge, reql, natural_language_query) | - | Required | - | - |
 | Diagrams - Session | Required | - | - | - |
 | Diagrams - UML | - | Required | - | - |
 

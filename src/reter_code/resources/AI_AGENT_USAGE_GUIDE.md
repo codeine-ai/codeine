@@ -103,8 +103,10 @@ RIGHT: Each step builds on accumulated knowledge
 |------|---------|
 | `add_knowledge` | Add facts/rules/Python files to RETER |
 | `add_external_python_directory` | Load external Python codebases |
-| `quick_query` | Execute REQL queries (advanced) |
-| `natural_language_query` | **RECOMMENDED** - Plain English queries |
+| `reql` | Execute REQL queries (advanced) |
+| `natural_language_query` | **RECOMMENDED** - Natural language to CADSL |
+| `execute_cadsl` | Execute CADSL scripts directly |
+| `generate_cadsl` | Generate CADSL from natural language (without executing) |
 
 ### Analysis Tools
 
@@ -150,10 +152,11 @@ thinking(
 **RECOMMENDED** for querying the knowledge base:
 
 ```python
-# Ask questions in plain English
+# Ask questions in plain English - translates to CADSL automatically
 natural_language_query("What classes inherit from BaseTool?")
 natural_language_query("Find methods with more than 5 parameters")
 natural_language_query("Which modules have the most dependencies?")
+natural_language_query("Show circular import dependencies")
 ```
 
 ### Pattern 3: Use `code_inspection` for Code Analysis
@@ -185,6 +188,40 @@ recommender("refactoring", "long_method")
 # Test coverage analysis
 recommender("test_coverage")
 recommender("test_coverage", "untested_classes")
+```
+
+### Pattern 5: Use `execute_cadsl` for Complex Queries
+
+```python
+# Execute inline CADSL
+execute_cadsl('''
+    query find_large_classes() {
+        reql {
+            SELECT ?c ?name (COUNT(?m) AS ?method_count)
+            WHERE {
+                ?c type oo:Class . ?c name ?name .
+                ?m type oo:Method . ?m definedIn ?c
+            }
+            GROUP BY ?c ?name
+            HAVING (?method_count > 10)
+        }
+        | emit { results }
+    }
+''')
+
+# Execute from a .cadsl file
+execute_cadsl("path/to/detector.cadsl", params={"threshold": 15})
+```
+
+### Pattern 6: Use `generate_cadsl` to Learn CADSL Syntax
+
+```python
+# Generate CADSL without executing - useful for learning or modifying
+generate_cadsl("Find all classes that inherit from BaseTool")
+# Returns: { "success": true, "cadsl_query": "query..." }
+
+# Then modify and execute if needed
+execute_cadsl(modified_query)
 ```
 
 ---
@@ -406,17 +443,17 @@ thinking(
 )
 ```
 
-### Mistake 3: Using `quick_query` Instead of `natural_language_query`
+### Mistake 3: Writing REQL Directly Instead of Using `natural_language_query`
 
 **WRONG:**
 ```python
 # Complex REQL that may have syntax errors
-quick_query(query="SELECT ?c WHERE { ?c a py:Class . ?c py:hasMethod ?m . ?m py:hasName '__init__' }")
+reql(query="SELECT ?c WHERE { ?c a py:Class . ?c py:hasMethod ?m . ?m py:hasName '__init__' }")
 ```
 
 **RIGHT:**
 ```python
-# Just ask in English
+# Just ask in English - natural_language_query generates CADSL automatically
 natural_language_query("Find classes that have __init__ methods")
 ```
 
@@ -456,7 +493,7 @@ natural_language_query("Find classes that have __init__ methods")
 
 1. **Always call `session(action="context")` first**
 2. **Use `thinking` for all reasoning** - captures your thought chain
-3. **Use `natural_language_query`** - easier than REQL
+3. **Use `natural_language_query`** - easier than writing REQL directly
 4. **Use `recommender`** for code quality analysis
 5. **Use `code_inspection(action="find_tests")`** to find tests
 6. **Create traceability** with operations in `thinking`

@@ -45,8 +45,8 @@ class ItemsQueryFilters:
 class UnifiedToolsRegistrar(ToolRegistrarBase):
     """Registers unified thinking system tools with FastMCP."""
 
-    def __init__(self, instance_manager, persistence_service):
-        super().__init__(instance_manager, persistence_service)
+    def __init__(self, instance_manager, persistence_service, tools_filter=None):
+        super().__init__(instance_manager, persistence_service, tools_filter)
         self._sessions = {}  # instance_name -> ThinkingSession
 
     def _get_session(self, instance_name: str):
@@ -103,6 +103,11 @@ class UnifiedToolsRegistrar(ToolRegistrarBase):
         if filters.source_tool:
             query_params["source_tool"] = filters.source_tool
 
+        # Pass a high limit to get all items for accurate total count
+        # Pagination will be applied in Python after counting
+        query_params["limit"] = 1000000  # Large limit to get all items
+        query_params["offset"] = 0
+
         items_list = store.get_items(session_id, **query_params)
 
         # Apply date filters
@@ -130,11 +135,15 @@ class UnifiedToolsRegistrar(ToolRegistrarBase):
         }
 
     def register(self, app: FastMCP) -> None:
-        """Register all unified tools."""
-        self._register_thinking_tool(app)
-        self._register_session_tool(app)
-        self._register_items_tool(app)
-        self._register_diagram_tool(app)
+        """Register all unified tools (respects tools_filter)."""
+        if self._should_register("thinking"):
+            self._register_thinking_tool(app)
+        if self._should_register("session"):
+            self._register_session_tool(app)
+        if self._should_register("items"):
+            self._register_items_tool(app)
+        if self._should_register("diagram"):
+            self._register_diagram_tool(app)
 
     def _register_thinking_tool(self, app: FastMCP) -> None:
         """Register the main thinking tool."""

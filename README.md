@@ -80,7 +80,8 @@ Now Claude starts fast because everything is cached.
 |------|-------------|
 | `code_inspection` | Multi-language code analysis (Python, JS, C#, C++) |
 | `recommender` | Refactoring and test coverage recommendations |
-| `natural_language_query` | Ask questions about code in plain English |
+| `natural_language_query` | Ask questions about code in plain English (CADSL) |
+| `reql` | Execute REQL queries directly |
 
 ### Semantic Search (RAG)
 

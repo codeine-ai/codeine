@@ -805,5 +805,5 @@ For a typical JavaScript module with:
 
 **MCP Tools Available**:
 - **JavaScript Loading**: `load_javascript_file`, `load_javascript_directory`, `load_javascript_code`
-- **Queries**: `query_select_reql`, `quick_query`
+- **Queries**: `query_select_reql`, `reql`
 - **Ontology**: `add_knowledge`

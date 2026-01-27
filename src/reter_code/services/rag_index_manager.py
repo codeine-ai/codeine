@@ -112,6 +112,12 @@ class RAGIndexManager:
         embedding_model: Name of the embedding model being used
         embedding_dim: Dimension of embeddings
         is_initialized: Whether the index is loaded and ready
+
+    @reter: ServiceLayer(self)
+    @reter: RAGComponent(self)
+    @reter: dependsOn(self, reter_code.services.EmbeddingService)
+    @reter: dependsOn(self, reter_code.services.FAISSWrapper)
+    @reter: dependsOn(self, reter_code.services.ContentExtractor)
     """
 
     def __init__(

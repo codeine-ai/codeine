@@ -29,8 +29,8 @@ This document lists all MCP resources with their URIs and all MCP tools with the
 |------|-------------|----------------|
 | `add_knowledge` | Add facts/rules to RETER | source, type, source_id |
 | `add_external_python_directory` | Load external Python files | directory, recursive |
-| `quick_query` | Execute REQL queries | query, type |
-| `natural_language_query` | **RECOMMENDED** - Plain English queries | question |
+| `reql` | Execute REQL queries | query, type |
+| `natural_language_query` | Natural language to CADSL | question, force_type |
 
 ### Instance & Analysis Tools (3)
 
@@ -205,23 +205,14 @@ See: system://reter/multiple-instances
 - `reload` - Reload modified sources
 - `check` - Consistency check
 
-### `natural_language_query` - Plain English Queries
+### `natural_language_query` - Natural Language to CADSL
 
-**RECOMMENDED** for querying the knowledge base!
-
-```python
-natural_language_query("What classes inherit from BaseTool?")
-natural_language_query("Find methods with more than 5 parameters")
-```
-
-### `hybrid_query` - Smart Query Router
-
-Routes queries to the best engine (REQL, CADSL, or RAG):
+Translates plain English questions to CADSL queries:
 
 ```python
-hybrid_query("Find all classes with more than 10 methods")  # -> REQL
-hybrid_query("Show circular import dependencies")  # -> CADSL
-hybrid_query("Find code similar to authentication handlers")  # -> RAG
+natural_language_query("Find all classes with more than 10 methods")
+natural_language_query("Show circular import dependencies")
+natural_language_query("List god classes in the codebase")
 ```
 
 ### `execute_cadsl` - Run CADSL Scripts
@@ -324,7 +315,7 @@ resources/
 - Template syntax: `query: "{field}"` expands placeholders from row data
 - Two modes: `best` (single match fields) or `all` (rag_matches array)
 - Supports batching, thresholds, and entity type filtering
-- Updated `hybrid_query` tool to route hybrid queries to CADSL
+- Updated `natural_language_query` tool to route hybrid queries to CADSL
 
 ### 2025-12-05: JavaScript Support
 - Added **JavaScript language support** with full fact extraction

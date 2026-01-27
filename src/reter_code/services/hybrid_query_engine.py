@@ -63,6 +63,10 @@ class CADSLToolIndex:
 
     Uses sentence-transformers embeddings for semantic similarity matching.
     Scans CADSL tool files and creates embeddings for efficient search.
+
+    @reter: ServiceLayer(self)
+    @reter: QueryEngine(self)
+    @reter: dependsOn(self, reter_code.services.EmbeddingService)
     """
 
     def __init__(self, tools_dir: Optional[Path] = None):

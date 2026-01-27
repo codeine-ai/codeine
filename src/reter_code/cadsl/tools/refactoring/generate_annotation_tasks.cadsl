@@ -1,0 +1,72 @@
+// Generate annotation tasks for classes without layer annotations
+// Creates tasks in RETER session for each unannotated class
+
+query generate_annotation_tasks(
+    category = "annotation",
+    capabilities = ["task_creation", "code_analysis"]
+) {
+    """
+    Generate tasks to add @reter: layer annotations to classes.
+
+    Finds all classes that don't have layer annotations and creates
+    tasks to add appropriate annotations based on file location and naming patterns.
+
+    Parameters:
+        dry_run: If true, returns task data without creating tasks (default: false)
+        limit: Maximum number of tasks to generate (default: 100)
+    """
+
+    param dry_run: bool = false;
+    param limit: int = 100;
+
+    reql {
+        SELECT ?class ?file ?line WHERE {
+            ?class type oo:Class .
+            ?class inFile ?file .
+            ?class atLine ?line .
+            FILTER NOT EXISTS { ?class type user:PresentationLayer }
+            FILTER NOT EXISTS { ?class type user:ServiceLayer }
+            FILTER NOT EXISTS { ?class type user:DSLLayer }
+            FILTER NOT EXISTS { ?class type user:InfrastructureLayer }
+            FILTER NOT EXISTS { ?class type user:CoreLayer }
+            FILTER NOT EXISTS { ?class type user:TestLayer }
+            FILTER NOT EXISTS { ?class type user:UtilityLayer }
+        }
+        ORDER BY ?file ?line
+    }
+    | limit { {limit} }
+    | map {
+        class_name: class,
+        file: file,
+        line: line,
+        suggested_layer: (
+            file contains "test" ? "TestLayer" :
+            file contains "services" ? "ServiceLayer" :
+            file contains "tools" ? "ServiceLayer" :
+            file contains "cadsl" ? "DSLLayer" :
+            file contains "dsl" ? "DSLLayer" :
+            class contains "Service" ? "ServiceLayer" :
+            class contains "Manager" ? "ServiceLayer" :
+            class contains "Handler" ? "ServiceLayer" :
+            class contains "Parser" ? "DSLLayer" :
+            class contains "Compiler" ? "DSLLayer" :
+            class contains "Transformer" ? "DSLLayer" :
+            class contains "Wrapper" ? "InfrastructureLayer" :
+            class contains "Client" ? "InfrastructureLayer" :
+            class contains "Store" ? "InfrastructureLayer" :
+            class contains "Repository" ? "InfrastructureLayer" :
+            class contains "Step" ? "CoreLayer" :
+            class contains "Result" ? "CoreLayer" :
+            "CoreLayer"
+        )
+    }
+    | create_task {
+        name: "Add @reter: {suggested_layer}(self) to {class_name}",
+        category: "annotation",
+        priority: medium,
+        description: "Add semantic layer annotation to class.\n\nFile: {file}:{line}\nSuggested layer: {suggested_layer}\n\nAdd to class docstring:\n@reter: {suggested_layer}(self)",
+        affects: file,
+        dry_run: {dry_run}
+    }
+    | emit { tasks }
+}

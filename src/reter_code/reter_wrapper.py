@@ -333,6 +333,10 @@ class ReterWrapper:
     - SWRL rules automatically fire on new facts
     - Selective forgetting by source ID
     - Persistent semantic memory for AI agents
+
+    @reter: InfrastructureLayer(self)
+    @reter: ReasoningEngine(self)
+    @reter: dependsOn(self, reter.Reter)
     """
 
     def __init__(self, load_ontology: bool = True) -> None:

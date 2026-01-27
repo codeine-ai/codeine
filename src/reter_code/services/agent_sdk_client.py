@@ -273,6 +273,49 @@ CADSL_SYSTEM_PROMPT_TEMPLATE = """You are a CADSL query generator. Your ONLY job
 - `exceptions/` - Error handling (silent_exception, general_exception...)
 - `inheritance/` - Class hierarchy (extract_superclass, collapse_hierarchy...)
 
+## CREATE_TASK STEP (Task Generation)
+Use `create_task` step to generate tasks in RETER session from query results:
+
+```cadsl
+query generate_tasks() {
+    reql { SELECT ?class ?file ?line WHERE { ?class type oo:Class . ?class inFile ?file . ?class atLine ?line } LIMIT 10 }
+    | create_task {
+        name: "Task for {class}",           // Template with {field} placeholders
+        category: "annotation",              // annotation, feature, bug, refactor, test, docs, research
+        priority: medium,                    // critical, high, medium, low
+        description: "Details: {file}:{line}",
+        affects: file,                       // Field name for file path (creates relation)
+        dry_run: false                       // true = preview only, false = create tasks
+    }
+    | emit { tasks }
+}
+```
+
+Use create_task when user asks to:
+- Generate tasks for code issues
+- Create annotation/documentation tasks
+- Batch create work items from query results
+
+## PYTHON STEP (Complex Transformations)
+Use `python` step for complex logic that can't be expressed in map/filter:
+
+```cadsl
+query with_python() {
+    reql { SELECT ?class ?file WHERE { ?class type oo:Class . ?class inFile ?file } }
+    | python {{
+        # Determine layer based on file path patterns
+        for row in rows:
+            f = row.get('file', '') or row.get('?file', '')
+            if 'test' in f: row['layer'] = 'TestLayer'
+            elif 'services' in f: row['layer'] = 'ServiceLayer'
+            elif 'cadsl' in f or 'dsl' in f: row['layer'] = 'DSLLayer'
+            else: row['layer'] = 'CoreLayer'
+        result = rows
+    }}
+    | emit { results }
+}
+```
+
 ## CRITICAL SYNTAX RULES
 1. REQL blocks do NOT support # comments - use NO comments inside reql {{ ... }} blocks
 2. Use REGEX() not MATCHES: `FILTER(REGEX(?name, "pattern", "i"))`
@@ -1086,8 +1129,13 @@ async def retry_cadsl_query(
     debug_log.debug(f"\n{'='*60}\nCADSL RETRY REQUEST\n{'='*60}")
     debug_log.debug(f"Previous query returned: {result_status}")
 
+    # Format system prompt with project root (same as main function)
+    import os
+    project_root = os.environ.get("RETER_PROJECT_ROOT", os.getcwd())
+    system_prompt = CADSL_SYSTEM_PROMPT_TEMPLATE.format(project_root=project_root)
+
     try:
-        response_text = await _call_agent(prompt, CADSL_SYSTEM_PROMPT, reter_instance=reter_instance, rag_manager=rag_manager)
+        response_text = await _call_agent(prompt, system_prompt, reter_instance=reter_instance, rag_manager=rag_manager)
         debug_log.debug(f"Retry agent response: {response_text[:500]}...")
 
         # Check if agent confirms empty is correct

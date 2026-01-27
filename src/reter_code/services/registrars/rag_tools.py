@@ -19,13 +19,14 @@ from ...reter_wrapper import DefaultInstanceNotInitialised
 class RAGToolsRegistrar(ToolRegistrarBase):
     """Registers RAG tools with FastMCP."""
 
-    def __init__(self, instance_manager, persistence_service, default_manager=None):
-        super().__init__(instance_manager, persistence_service)
+    def __init__(self, instance_manager, persistence_service, default_manager=None, tools_filter=None):
+        super().__init__(instance_manager, persistence_service, tools_filter)
         self._default_manager = default_manager
 
     def register(self, app: FastMCP) -> None:
-        """Register RAG tools (semantic_search only - others moved to system tool)."""
-        self._register_semantic_search(app)
+        """Register RAG tools (respects tools_filter)."""
+        if self._should_register("semantic_search"):
+            self._register_semantic_search(app)
 
     def _get_rag_manager(self):
         """Get the RAG manager from the default instance manager."""

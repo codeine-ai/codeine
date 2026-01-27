@@ -3,10 +3,15 @@ Tool Registrar Service
 
 Handles registration and management of MCP tools.
 Uses Claude Agent SDK for query generation (no sampling fallback).
+
+Tool Availability Modes (via TOOLS_AVAILABLE env var):
+- "default": Only essential tools: reql, system, thinking, session, items, semantic_search, natural_language_query
+- "full": All tools including code_inspection, recommender, diagram, execute_cadsl, etc.
 """
 
 import asyncio
-from typing import Dict, Any, Optional, TYPE_CHECKING
+import os
+from typing import Dict, Any, Optional, TYPE_CHECKING, Set
 from fastmcp import FastMCP, Context
 
 from ..logging_config import nlq_debug_logger as debug_log, ensure_nlq_logger_configured
@@ -28,20 +33,37 @@ from .hybrid_query_engine import (
 )
 from .agent_sdk_client import (
     is_agent_sdk_available,
-    generate_reql_query,
     generate_cadsl_query,
     retry_cadsl_query,
-    classify_query,
 )
 
 if TYPE_CHECKING:
     from .default_instance_manager import DefaultInstanceManager
 
 
+# Default tools available in "default" mode
+DEFAULT_TOOLS: Set[str] = {
+    "reql",
+    "system",
+    "thinking",
+    "session",
+    "items",
+    "execute_cadsl",
+    "generate_cadsl",
+    "semantic_search",
+    "natural_language_query",
+}
+
+
 class ToolRegistrar:
     """
     Manages MCP tool registration.
     Single Responsibility: Register and configure MCP tools.
+
+    @reter: ServiceLayer(self)
+    @reter: MCPToolProvider(self)
+    @reter: dependsOn(self, reter_code.services.ReterOperations)
+    @reter: dependsOn(self, reter_code.services.StatePersistenceService)
     """
 
     def __init__(
@@ -65,8 +87,16 @@ class ToolRegistrar:
         self.instance_manager = instance_manager
         self.default_manager = default_manager
 
+        # Read tools availability mode from environment
+        # "default" = essential tools only, "full" = all tools
+        self._tools_mode = os.environ.get("TOOLS_AVAILABLE", "default").lower()
+
         # Direct tools registration (pass default_manager for RAG)
-        self.tools_registrar = ToolsRegistrar(instance_manager, persistence, default_manager)
+        # Pass tools_filter for selective registration
+        tools_filter = DEFAULT_TOOLS if self._tools_mode == "default" else None
+        self.tools_registrar = ToolsRegistrar(
+            instance_manager, persistence, default_manager, tools_filter=tools_filter
+        )
 
         # System tools registrar (unified system management)
         self.system_registrar = SystemToolsRegistrar(
@@ -77,14 +107,42 @@ class ToolRegistrar:
         """
         Register all MCP tools with the application.
 
+        Respects TOOLS_AVAILABLE environment variable:
+        - "default": Only essential tools (reql, system, thinking, session, items, semantic_search, natural_language_query)
+        - "full": All tools
+
         Args:
             app: FastMCP application instance
         """
-        self._register_knowledge_tools(app)
-        self._register_query_tools(app)
-        self.system_registrar.register(app)  # Unified system tool
+        import logging
+        logger = logging.getLogger(__name__)
+
+        is_full_mode = self._tools_mode == "full"
+
+        # Log which tools mode is active
+        if is_full_mode:
+            logger.info("Tools mode: FULL (all tools available)")
+        else:
+            logger.info("Tools mode: DEFAULT (limited to: %s)", ", ".join(sorted(DEFAULT_TOOLS)))
+
+        # Knowledge tools (add_knowledge, add_external_directory) - full mode only
+        if is_full_mode:
+            self._register_knowledge_tools(app)
+
+        # Query tools (reql) - always registered in default mode
+        if is_full_mode or "reql" in DEFAULT_TOOLS:
+            self._register_query_tools(app)
+
+        # System tool - always registered in default mode
+        if is_full_mode or "system" in DEFAULT_TOOLS:
+            self.system_registrar.register(app)
+
+        # Domain tools (code_inspection, recommender, thinking, session, items, diagram, semantic_search)
+        # ToolsRegistrar handles filtering internally based on tools_filter
         self._register_domain_tools(app)
-        self._register_experimental_tools(app)
+
+        # Experimental tools (natural_language_query, execute_cadsl)
+        self._register_experimental_tools(app, is_full_mode)
 
     def _register_knowledge_tools(self, app: FastMCP) -> None:
         """Register knowledge management tools."""
@@ -165,16 +223,15 @@ class ToolRegistrar:
         """Register query execution tools."""
 
         @app.tool()
-        def quick_query(
+        def reql(
             query: str,
             type: str = "reql"
         ) -> Dict[str, Any]:
             """
-            Execute a quick query outside of reasoning flow.
+            Execute a REQL query against the code knowledge graph.
 
-            NOTE: For most use cases, prefer using `natural_language_query` instead!
-            It translates plain English questions into REQL automatically using LLM.
-            Use `quick_query` only when you need precise control over the REQL syntax.
+            REQL (RETER Query Language) allows structural queries over parsed code:
+            classes, methods, functions, imports, inheritance, etc.
 
             Automatically checks source validity before executing queries and includes
             warnings if any sources are outdated or deleted.
@@ -188,6 +245,10 @@ class ToolRegistrar:
                 count: Number of matches
                 source_validity: Information about outdated/deleted sources
                 warnings: Any warnings about source validity
+
+            Examples:
+                - "SELECT ?c ?name WHERE { ?c type oo:Class . ?c name ?name }"
+                - "SELECT ?m WHERE { ?m type oo:Method . ?m definedIn ?c . ?c name 'MyClass' }"
             """
             try:
                 require_default_instance()
@@ -200,193 +261,24 @@ class ToolRegistrar:
         """Register all RETER domain-specific tools (Python analysis, UML, Gantt, etc.)."""
         self.tools_registrar.register_all_tools(app)
 
-    def _register_experimental_tools(self, app: FastMCP) -> None:
-        """Register experimental tools for testing new features."""
-        self._register_nlq_tool(app)
-        self._register_hybrid_query_tool(app)
-        self._register_cadsl_tool(app)
+    def _register_experimental_tools(self, app: FastMCP, is_full_mode: bool = True) -> None:
+        """Register experimental tools for testing new features.
 
-    def _register_nlq_tool(self, app: FastMCP) -> None:
-        """Register the natural language query tool."""
+        Args:
+            app: FastMCP application instance
+            is_full_mode: If True, register all experimental tools. If False, only natural_language_query.
+        """
+        # natural_language_query - always available in default mode
+        if is_full_mode or "natural_language_query" in DEFAULT_TOOLS:
+            self._register_nlq_tool(app)
 
-        @app.tool()
-        async def natural_language_query(
-            question: str,
-            max_retries: int = 5,
-            timeout: int = 600,
-            max_results: int = 500,
-            ctx: Context = None
-        ) -> Dict[str, Any]:
-            """
-            Query CODE STRUCTURE using natural language (translates to REQL).
+        # execute_cadsl - available in default mode
+        if is_full_mode or "execute_cadsl" in DEFAULT_TOOLS:
+            self._register_cadsl_tool(app)
 
-            **PURPOSE**: Ask questions about code structure, relationships, and patterns.
-            This tool translates your natural language question into a REQL query that
-            searches the parsed Python codebase (classes, methods, functions, imports, etc.).
-
-            **NOT FOR**: General knowledge questions, documentation content, or semantic
-            code search. Use `semantic_search` for finding code by meaning/similarity.
-
-            **See: python://reter/query-patterns for REQL examples if needed**
-
-            Examples:
-                - "What classes inherit from BaseTool?"
-                - "Find all methods that call the save function"
-                - "List modules with more than 5 classes"
-                - "Which functions have the most parameters?"
-                - "Find functions with magic number 100"
-                - "Show string literals containing 'error'"
-
-            Translates natural language questions into REQL queries using LLM,
-            executes them against the code knowledge graph, and returns results.
-
-            Args:
-                question: Natural language question about code structure (plain English)
-                max_retries: Maximum retry attempts on syntax errors (default: 5)
-                timeout: Query timeout in seconds (default: 600)
-                max_results: Maximum results to return (default: 500)
-                ctx: MCP context (injected automatically)
-
-            Returns:
-                success: Whether query succeeded
-                results: Query results as list of dicts
-                count: Number of results
-                reql_query: The REQL query that was executed (useful for learning REQL)
-                attempts: Number of attempts made
-                error: Error message if failed
-                truncated: Whether results were truncated (if count > max_results)
-            """
-            try:
-                require_default_instance()
-            except ComponentNotReadyError as e:
-                return e.to_response()
-
-            # Ensure logger is configured with correct directory
-            ensure_nlq_logger_configured()
-
-            debug_log.debug(f"\n{'#'*60}\nNEW NLQ REQUEST\n{'#'*60}")
-            debug_log.debug(f"Question: {question}, Instance: default")
-
-            try:
-                reter = self.instance_manager.get_or_create_instance("default")
-            except Exception as e:
-                return self._nlq_error_response(f"Failed to get RETER instance: {str(e)}")
-
-            schema_info = query_instance_schema(reter)
-
-            # Execute with timeout protection
-            try:
-                async with asyncio.timeout(timeout):
-                    return await self._execute_nlq_with_agent_sdk(
-                        reter, question, schema_info, max_retries, max_results
-                    )
-            except asyncio.TimeoutError:
-                debug_log.debug(f"Query timed out after {timeout} seconds")
-                return self._nlq_error_response(
-                    f"Query timed out after {timeout} seconds. Try a more specific question.",
-                    attempts=0
-                )
-
-    def _nlq_error_response(self, error: str, query: str = None, attempts: int = 0) -> Dict[str, Any]:
-        """Create a standardized error response for NLQ tool."""
-        return {
-            "success": False,
-            "results": [],
-            "count": 0,
-            "reql_query": query,
-            "attempts": attempts,
-            "error": error
-        }
-
-    async def _execute_nlq_with_agent_sdk(
-        self,
-        reter,
-        question: str,
-        schema_info: str,
-        max_retries: int,
-        max_results: int,
-        similar_tools: Optional[list] = None
-    ) -> Dict[str, Any]:
-        """Execute NLQ using Agent SDK for query generation."""
-        debug_log.debug(f"\n{'='*60}\nNLQ EXECUTION (Agent SDK)\n{'='*60}")
-
-        if not is_agent_sdk_available():
-            return {
-                "success": False,
-                "results": [],
-                "count": 0,
-                "error": "Claude Agent SDK not available. Install with: pip install claude-agent-sdk"
-            }
-
-        # Build similar tools context if provided
-        similar_tools_context = None
-        if similar_tools:
-            similar_tools_context = build_similar_tools_section(similar_tools)
-
-        # Get project root for file path context in Agent SDK
-        project_root = None
-        if hasattr(self.instance_manager, '_project_root') and self.instance_manager._project_root:
-            project_root = str(self.instance_manager._project_root)
-
-        try:
-            # Generate and validate query using Agent SDK
-            result = await generate_reql_query(
-                question=question,
-                schema_info=schema_info,
-                reter_instance=reter,
-                max_iterations=max_retries,
-                similar_tools_context=similar_tools_context,
-                project_root=project_root
-            )
-
-            if not result.success:
-                return {
-                    "success": False,
-                    "results": [],
-                    "count": 0,
-                    "reql_query": result.query,
-                    "attempts": result.attempts,
-                    "tools_used": result.tools_used,
-                    "error": result.error or "Query generation failed"
-                }
-
-            # Query was already validated by Agent SDK, get results
-            generated_query = result.query
-            query_result = reter.reql(generated_query)
-            results = query_result.to_pandas().to_dict('records')
-            total_count = len(results)
-
-            debug_log.debug(f"QUERY SUCCESS: {total_count} results")
-
-            # Apply result truncation
-            truncated = total_count > max_results
-            if truncated:
-                results = results[:max_results]
-
-            response_dict = {
-                "success": True,
-                "results": results,
-                "count": total_count,
-                "reql_query": generated_query,
-                "attempts": result.attempts,
-                "tools_used": result.tools_used,
-                "error": None
-            }
-
-            if truncated:
-                response_dict["truncated"] = True
-                response_dict["warning"] = f"Results truncated. Showing {max_results} of {total_count}."
-
-            return truncate_response(response_dict)
-
-        except Exception as e:
-            debug_log.debug(f"Agent SDK error: {e}")
-            return {
-                "success": False,
-                "results": [],
-                "count": 0,
-                "error": str(e)
-            }
+        # generate_cadsl - generate CADSL without executing
+        if is_full_mode or "generate_cadsl" in DEFAULT_TOOLS:
+            self._register_generate_cadsl_tool(app)
 
     async def _execute_cadsl_query(
         self,
@@ -764,31 +656,26 @@ class ToolRegistrar:
                 "error": str(e)
             }
 
-    def _register_hybrid_query_tool(self, app: FastMCP) -> None:
-        """Register the hybrid natural language query tool."""
+    def _register_nlq_tool(self, app: FastMCP) -> None:
+        """Register the natural language query tool."""
 
         @app.tool()
-        async def hybrid_query(
+        async def natural_language_query(
             question: str,
-            force_type: str = None,
             max_retries: int = 5,
             timeout: int = 1800,
             max_results: int = 500,
             ctx: Context = None
         ) -> Dict[str, Any]:
             """
-            Smart natural language query that routes to the best execution engine.
+            Query code using natural language - translates to CADSL automatically.
 
-            This is an enhanced version of natural_language_query that automatically
-            detects the query type and routes to:
-            - REQL: For structural code queries (classes, methods, inheritance, etc.)
-            - CADSL: For complex queries (graph algorithms, diagrams, joins)
-            - RAG: For semantic/similarity queries (find similar code, duplicates)
-            - Hybrid: For queries combining structure and semantics
+            Ask questions about code structure, patterns, and relationships in plain English.
+            The query is translated to CADSL (Code Analysis DSL) and executed against the
+            code knowledge graph.
 
             Args:
                 question: Natural language question about code
-                force_type: Force a specific query type: "reql", "cadsl", "rag", or None for auto
                 max_retries: Maximum retry attempts on errors (default: 5)
                 timeout: Query timeout in seconds (default: 1800)
                 max_results: Maximum results to return (default: 500)
@@ -798,17 +685,16 @@ class ToolRegistrar:
                 success: Whether query succeeded
                 results: Query results as list of dicts
                 count: Number of results
-                query_type: Type of query executed (reql/cadsl/rag)
-                classification: How the query was classified
-                generated_query: The REQL or CADSL query generated (if applicable)
+                query_type: Always "cadsl"
+                generated_query: The CADSL query that was generated
                 error: Error message if failed
 
             Examples:
-                - "Find all classes with more than 10 methods" -> REQL
-                - "Show circular import dependencies" -> CADSL (graph_cycles)
-                - "Find code similar to authentication handlers" -> RAG
-                - "Generate a class diagram for the services module" -> CADSL (diagram)
-                - "Find duplicate methods across files" -> CADSL+RAG (hybrid)
+                - "Find all classes with more than 10 methods"
+                - "Show circular import dependencies"
+                - "List methods that call the save function"
+                - "Generate a class diagram for the services module"
+                - "Find god classes in the codebase"
             """
             import time
             start_time = time.time()
@@ -821,8 +707,8 @@ class ToolRegistrar:
             # Ensure logger is configured with correct directory
             ensure_nlq_logger_configured()
 
-            debug_log.debug(f"\n{'#'*60}\nNEW HYBRID QUERY REQUEST\n{'#'*60}")
-            debug_log.debug(f"Question: {question}, force_type: {force_type}")
+            debug_log.debug(f"\n{'#'*60}\nNEW NLQ REQUEST\n{'#'*60}")
+            debug_log.debug(f"Question: {question}")
 
             if ctx is None:
                 return {
@@ -844,81 +730,18 @@ class ToolRegistrar:
 
             schema_info = query_instance_schema(reter)
 
-            # Fast path: force_type bypasses classification entirely
-            if force_type and force_type.lower() in ("reql", "cadsl", "rag"):
-                from .hybrid_query_engine import find_similar_cadsl_tools
-                similar_tools = find_similar_cadsl_tools(question, max_results=5)
-                forced_type = force_type.lower()
-                debug_log.debug(f"FORCED TYPE: {forced_type}, similar_tools: {[t.name for t in similar_tools]}")
-
-                try:
-                    async with asyncio.timeout(timeout):
-                        if forced_type == "rag":
-                            result = self._execute_rag_query(question)
-                        elif forced_type == "cadsl":
-                            result = await self._execute_cadsl_query(
-                                question, schema_info, max_retries,
-                                similar_tools=similar_tools
-                            )
-                        else:  # reql
-                            result = await self._execute_nlq_with_agent_sdk(
-                                reter, question, schema_info, max_retries, max_results,
-                                similar_tools=similar_tools
-                            )
-
-                        result["classification"] = {
-                            "type": forced_type,
-                            "confidence": 1.0,
-                            "reasoning": f"Forced to {forced_type} by user",
-                        }
-                        if similar_tools:
-                            result["similar_tools"] = [t.to_dict() for t in similar_tools]
-                        result["execution_time_ms"] = (time.time() - start_time) * 1000
-                        return truncate_response(result)
-
-                except asyncio.TimeoutError:
-                    return {
-                        "success": False,
-                        "results": [],
-                        "count": 0,
-                        "query_type": forced_type,
-                        "error": f"Query timed out after {timeout} seconds",
-                    }
-
-            # Normal path: Default to CADSL to use existing tools with rag_enrich
-            # Only use RAG for explicit duplicate/similarity queries (handled by keyword routing)
-            from .hybrid_query_engine import find_similar_cadsl_tools, _check_keyword_rag_routing
-
-            # Check if this is a RAG query (duplicate/similarity detection)
-            rag_classification = _check_keyword_rag_routing(question)
+            # Find similar CADSL tools for context
+            from .hybrid_query_engine import find_similar_cadsl_tools
             similar_tools = find_similar_cadsl_tools(question, max_results=5)
 
-            if rag_classification:
-                # RAG for duplicate/similarity queries
-                query_type_str = "rag"
-                reasoning = rag_classification.reasoning
-            else:
-                # Default to CADSL for all other queries
-                query_type_str = "cadsl"
-                reasoning = "Defaulting to CADSL to leverage existing tools with rag_enrich"
-
-            debug_log.debug(f"QUERY TYPE: {query_type_str}, similar_tools: {[t.name for t in similar_tools]}")
+            debug_log.debug(f"Similar tools: {[t.name for t in similar_tools]}")
 
             try:
                 async with asyncio.timeout(timeout):
-                    if query_type_str == "rag":
-                        result = self._execute_rag_query(question)
-                    else:  # cadsl
-                        result = await self._execute_cadsl_query(
-                            question, schema_info, max_retries,
-                            similar_tools=similar_tools
-                        )
-
-                    result["classification"] = {
-                        "type": query_type_str,
-                        "confidence": 1.0,
-                        "reasoning": reasoning,
-                    }
+                    result = await self._execute_cadsl_query(
+                        question, schema_info, max_retries,
+                        similar_tools=similar_tools
+                    )
 
                     if similar_tools:
                         result["similar_tools"] = [t.to_dict() for t in similar_tools]
@@ -931,13 +754,8 @@ class ToolRegistrar:
                     "success": False,
                     "results": [],
                     "count": 0,
-                    "query_type": query_type_str,
+                    "query_type": "cadsl",
                     "error": f"Query timed out after {timeout} seconds",
-                    "classification": {
-                        "type": query_type_str,
-                        "confidence": 1.0,
-                        "reasoning": reasoning,
-                    }
                 }
 
     def _register_cadsl_tool(self, app: FastMCP) -> None:
@@ -1007,9 +825,18 @@ class ToolRegistrar:
             cadsl_content = script
             source_file = None
 
-            # Check if it looks like a file path
-            if script.strip().endswith('.cadsl') or os.path.sep in script or '/' in script:
-                path = Path(script)
+            # Check if it looks like a file path (not inline CADSL)
+            # Inline CADSL typically starts with 'query', 'detector', 'diagram' keywords
+            script_stripped = script.strip()
+            is_inline_cadsl = (
+                script_stripped.startswith('query ') or
+                script_stripped.startswith('detector ') or
+                script_stripped.startswith('diagram ') or
+                script_stripped.startswith('//')  # Comment
+            )
+
+            if not is_inline_cadsl and (script_stripped.endswith('.cadsl') or os.path.sep in script_stripped):
+                path = Path(script_stripped)
                 if path.exists() and path.is_file():
                     source_file = str(path)
                     with open(path, 'r', encoding='utf-8') as f:
@@ -1125,3 +952,150 @@ class ToolRegistrar:
                     "error": str(e)
                 }
 
+    def _register_generate_cadsl_tool(self, app: FastMCP) -> None:
+        """Register the generate CADSL tool (returns query without executing)."""
+
+        @app.tool()
+        async def generate_cadsl(
+            question: str,
+            max_retries: int = 5,
+            timeout: int = 300,
+            ctx: Context = None
+        ) -> Dict[str, Any]:
+            """
+            Generate a CADSL query from natural language without executing it.
+
+            Translates a natural language question into a CADSL (Code Analysis DSL) query
+            and returns the generated query as a string. Does NOT execute the query.
+
+            Use this when you want to:
+            - See what CADSL query would be generated for a question
+            - Modify the generated query before execution
+            - Learn CADSL syntax by example
+            - Debug query generation
+
+            Args:
+                question: Natural language question about code
+                max_retries: Maximum retry attempts on generation errors (default: 5)
+                timeout: Generation timeout in seconds (default: 300)
+                ctx: MCP context (injected automatically)
+
+            Returns:
+                success: Whether generation succeeded
+                cadsl_query: The generated CADSL query string
+                similar_tools: List of similar existing CADSL tools for reference
+                error: Error message if failed
+
+            Examples:
+                - "Find all classes with more than 10 methods"
+                - "Show circular import dependencies"
+                - "List methods that call the save function"
+                - "Generate a class diagram for the services module"
+            """
+            import time
+            start_time = time.time()
+
+            try:
+                require_default_instance()
+            except ComponentNotReadyError as e:
+                return e.to_response()
+
+            # Ensure logger is configured with correct directory
+            ensure_nlq_logger_configured()
+
+            debug_log.debug(f"\n{'#'*60}\nGENERATE CADSL REQUEST\n{'#'*60}")
+            debug_log.debug(f"Question: {question}")
+
+            if ctx is None:
+                return {
+                    "success": False,
+                    "cadsl_query": None,
+                    "error": "Context not available for LLM sampling"
+                }
+
+            if not is_agent_sdk_available():
+                return {
+                    "success": False,
+                    "cadsl_query": None,
+                    "error": "Claude Agent SDK not available. Install with: pip install claude-agent-sdk"
+                }
+
+            try:
+                reter = self.instance_manager.get_or_create_instance("default")
+            except Exception as e:
+                return {
+                    "success": False,
+                    "cadsl_query": None,
+                    "error": f"Failed to get RETER instance: {str(e)}"
+                }
+
+            schema_info = query_instance_schema(reter)
+
+            # Find similar CADSL tools for context
+            from .hybrid_query_engine import find_similar_cadsl_tools
+            similar_tools = find_similar_cadsl_tools(question, max_results=5)
+
+            debug_log.debug(f"Similar tools: {[t.name for t in similar_tools]}")
+
+            # Build similar tools context if provided
+            similar_tools_context = None
+            if similar_tools:
+                similar_tools_context = build_similar_tools_section(similar_tools)
+
+            # Get reter instance and rag_manager for query tools
+            rag_manager = self.default_manager.get_rag_manager() if self.default_manager else None
+
+            # Get project root for file path context
+            project_root = None
+            if hasattr(self.instance_manager, '_project_root') and self.instance_manager._project_root:
+                project_root = str(self.instance_manager._project_root)
+
+            try:
+                async with asyncio.timeout(timeout):
+                    # Generate CADSL using Agent SDK (without execution)
+                    result = await generate_cadsl_query(
+                        question=question,
+                        schema_info=schema_info,
+                        max_iterations=max_retries,
+                        similar_tools_context=similar_tools_context,
+                        project_root=project_root,
+                        reter_instance=reter,
+                        rag_manager=rag_manager
+                    )
+
+                    execution_time = (time.time() - start_time) * 1000
+
+                    if result.success and result.query:
+                        return {
+                            "success": True,
+                            "cadsl_query": result.query,
+                            "attempts": result.attempts,
+                            "tools_used": result.tools_used,
+                            "similar_tools": [t.to_dict() for t in similar_tools] if similar_tools else [],
+                            "execution_time_ms": execution_time,
+                            "error": None
+                        }
+                    else:
+                        return {
+                            "success": False,
+                            "cadsl_query": None,
+                            "attempts": result.attempts,
+                            "tools_used": result.tools_used,
+                            "similar_tools": [t.to_dict() for t in similar_tools] if similar_tools else [],
+                            "execution_time_ms": execution_time,
+                            "error": result.error or "Failed to generate CADSL query"
+                        }
+
+            except asyncio.TimeoutError:
+                return {
+                    "success": False,
+                    "cadsl_query": None,
+                    "error": f"Query generation timed out after {timeout} seconds"
+                }
+            except Exception as e:
+                debug_log.error(f"Generate CADSL failed: {e}", exc_info=True)
+                return {
+                    "success": False,
+                    "cadsl_query": None,
+                    "error": str(e)
+                }

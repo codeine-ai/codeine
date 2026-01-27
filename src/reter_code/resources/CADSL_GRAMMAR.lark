@@ -139,6 +139,8 @@ step: filter_step
     | cross_join_step
     | set_similarity_step
     | string_match_step
+    | rag_enrich_step
+    | create_task_step
 
 filter_step: "filter" "{" condition "}"
 
@@ -495,6 +497,61 @@ match_type: "common_affix"    -> match_affix
           | "common_suffix"   -> match_suffix
           | "levenshtein"     -> match_levenshtein
           | "contains"        -> match_contains
+
+// ============================================================
+// RAG ENRICH (Per-row semantic enrichment)
+// ============================================================
+
+// Enrich each row with RAG semantic search results
+// rag_enrich { query: "template {field}", top_k: 3, threshold: 0.5, mode: "best" }
+rag_enrich_step: "rag_enrich" "{" rag_enrich_spec "}"
+
+rag_enrich_spec: rag_enrich_param ("," rag_enrich_param)*
+
+rag_enrich_param: "query" ":" STRING                 -> re_query
+                | "query" ":" param_ref              -> re_query_param
+                | "top_k" ":" INT                    -> re_top_k
+                | "top_k" ":" param_ref              -> re_top_k_param
+                | "threshold" ":" SIGNED_FLOAT       -> re_threshold
+                | "threshold" ":" param_ref          -> re_threshold_param
+                | "mode" ":" rag_enrich_mode         -> re_mode
+                | "batch_size" ":" INT               -> re_batch_size
+                | "batch_size" ":" param_ref         -> re_batch_size_param
+                | "max_rows" ":" INT                 -> re_max_rows
+                | "max_rows" ":" param_ref           -> re_max_rows_param
+                | "entity_types" ":" rag_entity_list -> re_entity_types
+
+rag_enrich_mode: "best"  -> re_mode_best
+               | "all"   -> re_mode_all
+
+rag_entity_list: "[" STRING ("," STRING)* "]"
+
+// ============================================================
+// CREATE TASK (RETER Session Integration)
+// ============================================================
+
+// Create tasks in RETER session from pipeline data
+// create_task { name: "template {field}", category: "annotation", priority: "medium" }
+create_task_step: "create_task" "{" create_task_spec "}"
+
+create_task_spec: create_task_param ("," create_task_param)*
+
+create_task_param: "name" ":" STRING                    -> ct_name
+                 | "name" ":" param_ref                 -> ct_name_param
+                 | "category" ":" STRING                -> ct_category
+                 | "category" ":" param_ref             -> ct_category_param
+                 | "priority" ":" ct_priority_val       -> ct_priority
+                 | "priority" ":" param_ref             -> ct_priority_param
+                 | "description" ":" STRING             -> ct_description
+                 | "description" ":" param_ref          -> ct_description_param
+                 | "affects" ":" NAME                   -> ct_affects
+                 | "batch_size" ":" INT                 -> ct_batch_size
+                 | "dry_run" ":" bool_val               -> ct_dry_run
+
+ct_priority_val: "critical" -> ct_prio_critical
+               | "high"     -> ct_prio_high
+               | "medium"   -> ct_prio_medium
+               | "low"      -> ct_prio_low
 
 // ============================================================
 // GROUP BY
