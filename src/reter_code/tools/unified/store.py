@@ -228,6 +228,9 @@ class UnifiedStore:
     """
     Unified SQLite store for the thinking system.
 
+    @reter: ServiceLayer(self)
+    @reter: Repository(self)
+
     Manages sessions, items, relations, and artifacts in a single database.
     """
 

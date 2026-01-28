@@ -1,5 +1,6 @@
 // Generate annotation tasks for classes without layer annotations
 // Creates tasks in RETER session for each unannotated class
+// Each task requires manual analysis to determine the correct layer
 
 query generate_annotation_tasks(
     category = "annotation",
@@ -9,15 +10,15 @@ query generate_annotation_tasks(
     Generate tasks to add @reter: layer annotations to classes.
 
     Finds all classes that don't have layer annotations and creates
-    tasks to add appropriate annotations based on file location and naming patterns.
+    tasks for manual layer determination and annotation.
 
     Parameters:
         dry_run: If true, returns task data without creating tasks (default: false)
-        limit: Maximum number of tasks to generate (default: 100)
+        limit: Maximum number of tasks to generate (default: 2000)
     """
 
     param dry_run: bool = false;
-    param limit: int = 100;
+    param limit: int = 2000;
 
     reql {
         SELECT ?class ?file ?line WHERE {
@@ -31,58 +32,24 @@ query generate_annotation_tasks(
             FILTER NOT EXISTS { ?class type user:CoreLayer }
             FILTER NOT EXISTS { ?class type user:TestLayer }
             FILTER NOT EXISTS { ?class type user:UtilityLayer }
+            FILTER (!contains(?file, "test"))
+            FILTER (!contains(?file, "tests"))
+            FILTER (!contains(?file, "_test.py"))
+            FILTER (!contains(?file, "test_"))
         }
         ORDER BY ?file ?line
     }
     | limit { {limit} }
-    | python {
-        # Convert pyarrow to list of dicts if needed
-        if hasattr(rows, 'to_pylist'):
-            rows = rows.to_pylist()
-        elif hasattr(rows, 'to_pydict'):
-            d = rows.to_pydict()
-            rows = [dict(zip(d.keys(), vals)) for vals in zip(*d.values())]
-
-        # Determine layer based on file path and class name patterns
-        output = []
-        for row in rows:
-            file = str(row.get('?file', '') or row.get('file', ''))
-            cls = str(row.get('?class', '') or row.get('class', ''))
-            # Extract just the class name from fully qualified name
-            if '.' in cls:
-                cls = cls.split('.')[-1]
-
-            # Determine layer based on file path and class name
-            if 'test' in file.lower():
-                layer = 'TestLayer'
-            elif 'services' in file or 'tools' in file:
-                layer = 'ServiceLayer'
-            elif 'cadsl' in file or 'dsl' in file:
-                layer = 'DSLLayer'
-            elif any(p in cls for p in ['Service', 'Manager', 'Handler']):
-                layer = 'ServiceLayer'
-            elif any(p in cls for p in ['Parser', 'Compiler', 'Transformer']):
-                layer = 'DSLLayer'
-            elif any(p in cls for p in ['Wrapper', 'Client', 'Store', 'Repository']):
-                layer = 'InfrastructureLayer'
-            elif any(p in cls for p in ['Step', 'Result']):
-                layer = 'CoreLayer'
-            else:
-                layer = 'CoreLayer'
-
-            row['suggested_layer'] = layer
-            row['class_name'] = cls
-            row['file'] = file
-            row['line'] = row.get('?line', '') or row.get('line', '')
-            output.append(row)
-
-        result = output
+    | map {
+        class_name: class,
+        file: file,
+        line: line
     }
     | create_task {
-        name: "Add @reter: {suggested_layer}(self) to {class_name}",
+        name: "Determine layer and add @reter annotation to {class_name}",
         category: "annotation",
-        priority: low,
-        description: "Add semantic layer annotation.\n\nFile: {file}:{line}\nAdd to docstring: @reter: {suggested_layer}(self)",
+        priority: medium,
+        description: "Analyze class and add appropriate layer annotation.\n\nClass: {class_name}\nFile: {file}:{line}\n\nSteps:\n1. Read the class implementation\n2. Analyze responsibilities and dependencies\n3. Determine layer: PresentationLayer, ServiceLayer, DSLLayer, InfrastructureLayer, CoreLayer, TestLayer, UtilityLayer\n4. Identify functional component (e.g., Parser, Repository, Handler, Manager)\n5. Add @reter: <Layer>(self) and @reter: <FunctionalComponent>(self)\n\nLanguage syntax:\n- Python: in docstring\n- JS/TS: /** */ JSDoc\n- C#: /// XML doc\n- C++: /** */ or //\n\nNote: 'self' is auto-resolved to the class name.",
         affects: file,
         dry_run: {dry_run}
     }

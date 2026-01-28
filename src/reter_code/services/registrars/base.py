@@ -83,7 +83,12 @@ def truncate_mcp_response_async(func: Callable[..., Any]) -> Callable[..., Any]:
 
 
 class ToolRegistrarBase:
-    """Base class with common functionality for tool registrars."""
+    """
+    Base class with common functionality for tool registrars.
+
+    @reter: ServiceLayer(self)
+    @reter: Registrar(self)
+    """
 
     def __init__(self, instance_manager, persistence_service, tools_filter: Optional[Set[str]] = None):
         """

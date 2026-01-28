@@ -18,7 +18,12 @@ from fnmatch import fnmatch
 
 
 class GitignorePattern:
-    """Represents a single gitignore pattern."""
+    """
+    Represents a single gitignore pattern.
+
+    @reter: UtilityLayer(self)
+    @reter: ValueObject(self)
+    """
 
     def __init__(self, pattern: str, base_dir: Path, negation: bool = False):
         """
@@ -145,6 +150,9 @@ class GitignorePattern:
 class GitignoreParser:
     """
     Parses and caches .gitignore patterns for a project.
+
+    @reter: ServiceLayer(self)
+    @reter: Parser(self)
 
     Usage:
         parser = GitignoreParser(project_root)

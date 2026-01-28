@@ -13,7 +13,12 @@ from typing import Optional, Callable, Any, Dict
 
 
 class InitStatus(Enum):
-    """Status of initial server startup."""
+    """
+    Status of initial server startup.
+
+    @reter: UtilityLayer(self)
+    @reter: ValueObject(self)
+    """
     PENDING = "pending"           # Not started
     INITIALIZING = "initializing" # In progress
     READY = "ready"               # Complete, tools available
@@ -21,7 +26,12 @@ class InitStatus(Enum):
 
 
 class InitPhase(Enum):
-    """Current phase of initialization."""
+    """
+    Current phase of initialization.
+
+    @reter: UtilityLayer(self)
+    @reter: ValueObject(self)
+    """
     PENDING = "pending"
     LOADING_PYTHON = "loading_python"
     BUILDING_RAG_INDEX = "building_rag_index"  # Embedding model loads lazily here
@@ -29,7 +39,12 @@ class InitPhase(Enum):
 
 
 class SyncStatus(Enum):
-    """Status of file sync operations."""
+    """
+    Status of file sync operations.
+
+    @reter: UtilityLayer(self)
+    @reter: ValueObject(self)
+    """
     IDLE = "idle"           # No sync in progress
     SYNCING = "syncing"     # Sync in progress
     READY = "ready"         # Sync complete
@@ -37,7 +52,12 @@ class SyncStatus(Enum):
 
 
 class SyncPhase(Enum):
-    """Current phase of file synchronization."""
+    """
+    Current phase of file synchronization.
+
+    @reter: UtilityLayer(self)
+    @reter: ValueObject(self)
+    """
     IDLE = "idle"
     SCANNING = "scanning"
     LOADING = "loading"
@@ -51,6 +71,9 @@ class SyncPhase(Enum):
 class InstanceProgress:
     """
     Shared state for initialization and sync progress.
+
+    @reter: UtilityLayer(self)
+    @reter: ValueObject(self)
 
     The instance goes through two types of blocking operations:
     1. Initial startup (loading all files for the first time)
@@ -226,6 +249,9 @@ class InstanceNotReadyError(Exception):
     """
     Raised when a tool is called while the instance is busy.
 
+    @reter: UtilityLayer(self)
+    @reter: Exception(self)
+
     Covers both:
     - Initial startup (initialization in progress)
     - File sync (reindexing after file changes)
@@ -376,6 +402,9 @@ class ComponentReadiness:
     """
     Component readiness tracking.
 
+    @reter: UtilityLayer(self)
+    @reter: ValueObject(self)
+
     Components initialize sequentially:
     1. sql_ready - SQLite/UnifiedStore initialized
     2. reter_ready - Default RETER instance with Python files loaded
@@ -508,6 +537,9 @@ def reset_component_readiness() -> None:
 class ComponentNotReadyError(Exception):
     """
     Raised when a specific component is not ready.
+
+    @reter: UtilityLayer(self)
+    @reter: Exception(self)
 
     Allows tools to check for specific component readiness and return
     appropriate error messages indicating which component is still initializing.

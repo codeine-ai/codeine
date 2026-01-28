@@ -20,7 +20,11 @@ from lark import Tree, Token
 # ============================================================
 
 class Severity(Enum):
-    """Severity level for validation issues."""
+    """Severity level for validation issues.
+
+    @reter: DSLLayer(self)
+    @reter: ValueObject(self)
+    """
     ERROR = "error"      # Must be fixed, blocks compilation
     WARNING = "warning"  # Should be fixed, but allows compilation
     INFO = "info"        # Informational, style suggestions
@@ -28,7 +32,11 @@ class Severity(Enum):
 
 @dataclass
 class ValidationIssue:
-    """Represents a validation issue found in CADSL code."""
+    """Represents a validation issue found in CADSL code.
+
+    @reter: DSLLayer(self)
+    @reter: ValueObject(self)
+    """
     severity: Severity
     message: str
     line: Optional[int] = None
@@ -51,7 +59,11 @@ class ValidationIssue:
 
 @dataclass
 class ValidationResult:
-    """Result of validating a CADSL parse tree."""
+    """Result of validating a CADSL parse tree.
+
+    @reter: DSLLayer(self)
+    @reter: ValueObject(self)
+    """
     valid: bool
     issues: List[ValidationIssue] = field(default_factory=list)
     tool_info: Dict[str, Any] = field(default_factory=dict)
@@ -119,6 +131,9 @@ class CADSLValidator:
         if not result.valid:
             for issue in result.issues:
                 print(issue)
+
+    @reter: DSLLayer(self)
+    @reter: Validator(self)
     """
 
     def __init__(self, strict: bool = False):

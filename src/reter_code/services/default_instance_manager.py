@@ -62,6 +62,9 @@ class _FileChangeHandler(FileSystemEventHandler):
     """
     Watchdog event handler that sets a dirty flag when files change.
 
+    @reter: ServiceLayer(self)
+    @reter: Handler(self)
+
     Only triggers on supported code file extensions and respects
     gitignore/exclude patterns.
 
@@ -141,6 +144,9 @@ class _FileChangeHandler(FileSystemEventHandler):
 class DefaultInstanceManager:
     """
     Manages the "default" RETER instance with automatic file synchronization.
+
+    @reter: ServiceLayer(self)
+    @reter: Manager(self)
 
     The default instance:
     - Always appears in list_all_instances()

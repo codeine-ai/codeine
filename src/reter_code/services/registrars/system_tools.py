@@ -25,7 +25,12 @@ from ...reter_wrapper import DefaultInstanceNotInitialised
 
 
 class SystemToolsRegistrar(ToolRegistrarBase):
-    """Registers the unified system management tool."""
+    """
+    Registers the unified system management tool.
+
+    @reter: ServiceLayer(self)
+    @reter: Registrar(self)
+    """
 
     def __init__(self, instance_manager, persistence_service, default_manager=None, reter_ops=None):
         super().__init__(instance_manager, persistence_service)

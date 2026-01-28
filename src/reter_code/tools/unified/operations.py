@@ -19,6 +19,9 @@ class OperationsHandler:
     """
     Handles operations dict from thinking() calls.
 
+    @reter: ServiceLayer(self)
+    @reter: Handler(self)
+
     Operations are processed in order:
     1. RETER knowledge operations
     2. Item creation operations

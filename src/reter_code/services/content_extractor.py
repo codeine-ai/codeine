@@ -15,7 +15,12 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class CodeEntity:
-    """Represents a code entity extracted from source files."""
+    """
+    Represents a code entity extracted from source files.
+
+    @reter: UtilityLayer(self)
+    @reter: ValueObject(self)
+    """
     entity_type: str  # "class", "method", "function"
     name: str
     qualified_name: str
@@ -31,7 +36,12 @@ class CodeEntity:
 
 @dataclass
 class CommentBlock:
-    """Represents a comment block extracted from source files."""
+    """
+    Represents a comment block extracted from source files.
+
+    @reter: UtilityLayer(self)
+    @reter: ValueObject(self)
+    """
     comment_type: str  # "inline", "block", "todo", "fixme", "note", "warning"
     content: str
     file_path: str
@@ -45,6 +55,9 @@ class CommentBlock:
 class ContentExtractor:
     """
     Extracts source code content from files using line numbers.
+
+    @reter: ServiceLayer(self)
+    @reter: Extractor(self)
 
     Works with RETER query results that provide file paths and line numbers.
     Maintains a file cache to avoid repeated disk reads during batch operations.

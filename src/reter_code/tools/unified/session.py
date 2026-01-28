@@ -23,6 +23,9 @@ class ThinkingSession:
     """
     Central orchestrator for unified thinking sessions.
 
+    @reter: ServiceLayer(self)
+    @reter: Manager(self)
+
     Provides:
     - Session lifecycle management
     - Thinking with operations

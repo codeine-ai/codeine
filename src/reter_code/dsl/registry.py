@@ -15,14 +15,22 @@ from enum import Enum
 # Forward reference to avoid circular import
 # Actual ToolSpec is in core.py
 class ToolSpec:
-    """Forward reference placeholder."""
+    """Forward reference placeholder.
+
+    @reter: DSLLayer(self)
+    @reter: ValueObject(self)
+    """
     name: str
     type: Any
     meta: Dict[str, Any]
 
 
 class ToolType(Enum):
-    """Tool type enum (forward reference)."""
+    """Tool type enum (forward reference).
+
+    @reter: DSLLayer(self)
+    @reter: ValueObject(self)
+    """
     QUERY = "query"
     DETECTOR = "detector"
     DIAGRAM = "diagram"
@@ -47,6 +55,9 @@ class Registry:
         # Discovery
         queries = Registry.get_by_type(ToolType.QUERY)
         code_smells = Registry.get_by_category("code_smell")
+
+    @reter: DSLLayer(self)
+    @reter: Registrar(self)
     """
 
     # Class-level storage
@@ -243,6 +254,9 @@ class Namespace:
 
         # Load all tools from namespace
         refactoring.load()
+
+    @reter: DSLLayer(self)
+    @reter: ValueObject(self)
     """
     name: str
     _tools: Dict[str, Any] = field(default_factory=dict)

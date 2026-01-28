@@ -29,7 +29,12 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 # ============================================================
 
 class SecurityLevel(Enum):
-    """Security levels for Python block execution."""
+    """
+    Security levels for Python block execution.
+
+    @reter: DSLLayer(self)
+    @reter: ValueObject(self)
+    """
     RESTRICTED = "restricted"  # No imports, minimal builtins
     STANDARD = "standard"      # Safe imports, common builtins
     TRUSTED = "trusted"        # Full access (admin only)
@@ -41,7 +46,12 @@ class SecurityLevel(Enum):
 
 @dataclass
 class Capability:
-    """Represents a permission capability."""
+    """
+    Represents a permission capability.
+
+    @reter: DSLLayer(self)
+    @reter: ValueObject(self)
+    """
     prefix: str
     pattern: str  # e.g., "fs:read:*", "net:http:api.example.com"
 
@@ -55,7 +65,12 @@ class Capability:
 
 @dataclass
 class SecurityContext:
-    """Security context for Python execution."""
+    """
+    Security context for Python execution.
+
+    @reter: DSLLayer(self)
+    @reter: ValueObject(self)
+    """
     level: SecurityLevel = SecurityLevel.STANDARD
     capabilities: List[str] = field(default_factory=list)
     timeout_seconds: float = 30.0
@@ -140,6 +155,9 @@ class ASTValidator(ast.NodeVisitor):
     - Blocked node types (Import, Exec, etc.)
     - Dangerous function calls (eval, exec, etc.)
     - Dangerous attribute access (__class__, __globals__, etc.)
+
+    @reter: DSLLayer(self)
+    @reter: Validator(self)
     """
 
     def __init__(self, security_level: SecurityLevel = SecurityLevel.STANDARD):
@@ -470,7 +488,12 @@ def get_safe_builtins(security_level: SecurityLevel) -> Dict[str, Any]:
 
 @dataclass
 class ExecutionResult:
-    """Result of Python code execution."""
+    """
+    Result of Python code execution.
+
+    @reter: DSLLayer(self)
+    @reter: ValueObject(self)
+    """
     success: bool
     result: Any = None
     error: Optional[str] = None
@@ -495,6 +518,9 @@ class PythonExecutor:
             return result.result
         else:
             raise RuntimeError(result.error)
+
+    @reter: DSLLayer(self)
+    @reter: Executor(self)
     """
 
     def __init__(self, security_context: Optional[SecurityContext] = None):
@@ -701,6 +727,9 @@ class SecurePythonStep:
 
     This replaces the simpler PythonStep in transformer.py with
     full security controls.
+
+    @reter: DSLLayer(self)
+    @reter: Executor(self)
     """
 
     def __init__(self, code: str, security_context: Optional[SecurityContext] = None):

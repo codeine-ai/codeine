@@ -26,6 +26,9 @@ class ReterOperations:
     """
     Service for core RETER knowledge operations.
 
+    @reter: ServiceLayer(self)
+    @reter: Service(self)
+
     This service handles:
     - Adding knowledge incrementally (ontology, Python code)
     - Querying knowledge (REQL, DL)

@@ -353,6 +353,9 @@ class ToolBuilder:
             .pipeline(lambda p: p.reql("...").emit("modules"))
             .build()
         )
+
+    @reter: DSLLayer(self)
+    @reter: Builder(self)
     """
 
     def __init__(self, name: str, type_: ToolType):

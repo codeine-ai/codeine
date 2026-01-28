@@ -24,7 +24,12 @@ from lark.exceptions import (
 
 @dataclass
 class ParseError:
-    """Represents a parsing error with location information."""
+    """
+    Represents a parsing error with location information.
+
+    @reter: DSLLayer(self)
+    @reter: ValueObject(self)
+    """
     message: str
     line: int
     column: int
@@ -43,7 +48,12 @@ class ParseError:
 
 @dataclass
 class ParseResult:
-    """Result of parsing CADSL source code."""
+    """
+    Result of parsing CADSL source code.
+
+    @reter: DSLLayer(self)
+    @reter: ValueObject(self)
+    """
     success: bool
     tree: Optional[Tree] = None
     errors: List[ParseError] = field(default_factory=list)
@@ -74,6 +84,10 @@ class CADSLParser:
         else:
             for error in result.errors:
                 print(error)
+
+    @reter: DSLLayer(self)
+    @reter: Parser(self)
+    @reter: Singleton(self)
     """
 
     _instance: Optional["CADSLParser"] = None

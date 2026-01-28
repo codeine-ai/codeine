@@ -18,7 +18,12 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class MarkdownChunk:
-    """Represents an indexable chunk from a markdown file."""
+    """
+    Represents an indexable chunk from a markdown file.
+
+    @reter: UtilityLayer(self)
+    @reter: ValueObject(self)
+    """
     file: str
     chunk_type: str  # "document", "section", "code_block"
     content: str
@@ -40,6 +45,9 @@ class MarkdownChunk:
 class MarkdownIndexer:
     """
     Parses markdown files and extracts chunks for embedding.
+
+    @reter: ServiceLayer(self)
+    @reter: Parser(self)
 
     Strategies:
     - Small files (<max_chunk_words): Index as single document

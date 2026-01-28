@@ -23,7 +23,12 @@ from ..initialization_progress import (
 
 @dataclass
 class ItemsQueryFilters:
-    """Filter parameters for querying items."""
+    """
+    Filter parameters for querying items.
+
+    @reter: UtilityLayer(self)
+    @reter: ValueObject(self)
+    """
     item_type: Optional[str] = None
     status: Optional[str] = None
     priority: Optional[str] = None
@@ -43,7 +48,12 @@ class ItemsQueryFilters:
 
 
 class UnifiedToolsRegistrar(ToolRegistrarBase):
-    """Registers unified thinking system tools with FastMCP."""
+    """
+    Registers unified thinking system tools with FastMCP.
+
+    @reter: ServiceLayer(self)
+    @reter: Registrar(self)
+    """
 
     def __init__(self, instance_manager, persistence_service, tools_filter=None):
         super().__init__(instance_manager, persistence_service, tools_filter)

@@ -13,6 +13,9 @@ class ThoughtInput:
     """
     Input parameters for creating a thought in the thinking session.
 
+    @reter: UtilityLayer(self)
+    @reter: ValueObject(self)
+
     Groups all parameters needed to create a thought item,
     reducing parameter passing overhead and improving type safety.
     """

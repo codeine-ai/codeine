@@ -38,6 +38,9 @@ class ConfigLoader:
     """
     Loads configuration from reter_code.json file.
 
+    @reter: ServiceLayer(self)
+    @reter: Loader(self)
+
     Priority: Environment variables > reter_code.json > defaults
     """
 

@@ -68,7 +68,11 @@ def _create_file_handler(log_filename: str) -> Optional[logging.FileHandler]:
 
 
 class FlushingStreamHandler(logging.StreamHandler):
-    """StreamHandler that flushes after every emit."""
+    """StreamHandler that flushes after every emit.
+
+    @reter: InfrastructureLayer(self)
+    @reter: Handler(self)
+    """
     def emit(self, record):
         super().emit(record)
         self.flush()

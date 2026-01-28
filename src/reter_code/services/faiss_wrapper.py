@@ -34,7 +34,12 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class SearchResult:
-    """Result from a FAISS search operation."""
+    """
+    Result from a FAISS search operation.
+
+    @reter: UtilityLayer(self)
+    @reter: ValueObject(self)
+    """
     vector_id: int
     distance: float
     score: float  # Normalized similarity score (0-1)
@@ -42,7 +47,12 @@ class SearchResult:
 
 @dataclass
 class ClusterInfo:
-    """Information about a cluster of similar vectors."""
+    """
+    Information about a cluster of similar vectors.
+
+    @reter: UtilityLayer(self)
+    @reter: ValueObject(self)
+    """
     cluster_id: int
     centroid: np.ndarray
     member_ids: List[int]
@@ -53,6 +63,9 @@ class ClusterInfo:
 class FAISSWrapper:
     """
     Low-level wrapper for FAISS operations.
+
+    @reter: InfrastructureLayer(self)
+    @reter: Wrapper(self)
 
     Handles index creation, vector operations, and persistence.
     Uses IndexIDMap to support vector deletion (required for incremental updates).

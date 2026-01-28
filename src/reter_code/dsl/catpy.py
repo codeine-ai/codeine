@@ -39,6 +39,9 @@ class Functor(ABC, Generic[T]):
     Laws (for all f: a->b, g: b->c):
       1) Identity:     fmap(id)      == id
       2) Composition:  fmap(g)∘fmap(f) == fmap(g∘f)
+
+    @reter: DSLLayer(self)
+    @reter: Typeclass(self)
     """
 
     @abstractmethod
@@ -64,6 +67,9 @@ class Applicative(Functor[T], ABC):
       2) Homomorphism: pure(f).ap(pure(x)) == pure(f(x))
       3) Interchange:  u.ap(pure(y)) == pure(lambda f: f(y)).ap(u)
       4) Composition:  pure(compose).ap(u).ap(v).ap(w) == u.ap(v.ap(w))
+
+    @reter: DSLLayer(self)
+    @reter: Typeclass(self)
     """
 
     @classmethod
@@ -96,6 +102,9 @@ class Monad(Applicative[T], ABC):
       1) Left identity:  pure(x).bind(f) == f(x)
       2) Right identity: m.bind(pure)    == m
       3) Associativity:  m.bind(f).bind(g) == m.bind(lambda x: f(x).bind(g))
+
+    @reter: DSLLayer(self)
+    @reter: Typeclass(self)
     """
 
     @abstractmethod
@@ -130,6 +139,9 @@ class Maybe(Monad[T], ABC):
     Common patterns:
       - fmap applies a function only when a value exists.
       - bind sequences computations that may fail/return Nothing.
+
+    @reter: DSLLayer(self)
+    @reter: Monad(self)
     """
 
     @classmethod
@@ -157,6 +169,11 @@ class Maybe(Monad[T], ABC):
 
 @dataclass(frozen=True)
 class Just(Maybe[T]):
+    """Represents a present value in a Maybe context.
+
+    @reter: DSLLayer(self)
+    @reter: Monad(self)
+    """
     value: T
 
     def bind(self, f: Callable[[T], Maybe[U]]) -> Maybe[U]:
@@ -179,6 +196,11 @@ class Just(Maybe[T]):
 
 @dataclass(frozen=True)
 class Nothing(Maybe[Any]):
+    """Represents an absent value in a Maybe context.
+
+    @reter: DSLLayer(self)
+    @reter: Monad(self)
+    """
     def bind(self, f: Callable[[Any], Maybe[U]]) -> Maybe[U]:
         return self  # type: ignore[return-value]
 
@@ -203,6 +225,9 @@ class Result(Monad[T], ABC, Generic[T, E]):
     - Err(error)
 
     Prefer Result over Maybe when you want to keep *why* it failed.
+
+    @reter: DSLLayer(self)
+    @reter: Monad(self)
     """
 
     @classmethod
@@ -236,6 +261,11 @@ class Result(Monad[T], ABC, Generic[T, E]):
 
 @dataclass(frozen=True)
 class Ok(Result[T, E]):
+    """Represents a successful result.
+
+    @reter: DSLLayer(self)
+    @reter: Monad(self)
+    """
     value: T
 
     def bind(self, f: Callable[[T], Result[U, E]]) -> Result[U, E]:
@@ -257,6 +287,11 @@ class Ok(Result[T, E]):
 
 @dataclass(frozen=True)
 class Err(Result[Any, E]):
+    """Represents a failed result with error information.
+
+    @reter: DSLLayer(self)
+    @reter: Monad(self)
+    """
     error: E
 
     def bind(self, f: Callable[[Any], Result[U, E]]) -> Result[U, E]:
@@ -281,6 +316,9 @@ class ListF(Monad[T]):
     """
     A thin wrapper over an immutable tuple that behaves like a list
     but participates in the typeclasses in a principled way.
+
+    @reter: DSLLayer(self)
+    @reter: Monad(self)
     """
     items: Tuple[T, ...]
 
@@ -378,7 +416,11 @@ def flip(f: Callable[[T, U], V]) -> Callable[[U, T], V]:
 
 @dataclass(frozen=True)
 class PipelineError:
-    """Error that occurred during pipeline execution."""
+    """Error that occurred during pipeline execution.
+
+    @reter: DSLLayer(self)
+    @reter: ValueObject(self)
+    """
     step: str
     message: str
     cause: Exception = None

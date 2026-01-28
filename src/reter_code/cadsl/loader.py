@@ -33,7 +33,12 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class LoadResult:
-    """Result of loading CADSL tools."""
+    """
+    Result of loading CADSL tools.
+
+    @reter: DSLLayer(self)
+    @reter: ValueObject(self)
+    """
     success: bool
     tools_loaded: int = 0
     tool_names: List[str] = field(default_factory=list)
@@ -56,6 +61,9 @@ class RegisteredToolSpec:
 
     This wraps a CADSL ToolSpec and provides the interface expected
     by the Registry class.
+
+    @reter: DSLLayer(self)
+    @reter: ValueObject(self)
     """
     name: str
     type: "ToolType"
@@ -70,7 +78,12 @@ class RegisteredToolSpec:
 
 
 class ToolType:
-    """Tool type enum compatible with registry."""
+    """
+    Tool type enum compatible with registry.
+
+    @reter: DSLLayer(self)
+    @reter: ValueObject(self)
+    """
     QUERY = "query"
     DETECTOR = "detector"
     DIAGRAM = "diagram"
@@ -85,7 +98,12 @@ class ToolType:
 
 @dataclass
 class ParamSpec:
-    """Parameter specification compatible with registry."""
+    """
+    Parameter specification compatible with registry.
+
+    @reter: DSLLayer(self)
+    @reter: ValueObject(self)
+    """
     name: str
     type: type
     required: bool = False
@@ -522,10 +540,6 @@ def build_pipeline_factory(spec: CADSLToolSpec,
                 if "description_template_param" in step_spec:
                     description_template = ctx.params.get(step_spec["description_template_param"], description_template)
 
-                dry_run = step_spec.get("dry_run", False)
-                if "dry_run_param" in step_spec:
-                    dry_run = ctx.params.get(step_spec["dry_run_param"], dry_run)
-
                 pipeline = pipeline >> CreateTaskStep(
                     name_template=name_template,
                     category=category,
@@ -533,7 +547,7 @@ def build_pipeline_factory(spec: CADSLToolSpec,
                     description_template=description_template,
                     affects_field=step_spec.get("affects_field"),
                     batch_size=step_spec.get("batch_size", 50),
-                    dry_run=dry_run,
+                    dry_run=step_spec.get("dry_run", False),
                 )
 
         if emit_key:

@@ -99,7 +99,11 @@ def ensure_list(data: Union[pa.Table, List[Dict[str, Any]]]) -> List[Dict[str, A
 # =============================================================================
 
 class ArrowSource(ABC):
-    """Base class for sources that return Arrow tables."""
+    """Base class for sources that return Arrow tables.
+
+    @reter: DSLLayer(self)
+    @reter: Source(self)
+    """
 
     @abstractmethod
     def execute(self, ctx: Context) -> PipelineResult[pa.Table]:
@@ -115,6 +119,9 @@ class ArrowREQLSource(ArrowSource):
     - oo:Class, oo:Method, oo:Function (language-independent)
     - py:Class, py:Method (Python-specific)
     - js:Class, js:Function (JavaScript-specific)
+
+    @reter: DSLLayer(self)
+    @reter: Source(self)
     """
     query: str
 
@@ -142,7 +149,11 @@ class ArrowREQLSource(ArrowSource):
 
 @dataclass
 class ArrowRAGSource(ArrowSource):
-    """RAG source that returns Arrow table."""
+    """RAG source that returns Arrow table.
+
+    @reter: DSLLayer(self)
+    @reter: Source(self)
+    """
     operation: Literal["search", "duplicates", "clusters"]
     params: Dict[str, Any] = field(default_factory=dict)
 
@@ -218,7 +229,11 @@ class ArrowRAGSource(ArrowSource):
 
 @dataclass
 class ArrowValueSource(ArrowSource):
-    """Literal value source as Arrow table."""
+    """Literal value source as Arrow table.
+
+    @reter: DSLLayer(self)
+    @reter: Source(self)
+    """
     value: Union[List[Dict], pa.Table]
 
     def execute(self, ctx: Context) -> PipelineResult[pa.Table]:
@@ -227,7 +242,11 @@ class ArrowValueSource(ArrowSource):
 
 @dataclass
 class ArrowMergeSource(ArrowSource):
-    """Merge multiple sources (UNION ALL)."""
+    """Merge multiple sources (UNION ALL).
+
+    @reter: DSLLayer(self)
+    @reter: Source(self)
+    """
     sources: List[ArrowSource]
 
     def execute(self, ctx: Context) -> PipelineResult[pa.Table]:
@@ -257,7 +276,11 @@ class ArrowMergeSource(ArrowSource):
 # =============================================================================
 
 class ArrowStep(ABC):
-    """Base class for steps that operate on Arrow tables."""
+    """Base class for steps that operate on Arrow tables.
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
+    """
 
     @abstractmethod
     def execute(self, table: pa.Table, ctx: Optional[Context] = None) -> PipelineResult[pa.Table]:
@@ -267,7 +290,11 @@ class ArrowStep(ABC):
 
 @dataclass
 class ArrowFilterStep(ArrowStep):
-    """Filter rows using Arrow compute expressions."""
+    """Filter rows using Arrow compute expressions.
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
+    """
     condition: str  # Expression like "count > 10"
 
     def execute(self, table: pa.Table, ctx: Optional[Context] = None) -> PipelineResult[pa.Table]:
@@ -359,7 +386,11 @@ class ArrowFilterStep(ArrowStep):
 
 @dataclass
 class ArrowSelectStep(ArrowStep):
-    """Select and rename columns."""
+    """Select and rename columns.
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
+    """
     fields: Dict[str, str]  # output_name -> source_name
 
     def execute(self, table: pa.Table, ctx: Optional[Context] = None) -> PipelineResult[pa.Table]:
@@ -388,7 +419,11 @@ class ArrowSelectStep(ArrowStep):
 
 @dataclass
 class ArrowOrderByStep(ArrowStep):
-    """Sort table by column."""
+    """Sort table by column.
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
+    """
     field_name: str
     descending: bool = False
 
@@ -415,7 +450,11 @@ class ArrowOrderByStep(ArrowStep):
 
 @dataclass
 class ArrowLimitStep(ArrowStep):
-    """Limit number of rows."""
+    """Limit number of rows.
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
+    """
     count: int
 
     def execute(self, table: pa.Table, ctx: Optional[Context] = None) -> PipelineResult[pa.Table]:
@@ -428,7 +467,11 @@ class ArrowLimitStep(ArrowStep):
 
 @dataclass
 class ArrowOffsetStep(ArrowStep):
-    """Skip first N rows."""
+    """Skip first N rows.
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
+    """
     count: int
 
     def execute(self, table: pa.Table, ctx: Optional[Context] = None) -> PipelineResult[pa.Table]:
@@ -437,7 +480,11 @@ class ArrowOffsetStep(ArrowStep):
 
 @dataclass
 class ArrowUniqueStep(ArrowStep):
-    """Remove duplicate rows based on columns."""
+    """Remove duplicate rows based on columns.
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
+    """
     columns: Optional[List[str]] = None
 
     def execute(self, table: pa.Table, ctx: Optional[Context] = None) -> PipelineResult[pa.Table]:
@@ -472,6 +519,9 @@ class ArrowMapStep(ArrowStep):
 
     Transforms is a dict of column_name -> expression or value.
     Special key '...row' means include all existing columns.
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
     transforms: Dict[str, Any]
 
@@ -528,7 +578,11 @@ class ArrowMapStep(ArrowStep):
 
 @dataclass
 class ArrowAggregateStep(ArrowStep):
-    """Aggregate table with functions."""
+    """Aggregate table with functions.
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
+    """
     aggregations: Dict[str, Tuple[str, str]]  # output -> (field, func)
 
     def execute(self, table: pa.Table, ctx: Optional[Context] = None) -> PipelineResult[pa.Table]:
@@ -566,7 +620,11 @@ class ArrowAggregateStep(ArrowStep):
 
 @dataclass
 class ArrowGroupByStep(ArrowStep):
-    """Group by columns with aggregations."""
+    """Group by columns with aggregations.
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
+    """
     group_columns: List[str]
     aggregations: List[Tuple[str, str, str]]  # (output_name, source_column, func)
 
@@ -617,7 +675,11 @@ class ArrowGroupByStep(ArrowStep):
 
 @dataclass
 class ArrowJoinStep(ArrowStep):
-    """Join two tables."""
+    """Join two tables.
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
+    """
     right_source: ArrowSource
     left_keys: List[str]
     right_keys: List[str]
@@ -671,6 +733,9 @@ class ArrowPythonStep(ArrowStep):
 
     Converts Arrow table to list of dicts for Python execution,
     then converts result back to Arrow table.
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
     code: str
 
@@ -718,6 +783,9 @@ class ArrowPipeline:
 
     Uses Arrow tables throughout, only converting to list of dicts
     when explicitly needed (python blocks, emit).
+
+    @reter: DSLLayer(self)
+    @reter: Monad(self)
     """
     _source: ArrowSource
     _steps: List[ArrowStep] = field(default_factory=list)

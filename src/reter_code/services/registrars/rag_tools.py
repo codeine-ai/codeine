@@ -17,7 +17,12 @@ from ...reter_wrapper import DefaultInstanceNotInitialised
 
 
 class RAGToolsRegistrar(ToolRegistrarBase):
-    """Registers RAG tools with FastMCP."""
+    """
+    Registers RAG tools with FastMCP.
+
+    @reter: ServiceLayer(self)
+    @reter: Registrar(self)
+    """
 
     def __init__(self, instance_manager, persistence_service, default_manager=None, tools_filter=None):
         super().__init__(instance_manager, persistence_service, tools_filter)

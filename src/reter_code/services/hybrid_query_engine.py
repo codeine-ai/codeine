@@ -35,7 +35,12 @@ from .agent_sdk_client import (
 
 @dataclass
 class CADSLToolMetadata:
-    """Metadata extracted from a CADSL tool file."""
+    """
+    Metadata extracted from a CADSL tool file.
+
+    @reter: UtilityLayer(self)
+    @reter: ValueObject(self)
+    """
     name: str
     file_path: Path
     category: str
@@ -601,7 +606,12 @@ def handle_tool_call(tool_name: str, tool_input: Dict[str, Any]) -> str:
 # ============================================================
 
 class QueryType(Enum):
-    """Types of queries the hybrid engine can handle."""
+    """
+    Types of queries the hybrid engine can handle.
+
+    @reter: UtilityLayer(self)
+    @reter: ValueObject(self)
+    """
     REQL = "reql"           # Simple structural queries
     CADSL = "cadsl"         # Complex pipelines, graph algorithms
     RAG = "rag"             # Semantic/similarity search
@@ -609,7 +619,12 @@ class QueryType(Enum):
 
 @dataclass
 class SimilarTool:
-    """A similar CADSL tool found via case-based reasoning."""
+    """
+    A similar CADSL tool found via case-based reasoning.
+
+    @reter: UtilityLayer(self)
+    @reter: ValueObject(self)
+    """
     name: str
     score: float
     category: str
@@ -627,7 +642,12 @@ class SimilarTool:
 
 @dataclass
 class QueryClassification:
-    """Result of classifying a natural language query."""
+    """
+    Result of classifying a natural language query.
+
+    @reter: UtilityLayer(self)
+    @reter: ValueObject(self)
+    """
     query_type: QueryType
     confidence: float
     reasoning: str
@@ -1146,7 +1166,12 @@ def build_rag_query_params(question: str) -> Dict[str, Any]:
 
 @dataclass
 class HybridQueryResult:
-    """Result of executing a hybrid query."""
+    """
+    Result of executing a hybrid query.
+
+    @reter: UtilityLayer(self)
+    @reter: ValueObject(self)
+    """
     success: bool
     results: List[Dict[str, Any]]
     count: int

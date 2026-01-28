@@ -38,7 +38,12 @@ logger = configure_logger_for_debug_trace(__name__)
 
 
 class RAGSearchResult:
-    """Result from a RAG semantic search."""
+    """
+    Result from a RAG semantic search.
+
+    @reter: UtilityLayer(self)
+    @reter: ValueObject(self)
+    """
 
     def __init__(
         self,
@@ -250,21 +255,40 @@ class RAGIndexManager:
             }
 
         try:
-            # Get current Python and JavaScript sources from RETER
+            # Get current sources from RETER (all supported code file types)
             all_sources, _ = reter.get_all_sources()
             current_code: Dict[str, str] = {}  # rel_path -> md5
+            # Must match extensions from sync_sources: JS_EXTENSIONS, HTML_EXTENSIONS, etc.
+            code_extensions = (
+                ".py",  # Python
+                ".js", ".ts", ".jsx", ".tsx", ".mjs",  # JavaScript/TypeScript
+                ".html", ".htm",  # HTML
+                ".cs",  # C#
+                ".cpp", ".cc", ".cxx", ".hpp", ".h",  # C++
+            )
             for source_id in all_sources:
                 if "|" in source_id:
                     md5_hash, rel_path = source_id.split("|", 1)
-                    if rel_path.endswith(".py") or rel_path.endswith(".js"):
+                    if rel_path.endswith(code_extensions):
                         rel_path_normalized = rel_path.replace("\\", "/")
                         current_code[rel_path_normalized] = md5_hash
 
-            # Get indexed code files (Python and JavaScript)
+            # Get indexed code files
+            # Must strip prefixes like js:, html:, cs:, cpp: to match RETER source paths
             indexed_code: Dict[str, str] = {}  # rel_path -> md5
             for key, md5 in self._indexed_files.items():
-                if not key.startswith("md:"):
-                    indexed_code[key.replace("\\", "/")] = md5
+                if key.startswith("md:"):
+                    continue  # Skip markdown
+                # Strip file type prefixes
+                clean_key = key
+                for prefix in ("js:", "html:", "cs:", "cpp:"):
+                    if key.startswith(prefix):
+                        clean_key = key[len(prefix):]
+                        break
+                indexed_code[clean_key.replace("\\", "/")] = md5
+
+            debug_log(f"[RAG] get_sync_status: current_code has {len(current_code)} files, indexed_code has {len(indexed_code)} files")
+            debug_log(f"[RAG] get_sync_status: _indexed_files sample keys: {list(self._indexed_files.keys())[:5]}")
 
             stale_files = []
             missing_files = []
@@ -483,6 +507,7 @@ class RAGIndexManager:
 
         Returns:
             Dict mapping rel_path -> md5_hash for all indexed files
+            Keys may have prefixes: js:, html:, cs:, cpp:, md:
         """
         if not self._rag_files_path or not self._rag_files_path.exists():
             return {}
@@ -490,11 +515,25 @@ class RAGIndexManager:
         try:
             with open(self._rag_files_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                # Format: {"python": {rel_path: md5}, "markdown": {rel_path: md5}}
+                # Format: {"python": {...}, "javascript": {...}, "html": {...}, etc.}
                 result = {}
+                # Python files have no prefix
                 result.update(data.get("python", {}))
+                # JavaScript files get js: prefix
+                result.update({f"js:{k}": v for k, v in data.get("javascript", {}).items()})
+                # HTML files get html: prefix
+                result.update({f"html:{k}": v for k, v in data.get("html", {}).items()})
+                # C# files get cs: prefix
+                result.update({f"cs:{k}": v for k, v in data.get("csharp", {}).items()})
+                # C++ files get cpp: prefix
+                result.update({f"cpp:{k}": v for k, v in data.get("cpp", {}).items()})
+                # Markdown files get md: prefix
                 result.update({f"md:{k}": v for k, v in data.get("markdown", {}).items()})
-                debug_log(f"[RAG] _load_rag_files: Loaded {len(result)} indexed files")
+
+                debug_log(f"[RAG] _load_rag_files: Loaded {len(result)} indexed files "
+                         f"(py={len(data.get('python', {}))}, js={len(data.get('javascript', {}))}, "
+                         f"html={len(data.get('html', {}))}, cs={len(data.get('csharp', {}))}, "
+                         f"cpp={len(data.get('cpp', {}))}, md={len(data.get('markdown', {}))})")
                 return result
         except Exception as e:
             debug_log(f"[RAG] _load_rag_files: Error loading: {e}")
@@ -509,19 +548,39 @@ class RAGIndexManager:
 
         # Split by type for cleaner JSON
         python_files = {}
+        javascript_files = {}
+        html_files = {}
+        csharp_files = {}
+        cpp_files = {}
         markdown_files = {}
+
         for key, md5 in self._indexed_files.items():
             if key.startswith("md:"):
                 markdown_files[key[3:]] = md5  # Remove "md:" prefix
+            elif key.startswith("js:"):
+                javascript_files[key[3:]] = md5  # Remove "js:" prefix
+            elif key.startswith("html:"):
+                html_files[key[5:]] = md5  # Remove "html:" prefix
+            elif key.startswith("cs:"):
+                csharp_files[key[3:]] = md5  # Remove "cs:" prefix
+            elif key.startswith("cpp:"):
+                cpp_files[key[4:]] = md5  # Remove "cpp:" prefix
             else:
-                python_files[key] = md5
+                python_files[key] = md5  # Python has no prefix
 
         data = {
-            "version": "1.0",
+            "version": "1.1",
             "updated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "python": python_files,
+            "javascript": javascript_files,
+            "html": html_files,
+            "csharp": csharp_files,
+            "cpp": cpp_files,
             "markdown": markdown_files,
         }
+
+        debug_log(f"[RAG] _save_rag_files: Saving py={len(python_files)}, js={len(javascript_files)}, "
+                 f"html={len(html_files)}, cs={len(csharp_files)}, cpp={len(cpp_files)}, md={len(markdown_files)}")
 
         try:
             with open(self._rag_files_path, 'w', encoding='utf-8') as f:
@@ -701,9 +760,11 @@ class RAGIndexManager:
                 logger.error(f"Error collecting JavaScript {source_id}: {e}")
                 stats["errors"].append(f"JavaScript: {source_id}: {e}")
 
-        # 3d. Collect JavaScript literals (bulk query)
+        # 3d. Collect JavaScript literals (bulk query - filtered by changed sources)
         if changed_javascript_sources:
-            js_literal_texts, js_literal_metadata = self._collect_all_javascript_literals_bulk(reter, project_root)
+            js_literal_texts, js_literal_metadata = self._collect_all_javascript_literals_bulk(
+                reter, project_root, changed_sources=changed_javascript_sources
+            )
             if js_literal_texts:
                 source_tracking.append(("javascript_literals_bulk", "javascript_literal", len(all_texts), len(js_literal_texts)))
                 all_texts.extend(js_literal_texts)
@@ -797,6 +858,22 @@ class RAGIndexManager:
                     "vector_ids": source_vector_ids,
                 }
 
+                # Update _indexed_files to keep sync status accurate
+                # Use prefixes matching sync_sources() convention
+                if file_type in ("python", "python_comment", "python_literal") and md5_hash:
+                    self._indexed_files[rel_path] = md5_hash
+                elif file_type in ("javascript", "javascript_literal") and md5_hash:
+                    self._indexed_files[f"js:{rel_path}"] = md5_hash
+                elif file_type == "html" and md5_hash:
+                    self._indexed_files[f"html:{rel_path}"] = md5_hash
+                elif file_type == "csharp" and md5_hash:
+                    self._indexed_files[f"cs:{rel_path}"] = md5_hash
+                elif file_type == "cpp" and md5_hash:
+                    self._indexed_files[f"cpp:{rel_path}"] = md5_hash
+                elif file_type == "markdown":
+                    # Markdown uses rel_path as key with md: prefix
+                    self._indexed_files[f"md:{rel_path}"] = md5_hash
+
                 # Update stats
                 if file_type in ("python", "python_comment", "python_literal"):
                     stats["python_vectors_added"] += count
@@ -813,6 +890,7 @@ class RAGIndexManager:
 
         # 5. Save index and metadata
         self._save_index()
+        self._save_rag_files()  # Also save _indexed_files to keep sync status accurate
 
         stats["time_ms"] = int((time.time() - start_time) * 1000)
         total_removed = (
@@ -887,7 +965,15 @@ class RAGIndexManager:
 
         # Load indexed files from JSON (fast, no model needed)
         self._indexed_files = self._load_rag_files()
-        debug_log(f"[RAG] sync_sources: Loaded {len(self._indexed_files)} indexed files from JSON")
+        # Count by type for debugging
+        py_count = sum(1 for k in self._indexed_files if not k.startswith(("js:", "html:", "cs:", "cpp:", "md:")))
+        js_count = sum(1 for k in self._indexed_files if k.startswith("js:"))
+        html_count = sum(1 for k in self._indexed_files if k.startswith("html:"))
+        cs_count = sum(1 for k in self._indexed_files if k.startswith("cs:"))
+        cpp_count = sum(1 for k in self._indexed_files if k.startswith("cpp:"))
+        md_count = sum(1 for k in self._indexed_files if k.startswith("md:"))
+        debug_log(f"[RAG] sync_sources: Loaded {len(self._indexed_files)} indexed files from JSON "
+                 f"(py={py_count}, js={js_count}, html={html_count}, cs={cs_count}, cpp={cpp_count}, md={md_count})")
 
         stats = {
             "python_added": 0,
@@ -925,22 +1011,42 @@ class RAGIndexManager:
         current_csharp: Dict[str, Tuple[str, str]] = {}  # rel_path -> (source_id, md5)
         current_cpp: Dict[str, Tuple[str, str]] = {}  # rel_path -> (source_id, md5)
 
+        # Helper to compute actual file MD5 (more reliable than RETER snapshot MD5s)
+        def compute_file_md5(abs_path: Path) -> Optional[str]:
+            try:
+                content = abs_path.read_bytes()
+                return hashlib.md5(content).hexdigest()
+            except Exception:
+                return None
+
         for source_id in all_sources:
             if "|" in source_id:
-                md5_hash, rel_path = source_id.split("|", 1)
+                reter_md5, rel_path = source_id.split("|", 1)
                 rel_path_normalized = rel_path.replace("\\", "/")
                 rel_path_lower = rel_path.lower()
 
                 if rel_path_lower.endswith(".py"):
-                    current_python[rel_path_normalized] = (source_id, md5_hash)
+                    # Use actual file MD5 (RETER's MD5 is from parsed content, not stable across restarts)
+                    actual_md5 = compute_file_md5(project_root / rel_path_normalized)
+                    if actual_md5:
+                        current_python[rel_path_normalized] = (source_id, actual_md5)
                 elif rel_path_lower.endswith(JS_EXTENSIONS):
-                    current_javascript[rel_path_normalized] = (source_id, md5_hash)
+                    # For non-Python files, compute actual file MD5 to avoid stale snapshot MD5s
+                    actual_md5 = compute_file_md5(project_root / rel_path_normalized)
+                    if actual_md5:
+                        current_javascript[rel_path_normalized] = (source_id, actual_md5)
                 elif rel_path_lower.endswith(HTML_EXTENSIONS):
-                    current_html[rel_path_normalized] = (source_id, md5_hash)
+                    actual_md5 = compute_file_md5(project_root / rel_path_normalized)
+                    if actual_md5:
+                        current_html[rel_path_normalized] = (source_id, actual_md5)
                 elif rel_path_lower.endswith(CSHARP_EXTENSIONS):
-                    current_csharp[rel_path_normalized] = (source_id, md5_hash)
+                    actual_md5 = compute_file_md5(project_root / rel_path_normalized)
+                    if actual_md5:
+                        current_csharp[rel_path_normalized] = (source_id, actual_md5)
                 elif rel_path_lower.endswith(CPP_EXTENSIONS):
-                    current_cpp[rel_path_normalized] = (source_id, md5_hash)
+                    actual_md5 = compute_file_md5(project_root / rel_path_normalized)
+                    if actual_md5:
+                        current_cpp[rel_path_normalized] = (source_id, actual_md5)
 
         # Get indexed files from _indexed_files (using prefixes: py:, js:, html:, cs:, cpp:, md:)
         indexed_python: Dict[str, str] = {}  # rel_path -> md5
@@ -973,9 +1079,11 @@ class RAGIndexManager:
             indexed_md5 = indexed_python.get(rel_path)
             if indexed_md5 is None:
                 # New file
+                debug_log(f"[RAG] sync_sources: Python NEW: {rel_path}")
                 python_to_add.append((source_id, rel_path, current_md5))
             elif current_md5 != indexed_md5:
                 # Modified file
+                debug_log(f"[RAG] sync_sources: Python MODIFIED: {rel_path} (indexed={indexed_md5[:8]}... vs current={current_md5[:8]}...)")
                 python_to_remove.append(rel_path)
                 python_to_add.append((source_id, rel_path, current_md5))
             else:
@@ -2027,13 +2135,18 @@ class RAGIndexManager:
                     _, rel_path = source_id.split("|", 1)
                 else:
                     rel_path = source_id
-                # Convert path to module name: src/reter_code/foo/bar.py -> reter_code.foo.bar
+                # Convert path to module name: reter_code/src/reter_code/foo/bar.py -> reter_code.foo.bar
                 rel_path = rel_path.replace("\\", "/")
                 if rel_path.endswith(".py"):
                     rel_path = rel_path[:-3]
-                # Remove common prefixes like src/
+                # Remove common prefixes like src/, and handle pkg/src/pkg/ pattern
                 if rel_path.startswith("src/"):
                     rel_path = rel_path[4:]
+                elif "/src/" in rel_path:
+                    # Handle pattern like reter_code/src/reter_code/... -> reter_code/...
+                    parts = rel_path.split("/src/", 1)
+                    if len(parts) == 2:
+                        rel_path = parts[1]  # Take part after /src/
                 module_name = rel_path.replace("/", ".")
                 changed_modules.add(module_name)
             debug_log(f"[RAG] _collect_all_python_literals_bulk: filtering by {len(changed_modules)} modules: {list(changed_modules)[:5]}...")
@@ -2157,14 +2270,49 @@ class RAGIndexManager:
         self,
         reter: "ReterWrapper",
         project_root: Path,
-        min_length: int = 32
+        min_length: int = 32,
+        changed_sources: Optional[List[str]] = None
     ) -> Tuple[List[str], List[Dict[str, Any]]]:
         """
-        Collect all JavaScript string literals for batched indexing (without generating embeddings).
+        Collect JavaScript string literals for batched indexing (without generating embeddings).
+
+        Args:
+            reter: RETER wrapper instance
+            project_root: Project root path
+            min_length: Minimum literal length to include
+            changed_sources: If provided, only collect literals from these sources (format: md5|rel_path)
+                           If None, collect ALL literals (for full reindex)
 
         Returns:
             Tuple of (texts, literal_metadata)
         """
+        # Convert source_ids to module names for filtering
+        changed_modules: Optional[set] = None
+        if changed_sources:
+            changed_modules = set()
+            for source_id in changed_sources:
+                if "|" in source_id:
+                    _, rel_path = source_id.split("|", 1)
+                else:
+                    rel_path = source_id
+                # Convert path to module name
+                rel_path = rel_path.replace("\\", "/")
+                # Remove extensions
+                for ext in ('.js', '.ts', '.jsx', '.tsx', '.mjs'):
+                    if rel_path.endswith(ext):
+                        rel_path = rel_path[:-len(ext)]
+                        break
+                # Handle /src/ pattern
+                if rel_path.startswith("src/"):
+                    rel_path = rel_path[4:]
+                elif "/src/" in rel_path:
+                    parts = rel_path.split("/src/", 1)
+                    if len(parts) == 2:
+                        rel_path = parts[1]
+                module_name = rel_path.replace("/", ".")
+                changed_modules.add(module_name)
+            debug_log(f"[RAG] _collect_all_javascript_literals_bulk: filtering by {len(changed_modules)} modules")
+
         try:
             query = """
                 SELECT DISTINCT ?entity ?literal ?module ?line
@@ -2190,6 +2338,10 @@ class RAGIndexManager:
 
         for row in rows:
             entity, literal, module, line = row
+
+            # Filter by changed modules if specified
+            if changed_modules is not None and module not in changed_modules:
+                continue
 
             clean = literal.strip().strip('"\'`')
             if len(clean) < min_length:

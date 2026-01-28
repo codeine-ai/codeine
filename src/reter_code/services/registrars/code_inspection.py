@@ -59,6 +59,9 @@ class CodeInspectionToolsRegistrar(ToolRegistrarBase):
     """
     Registers a unified code_inspection tool with FastMCP.
 
+    @reter: ServiceLayer(self)
+    @reter: Registrar(self)
+
     Uses CADSL tools from cadsl/tools/inspection.
     UML diagrams are available via the 'diagram' tool.
     """

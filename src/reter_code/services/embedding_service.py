@@ -582,6 +582,9 @@ class LightweightEmbeddingService(EmbeddingService):
     """
     Lightweight embedding service for testing without heavy dependencies.
 
+    @reter: ServiceLayer(self)
+    @reter: Service(self)
+
     Uses hash-based embeddings that maintain some semantic properties
     (same text = same embedding) but are NOT suitable for production.
     """

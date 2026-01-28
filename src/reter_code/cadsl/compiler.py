@@ -422,6 +422,9 @@ class ConditionCompiler:
     - String operators: matches, starts_with, ends_with, contains
     - Membership: in [list], in {param}
     - Null checks: is null, is not null
+
+    @reter: DSLLayer(self)
+    @reter: Compiler(self)
     """
 
     def __init__(self):
@@ -661,6 +664,9 @@ class ObjectExprCompiler:
     - Named fields: {name: expr, ...}
     - Spread operator: {...row, extra: value}
     - String interpolation: "text {field}"
+
+    @reter: DSLLayer(self)
+    @reter: Compiler(self)
     """
 
     def __init__(self):

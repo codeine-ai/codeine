@@ -45,7 +45,12 @@ RECOMMENDER_TYPES = {
 
 
 class RecommenderToolsRegistrar(ToolRegistrarBase):
-    """Registers the unified recommender tool with FastMCP."""
+    """
+    Registers the unified recommender tool with FastMCP.
+
+    @reter: ServiceLayer(self)
+    @reter: Registrar(self)
+    """
 
     def __init__(self, instance_manager, persistence_service, default_manager=None, tools_filter=None):
         super().__init__(instance_manager, persistence_service, tools_filter)

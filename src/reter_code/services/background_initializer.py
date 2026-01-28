@@ -33,6 +33,9 @@ class BackgroundInitializer:
     """
     Handles background initialization of the default RETER instance.
 
+    @reter: ServiceLayer(self)
+    @reter: Manager(self)
+
     Runs in a separate thread to avoid blocking MCP server startup.
 
     Phases:
@@ -333,6 +336,9 @@ class BackgroundInitializer:
 class BackgroundSyncTask:
     """
     Handles background file synchronization.
+
+    @reter: ServiceLayer(self)
+    @reter: Task(self)
 
     Triggered when file changes are detected (via file watcher or manual check).
     """

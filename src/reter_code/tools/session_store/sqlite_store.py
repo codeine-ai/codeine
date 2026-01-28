@@ -22,6 +22,9 @@ class SQLiteSessionStore:
     """
     Base class for SQLite-based session storage.
 
+    @reter: ServiceLayer(self)
+    @reter: Repository(self)
+
     Features:
     - Connection pooling with thread-local connections
     - WAL mode for concurrent read/write access

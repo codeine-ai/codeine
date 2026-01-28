@@ -27,43 +27,81 @@ logger = configure_logger_for_debug_trace(__name__)
 # RETER Exception Hierarchy
 # =============================================================================
 class ReterError(Exception):
-    """Base exception for all RETER operations."""
+    """
+    Base exception for all RETER operations.
+
+    @reter: UtilityLayer(self)
+    @reter: Exception(self)
+    """
     pass
 
 
 class ReterFileError(ReterError):
-    """Exception for file-related RETER operations (save/load)."""
+    """
+    Exception for file-related RETER operations (save/load).
+
+    @reter: UtilityLayer(self)
+    @reter: Exception(self)
+    """
     pass
 
 
 class ReterFileNotFoundError(ReterFileError):
-    """Raised when a RETER snapshot file is not found."""
+    """
+    Raised when a RETER snapshot file is not found.
+
+    @reter: UtilityLayer(self)
+    @reter: Exception(self)
+    """
     pass
 
 
 class ReterSaveError(ReterFileError):
-    """Raised when saving RETER network fails."""
+    """
+    Raised when saving RETER network fails.
+
+    @reter: UtilityLayer(self)
+    @reter: Exception(self)
+    """
     pass
 
 
 class ReterLoadError(ReterFileError):
-    """Raised when loading RETER network fails."""
+    """
+    Raised when loading RETER network fails.
+
+    @reter: UtilityLayer(self)
+    @reter: Exception(self)
+    """
     pass
 
 
 class ReterQueryError(ReterError):
-    """Exception for query-related RETER operations."""
+    """
+    Exception for query-related RETER operations.
+
+    @reter: UtilityLayer(self)
+    @reter: Exception(self)
+    """
     pass
 
 
 class ReterOntologyError(ReterError):
-    """Exception for ontology/knowledge loading errors."""
+    """
+    Exception for ontology/knowledge loading errors.
+
+    @reter: UtilityLayer(self)
+    @reter: Exception(self)
+    """
     pass
 
 
 class DefaultInstanceNotInitialised(ReterError):
     """
     Raised when attempting to access RETER before initialization is complete.
+
+    @reter: UtilityLayer(self)
+    @reter: Exception(self)
 
     This exception is thrown by ReterWrapper and RAGIndexManager when:
     - Server is starting up and background initialization hasn't completed

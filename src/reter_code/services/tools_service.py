@@ -36,6 +36,9 @@ class ToolsRegistrar(ToolRegistrarBase):
     """
     Registers all RETER tools directly with FastMCP.
 
+    @reter: ServiceLayer(self)
+    @reter: Registrar(self)
+
     Delegates to specialized registrar classes for each tool category.
     Extends ToolRegistrarBase for common functionality (_get_reter,
     _save_snapshot, _ensure_ontology_loaded).

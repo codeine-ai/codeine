@@ -24,7 +24,12 @@ from enum import Enum
 
 
 class Language(Enum):
-    """Supported programming languages for code analysis."""
+    """
+    Supported programming languages for code analysis.
+
+    @reter: UtilityLayer(self)
+    @reter: ValueObject(self)
+    """
     OO = "oo"           # Object-Oriented meta-ontology (language-independent)
     PYTHON = "py"       # Python
     JAVASCRIPT = "js"   # JavaScript
@@ -68,7 +73,12 @@ LanguageType = Literal["oo", "py", "python", "js", "javascript", "html", "htm", 
 
 @dataclass
 class EntityMapping:
-    """Maps generic OO concepts to language-specific concepts."""
+    """
+    Maps generic OO concepts to language-specific concepts.
+
+    @reter: UtilityLayer(self)
+    @reter: ValueObject(self)
+    """
     oo: str           # Generic OO concept
     py: Optional[str] = None  # Python-specific (defaults to oo)
     js: Optional[str] = None  # JavaScript-specific (defaults to oo)
@@ -94,6 +104,9 @@ class EntityMapping:
 class LanguageSupport:
     """
     Central class for managing language-specific ontology prefixes.
+
+    @reter: UtilityLayer(self)
+    @reter: Utility(self)
 
     This enables language-independent code analysis tools by abstracting
     the ontology prefix (oo:, py:, js:) from the query logic.

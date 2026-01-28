@@ -42,7 +42,12 @@ from ..reter_wrapper import debug_log
 
 @dataclass
 class FileInfo:
-    """Information about a single tracked file."""
+    """
+    Information about a single tracked file.
+
+    @reter: UtilityLayer(self)
+    @reter: ValueObject(self)
+    """
     rel_path: str
     abs_path: str
     md5: str
@@ -78,7 +83,12 @@ class FileInfo:
 
 @dataclass
 class SyncChanges:
-    """Changes detected during sync."""
+    """
+    Changes detected during sync.
+
+    @reter: UtilityLayer(self)
+    @reter: ValueObject(self)
+    """
     to_add: List[FileInfo] = field(default_factory=list)
     to_modify: List[Tuple[FileInfo, FileInfo]] = field(default_factory=list)  # (new_info, old_info)
     to_delete: List[FileInfo] = field(default_factory=list)
@@ -95,6 +105,9 @@ class SyncChanges:
 class SourceStateManager:
     """
     Manages the unified source state JSON file.
+
+    @reter: ServiceLayer(self)
+    @reter: Manager(self)
 
     This is the single source of truth for what's loaded in RETER and RAG.
     """

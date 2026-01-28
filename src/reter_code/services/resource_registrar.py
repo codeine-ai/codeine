@@ -13,6 +13,10 @@ from .documentation_provider import DocumentationProvider
 class ResourceRegistrar:
     """
     Manages MCP resource registration for documentation.
+
+    @reter: ServiceLayer(self)
+    @reter: Registrar(self)
+
     Single Responsibility: Register and serve documentation resources.
     """
 

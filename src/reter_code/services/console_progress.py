@@ -26,7 +26,12 @@ from rich.text import Text
 
 
 class StderrSuppressor:
-    """Context manager to suppress stderr output during progress display."""
+    """
+    Context manager to suppress stderr output during progress display.
+
+    @reter: UtilityLayer(self)
+    @reter: Utility(self)
+    """
 
     def __init__(self):
         self._original_stderr: Optional[TextIO] = None
@@ -49,7 +54,12 @@ class StderrSuppressor:
 
 
 class ConsoleProgress:
-    """Rich-based console progress display for sync operations."""
+    """
+    Rich-based console progress display for sync operations.
+
+    @reter: PresentationLayer(self)
+    @reter: View(self)
+    """
 
     def __init__(self):
         self.console = Console()

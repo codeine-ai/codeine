@@ -28,6 +28,9 @@ class ConditionalStep(Step[T, T]):
 
     If the condition is not met, the step is skipped and data passes through
     unchanged.
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
     inner_step: Step[T, T]
     condition: Callable[[], bool]
@@ -118,6 +121,9 @@ class BranchStep(Step[T, U]):
     A step that branches execution based on a condition.
 
     If condition is true, executes then_step, otherwise executes else_step.
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
     condition: Callable[[T], bool]
     then_step: Step[T, U]
@@ -179,6 +185,9 @@ def branch(
 class MergeStep(Step[Any, List]):
     """
     Merge results from multiple pipelines.
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
     pipelines: List[Pipeline]
     merge_fn: Callable[[List[Any]], Any]
@@ -228,7 +237,11 @@ def merge(*pipelines: Pipeline) -> MergeStep:
 
 @dataclass
 class IdentityStep(Step[T, T]):
-    """Pass-through step that returns input unchanged."""
+    """Pass-through step that returns input unchanged.
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
+    """
 
     def execute(self, data: T) -> PipelineResult[T]:
         return Ok(data)
@@ -252,6 +265,9 @@ class TapStep(Step[T, T]):
     Side-effect step that executes a function without modifying data.
 
     Useful for logging, debugging, or triggering external actions.
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
     fn: Callable[[T], None]
 
@@ -290,6 +306,9 @@ def tap(fn: Callable[[T], None]) -> TapStep[T]:
 class CatchStep(Step[T, T]):
     """
     Error handling step that catches errors and returns a default.
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
     handler: Callable[[Err], T]
 
@@ -331,6 +350,9 @@ class ParallelStep(Step[T, List]):
     Execute multiple steps in parallel on the same input.
 
     Results are collected into a list.
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
     steps: List[Step]
 
@@ -409,6 +431,11 @@ def compose(*steps: Step) -> Step:
     """
     @dataclass
     class ComposedStep(Step):
+        """Composed step that executes inner steps in sequence.
+
+        @reter: DSLLayer(self)
+        @reter: Step(self)
+        """
         inner_steps: List[Step]
 
         def execute(self, data: Any) -> PipelineResult[Any]:

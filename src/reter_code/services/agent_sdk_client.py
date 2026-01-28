@@ -36,14 +36,24 @@ def is_agent_sdk_available() -> bool:
 
 
 class QueryType(Enum):
-    """Types of queries the generator can handle."""
+    """
+    Types of queries the generator can handle.
+
+    @reter: UtilityLayer(self)
+    @reter: ValueObject(self)
+    """
     REQL = "reql"
     CADSL = "cadsl"
 
 
 @dataclass
 class QueryGenerationResult:
-    """Result of query generation."""
+    """
+    Result of query generation.
+
+    @reter: UtilityLayer(self)
+    @reter: ValueObject(self)
+    """
     success: bool
     query: Optional[str]
     tools_used: List[str]
@@ -196,7 +206,7 @@ REQL_SYSTEM_PROMPT_TEMPLATE = """You are a REQL query generator. Generate valid 
 
 **Verification Tools:**
 - `Read` - Read source files to verify results are valid. IMPORTANT: Use paths relative to PROJECT ROOT above.
-- `Grep` - Search codebase to cross-check findings. IMPORTANT: Use paths relative to PROJECT ROOT above.
+- `Grep` - Search codebase to cross-check findings. CRITICAL: ALWAYS specify a `path` parameter to limit search scope (e.g., path="reter_code/src"). Never call Grep without a path - results will exceed buffer limits and fail.
 
 ## ENTITY TYPES (oo: prefix)
 - oo:Class, oo:Method, oo:Function, oo:Module, oo:Import
@@ -259,7 +269,7 @@ CADSL_SYSTEM_PROMPT_TEMPLATE = """You are a CADSL query generator. Your ONLY job
 
 **Verification Tools:**
 - `Read` - Read source files to verify results are valid. IMPORTANT: Use paths relative to PROJECT ROOT above.
-- `Grep` - Search codebase to cross-check findings. IMPORTANT: Use paths relative to PROJECT ROOT above.
+- `Grep` - Search codebase to cross-check findings. CRITICAL: ALWAYS specify a `path` parameter to limit search scope (e.g., path="reter_code/src"). Never call Grep without a path - results will exceed buffer limits and fail.
 
 ## EXAMPLE CATEGORIES (for search_examples / get_example)
 - `smells/` - Code smell detectors (god_class, long_methods, dead_code, magic_numbers...)
@@ -277,18 +287,18 @@ CADSL_SYSTEM_PROMPT_TEMPLATE = """You are a CADSL query generator. Your ONLY job
 Use `create_task` step to generate tasks in RETER session from query results:
 
 ```cadsl
-query generate_tasks() {
-    reql { SELECT ?class ?file ?line WHERE { ?class type oo:Class . ?class inFile ?file . ?class atLine ?line } LIMIT 10 }
-    | create_task {
-        name: "Task for {class}",           // Template with {field} placeholders
+query generate_tasks() {{
+    reql {{ SELECT ?class ?file ?line WHERE {{ ?class type oo:Class . ?class inFile ?file . ?class atLine ?line }} LIMIT 10 }}
+    | create_task {{
+        name: "Task for {{class}}",           // Template with {{field}} placeholders
         category: "annotation",              // annotation, feature, bug, refactor, test, docs, research
         priority: medium,                    // critical, high, medium, low
-        description: "Details: {file}:{line}",
+        description: "Details: {{file}}:{{line}}",
         affects: file,                       // Field name for file path (creates relation)
         dry_run: false                       // true = preview only, false = create tasks
-    }
-    | emit { tasks }
-}
+    }}
+    | emit {{ tasks }}
+}}
 ```
 
 Use create_task when user asks to:
@@ -300,9 +310,9 @@ Use create_task when user asks to:
 Use `python` step for complex logic that can't be expressed in map/filter:
 
 ```cadsl
-query with_python() {
-    reql { SELECT ?class ?file WHERE { ?class type oo:Class . ?class inFile ?file } }
-    | python {{
+query with_python() {{
+    reql {{ SELECT ?class ?file WHERE {{ ?class type oo:Class . ?class inFile ?file }} }}
+    | python {{{{
         # Determine layer based on file path patterns
         for row in rows:
             f = row.get('file', '') or row.get('?file', '')
@@ -311,9 +321,9 @@ query with_python() {
             elif 'cadsl' in f or 'dsl' in f: row['layer'] = 'DSLLayer'
             else: row['layer'] = 'CoreLayer'
         result = rows
-    }}
-    | emit { results }
-}
+    }}}}
+    | emit {{ results }}
+}}
 ```
 
 ## CRITICAL SYNTAX RULES

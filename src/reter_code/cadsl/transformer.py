@@ -27,7 +27,11 @@ from .compiler import (
 
 @dataclass
 class ParamSpec:
-    """Specification for a tool parameter."""
+    """Specification for a tool parameter.
+
+    @reter: DSLLayer(self)
+    @reter: ValueObject(self)
+    """
     name: str
     type: str
     required: bool = False
@@ -41,6 +45,9 @@ class ToolSpec:
     Specification for a CADSL tool.
 
     Contains all the information needed to create and execute a pipeline.
+
+    @reter: DSLLayer(self)
+    @reter: ValueObject(self)
     """
     name: str
     tool_type: str  # "query", "detector", "diagram"
@@ -1596,8 +1603,6 @@ class CADSLTransformer:
                             dry_run_node = param.children[0]
                             if isinstance(dry_run_node, Tree):
                                 result["dry_run"] = dry_run_node.data == "bool_true"
-                        elif param.data == "ct_dry_run_param":
-                            result["dry_run_param"] = str(param.children[0].children[0])
 
         return result
 
@@ -1680,6 +1685,9 @@ class PipelineBuilder:
 
     This separates the AST transformation from Pipeline construction,
     allowing for different target Pipeline implementations.
+
+    @reter: DSLLayer(self)
+    @reter: Builder(self)
     """
 
     def __init__(self):
@@ -2043,6 +2051,9 @@ class WhenStep:
     Conditional step - executes inner step only when condition is true.
 
     Syntax: when { condition } step
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
 
     def __init__(self, condition, inner_step_spec):
@@ -2103,6 +2114,9 @@ class UnlessStep:
     Inverted conditional step - executes inner step only when condition is false.
 
     Syntax: unless { condition } step
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
 
     def __init__(self, condition, inner_step_spec):
@@ -2138,6 +2152,9 @@ class BranchStep:
     Branching step - executes then_step if condition is true, else_step otherwise.
 
     Syntax: branch { condition } then step [else step]
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
 
     def __init__(self, condition, then_step_spec, else_step_spec=None):
@@ -2179,6 +2196,9 @@ class CatchStep:
 
     Note: This step wraps the pipeline execution, catching any errors
     and returning the default value instead.
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
 
     def __init__(self, default_fn):
@@ -2199,6 +2219,9 @@ class ParallelStep:
     Syntax: parallel { step1, step2, ... }
 
     Results from all steps are collected into a list.
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
 
     def __init__(self, step_specs):
@@ -2258,6 +2281,9 @@ class GraphCyclesStep:
     Syntax: graph_cycles { from: field, to: field }
 
     Uses DFS to detect cycles and returns a list of cycles found.
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
 
     def __init__(self, from_field, to_field):
@@ -2328,6 +2354,9 @@ class GraphClosureStep:
     Syntax: graph_closure { from: field, to: field, max_depth: 10 }
 
     Returns all reachable nodes from each source node.
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
 
     def __init__(self, from_field, to_field, max_depth=10):
@@ -2392,6 +2421,9 @@ class GraphTraverseStep:
     Traverse a directed graph using BFS or DFS.
 
     Syntax: graph_traverse { from: field, to: field, algorithm: bfs, max_depth: 10 }
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
 
     def __init__(self, from_field, to_field, algorithm="bfs", max_depth=10, root=None):
@@ -2511,6 +2543,9 @@ class CollectStep:
     Syntax: collect { by: field, name: op(field) }
 
     Operations: set, list, first, last, count, sum, avg, min, max
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
 
     def __init__(self, by: str, fields: dict):
@@ -2581,6 +2616,9 @@ class NestStep:
     Create nested/tree structure from flat data.
 
     Syntax: nest { parent: field, child: field, root: expr, max_depth: 10 }
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
 
     def __init__(self, parent: str, child: str, root=None, max_depth=10, children_key="children"):
@@ -2650,6 +2688,9 @@ class RenderTableStep:
     Render data as formatted table.
 
     Syntax: render_table { format: markdown, columns: [name, count], title: "Summary" }
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
 
     def __init__(self, format="markdown", columns=None, title=None, totals=False,
@@ -2812,6 +2853,9 @@ class RenderChartStep:
     Render data as chart.
 
     Syntax: render_chart { type: bar, x: category, y: count, format: mermaid }
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
 
     def __init__(self, chart_type="bar", x=None, y=None, series=None, title=None,
@@ -2942,6 +2986,9 @@ class RenderMermaidStep:
 
     Syntax: render_mermaid { type: flowchart, nodes: name, edges: from -> to }
     Supports: flowchart, sequence, class, gantt, state, er, pie
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
 
     def __init__(self, mermaid_type, nodes=None, edges_from=None, edges_to=None, direction="TB",
@@ -3245,6 +3292,9 @@ class PivotStep:
     Create a pivot table from data.
 
     Syntax: pivot { rows: field, cols: field, value: field, aggregate: sum }
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
 
     def __init__(self, rows, cols, value, aggregate="sum"):
@@ -3318,6 +3368,9 @@ class ComputeStep:
     Compute new fields using expressions.
 
     Syntax: compute { ratio: a / b, pct: ratio * 100 }
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
 
     def __init__(self, computations):
@@ -3355,6 +3408,9 @@ class JoinStep:
     Syntax: join { left: key, right: source, right_key: key, type: inner }
 
     Supports all PyArrow join types: inner, left, right, outer, semi, anti.
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
 
     def __init__(self, left_key, right_source_spec, right_key, join_type="inner"):
@@ -3504,6 +3560,9 @@ class MergeSource:
     Or with per-source steps: merge { source1 | step1 | step2, source2 | step3 }
 
     Executes all sources (with their steps) and concatenates their results.
+
+    @reter: DSLLayer(self)
+    @reter: Source(self)
     """
 
     def __init__(self, source_specs):
@@ -3637,6 +3696,9 @@ class CrossJoinStep:
 
     Creates all pairs from input rows. With unique_pairs=true, generates (n*(n-1))/2 pairs.
     Uses PyArrow for efficient vectorized operations.
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
 
     def __init__(self, unique_pairs=True, exclude_self=True, left_prefix="left_", right_prefix="right_"):
@@ -3714,6 +3776,9 @@ class SetSimilarityStep:
     - dice: 2 * |intersection| / (|A| + |B|)
     - overlap: |intersection| / min(|A|, |B|)
     - cosine: |intersection| / sqrt(|A| * |B|)
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
 
     def __init__(self, left_col, right_col, sim_type="jaccard", output="similarity",
@@ -3791,6 +3856,9 @@ class StringMatchStep:
     - common_suffix: Check for common suffix only
     - levenshtein: Calculate edit distance (requires output_distance)
     - contains: Check if one contains the other
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
 
     def __init__(self, left_col, right_col, match_type="common_affix", min_length=3,
@@ -3910,6 +3978,9 @@ class RagEnrichStep:
     - "all": Adds array of all matches as rag_matches field
 
     Uses batching for performance optimization.
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
 
     def __init__(self, query_template, top_k=1, threshold=None, mode="best",
@@ -4115,6 +4186,9 @@ class CreateTaskStep:
     - affects: Field name containing file path to mark as affected
     - batch_size: Number of tasks to create per batch
     - dry_run: If true, returns task data without creating tasks
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
 
     def __init__(self, name_template, category="annotation", priority="medium",
@@ -4296,6 +4370,9 @@ class PythonStep:
     - rows: Input data from previous step
     - ctx: Execution context with params
     - result: Must be set to the output value
+
+    @reter: DSLLayer(self)
+    @reter: Step(self)
     """
 
     def __init__(self, code: str):
