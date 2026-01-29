@@ -35,9 +35,9 @@ query list_modules() {
     reql {
         SELECT ?m ?name ?file
         WHERE {
-            ?m type oo:Module .
-            ?m name ?name .
-            ?m inFile ?file
+            ?m type module .
+            ?m has-name ?name .
+            ?m is-in-file ?file
         }
         ORDER BY ?name
         LIMIT {limit}
@@ -57,10 +57,10 @@ detector god_class(category="design", severity="high") {
     reql {
         SELECT ?c ?name (COUNT(?m) AS ?method_count)
         WHERE {
-            ?c type oo:Class .
-            ?c name ?name .
-            ?m type oo:Method .
-            ?m definedIn ?c
+            ?c type class .
+            ?c has-name ?name .
+            ?m type method .
+            ?m is-defined-in ?c
         }
         GROUP BY ?c ?name
         ORDER BY DESC(?method_count)
@@ -84,8 +84,8 @@ detector circular_imports(category="dependencies", severity="high", security="st
     reql {
         SELECT ?m1 ?m2 ?name1 ?name2
         WHERE {
-            ?m1 type oo:Module . ?m1 name ?name1 .
-            ?m2 type oo:Module . ?m2 name ?name2 .
+            ?m1 type module . ?m1 name ?name1 .
+            ?m2 type module . ?m2 name ?name2 .
             ?m1 imports ?m2
         }
     }
@@ -113,11 +113,11 @@ diagram class_hierarchy() {
     reql {
         SELECT ?c ?className ?base ?baseName
         WHERE {
-            ?c type oo:Class .
-            ?c name ?className .
+            ?c type class .
+            ?c has-name ?className .
             OPTIONAL {
-                ?c inheritsFrom ?base .
-                ?base name ?baseName
+                ?c inherits-from ?base .
+                ?base has-name ?baseName
             }
         }
         ORDER BY ?className
@@ -131,12 +131,12 @@ diagram class_hierarchy() {
 MULTIPLE_TOOLS = '''
 query list_classes() {
     param limit: int = 50;
-    reql { SELECT ?c WHERE { ?c type oo:Class } LIMIT {limit} }
+    reql { SELECT ?c WHERE { ?c type class } LIMIT {limit} }
     | emit { classes }
 }
 
 detector empty_class(category="code_smell", severity="low") {
-    reql { SELECT ?c WHERE { ?c type oo:Class } }
+    reql { SELECT ?c WHERE { ?c type class } }
     | filter { method_count == 0 }
     | emit { findings }
 }
@@ -146,7 +146,7 @@ COMPLEX_CONDITIONS = '''
 detector complex_filter(category="test", severity="medium") {
     param threshold: int = 10;
 
-    reql { SELECT ?x ?name ?count WHERE { ?x type oo:Class } }
+    reql { SELECT ?x ?name ?count WHERE { ?x type class } }
     | filter { count > {threshold} and not (name starts_with "_") }
     | filter { name matches "^[A-Z]" or count >= 100 }
     | filter { status in ["active", "pending"] }
@@ -164,7 +164,7 @@ detector broken {
 INVALID_TYPE = '''
 query bad_types() {
     param count: integer = 10;
-    reql { SELECT ?x WHERE { ?x type oo:Class } }
+    reql { SELECT ?x WHERE { ?x type class } }
     | emit { results }
 }
 '''

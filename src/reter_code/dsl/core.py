@@ -176,10 +176,9 @@ class MappedSource(Source[U], Generic[T, U]):
 class REQLSource(Source[pa.Table]):
     """REQL query source - returns PyArrow table for vectorized operations.
 
-    REQL queries must use explicit ontology prefixes for entity types:
-    - oo:Class, oo:Method, oo:Function (language-independent)
-    - py:Class, py:Method (Python-specific)
-    - js:Class, js:Function (JavaScript-specific)
+    REQL queries use plain type names (CNL naming convention):
+    - class, method, function (language-independent)
+    - Predicates use hyphenated format: is-in-file, has-name, is-defined-in
 
     Parameter placeholders like {limit}, {target} are still supported
     and resolved from ctx.params at runtime.

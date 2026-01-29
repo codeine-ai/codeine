@@ -1,6 +1,0 @@
-{
-    "project_include": "src/*,lib/*",
-    "project_exclude": "test_*.py,*_test.py,**/__pycache__/*,**/node_modules/*",
-    "anthropic_model": "claude-opus-4-5-20251101",
-    "anthropic_max_tokens": 1024
-}

@@ -115,10 +115,9 @@ class ArrowSource(ABC):
 class ArrowREQLSource(ArrowSource):
     """REQL query source that returns Arrow table directly.
 
-    REQL queries must use explicit ontology prefixes for entity types:
-    - oo:Class, oo:Method, oo:Function (language-independent)
-    - py:Class, py:Method (Python-specific)
-    - js:Class, js:Function (JavaScript-specific)
+    REQL queries use plain type names (CNL naming convention):
+    - class, method, function (language-independent)
+    - Predicates use hyphenated format: is-in-file, has-name, is-defined-in
 
     @reter: DSLLayer(self)
     @reter: Source(self)

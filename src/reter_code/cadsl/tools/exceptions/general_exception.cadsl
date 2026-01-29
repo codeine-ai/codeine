@@ -11,11 +11,11 @@ detector too_general_exceptions(category="exception_handling", severity="high") 
     reql {
         SELECT ?h ?exception_type ?func_name ?file ?line
         WHERE {
-            ?h type oo:CatchClause .
-            ?h inFile ?file .
-            ?h atLine ?line .
-            ?h exceptionType ?exception_type .
-            OPTIONAL { ?h inFunction ?f . ?f name ?func_name }
+            ?h type catch-clause .
+            ?h is-in-file ?file .
+            ?h is-at-line ?line .
+            ?h exception-type ?exception_type .
+            OPTIONAL { ?h is-in-function ?f . ?f has-name ?func_name }
             FILTER ( ?exception_type = "Exception" || ?exception_type = "BaseException" || ?exception_type = "" )
         }
         ORDER BY ?file ?line

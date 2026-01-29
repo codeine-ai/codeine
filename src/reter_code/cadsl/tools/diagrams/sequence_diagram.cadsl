@@ -14,18 +14,18 @@ diagram sequence_diagram() {
     reql {
         SELECT ?caller ?caller_name ?caller_class ?callee ?callee_name ?callee_class ?file ?line
         WHERE {
-            ?caller type oo:Method .
-            ?caller name ?caller_name .
-            ?caller definedIn ?cc .
-            ?cc name ?caller_class .
-            ?caller inFile ?file .
-            ?caller atLine ?line .
+            ?caller type method .
+            ?caller has-name ?caller_name .
+            ?caller is-defined-in ?cc .
+            ?cc has-name ?caller_class .
+            ?caller is-in-file ?file .
+            ?caller is-at-line ?line .
             ?caller calls ?callee .
-            ?callee type oo:Method .
-            ?callee name ?callee_name .
+            ?callee type method .
+            ?callee has-name ?callee_name .
             OPTIONAL {
-                ?callee definedIn ?tc .
-                ?tc name ?callee_class
+                ?callee is-defined-in ?tc .
+                ?tc has-name ?callee_class
             }
         }
         ORDER BY ?caller_class ?caller_name

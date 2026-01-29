@@ -10,13 +10,13 @@ detector public_api_untested(category="test_coverage", severity="high") {
     reql {
         SELECT ?e ?name ?entity_type ?file ?line
         WHERE {
-            { ?e type oo:Class } UNION { ?e type oo:Function }
-            ?e name ?name .
-            ?e inFile ?file .
-            ?e atLine ?line .
+            { ?e type class } UNION { ?e type function }
+            ?e has-name ?name .
+            ?e is-in-file ?file .
+            ?e is-at-line ?line .
             ?e isExported true .
             FILTER ( !REGEX(?name, "^_") && !REGEX(?file, "test_") )
-            MINUS { ?test calls ?e . ?test inFile ?test_file . FILTER ( REGEX(?test_file, "test_") ) }
+            MINUS { ?test calls ?e . ?test is-in-file ?test_file . FILTER ( REGEX(?test_file, "test_") ) }
         }
         ORDER BY ?entity_type ?name
         LIMIT {limit}

@@ -23,14 +23,14 @@ diagram call_graph() {
             }
             UNION
             {
-                ?caller maybeCalls ?callee .
+                ?caller maybe-calls ?callee .
                 BIND("maybe" AS ?call_type)
             }
-            ?caller name ?caller_name .
-            ?caller inFile ?file .
-            ?caller atLine ?line .
+            ?caller has-name ?caller_name .
+            ?caller is-in-file ?file .
+            ?caller is-at-line ?line .
             ?caller concept ?caller_type .
-            ?callee name ?callee_name .
+            ?callee has-name ?callee_name .
             ?callee concept ?callee_type .
             FILTER(CONTAINS(?caller_type, "Method") || CONTAINS(?caller_type, "Function"))
             FILTER(CONTAINS(?callee_type, "Method") || CONTAINS(?callee_type, "Function"))

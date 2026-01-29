@@ -13,12 +13,12 @@ detector inline_method(category="refactoring", severity="low") {
     reql {
         SELECT ?m ?name ?class_name ?file ?line ?line_count (COUNT(?caller) AS ?caller_count)
         WHERE {
-            ?m type oo:Method .
-            ?m name ?name .
-            ?m inFile ?file .
-            ?m atLine ?line .
-            ?m lineCount ?line_count .
-            OPTIONAL { ?m definedIn ?c . ?c name ?class_name }
+            ?m type method .
+            ?m has-name ?name .
+            ?m is-in-file ?file .
+            ?m is-at-line ?line .
+            ?m has-line-count ?line_count .
+            OPTIONAL { ?m is-defined-in ?c . ?c has-name ?class_name }
             OPTIONAL { ?caller calls ?m }
         }
         GROUP BY ?m ?name ?class_name ?file ?line ?line_count

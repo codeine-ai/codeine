@@ -11,11 +11,11 @@ detector generic_exception_raising(category="exception_handling", severity="medi
     reql {
         SELECT ?r ?exception_type ?func_name ?file ?line
         WHERE {
-            ?r type oo:ThrowStatement .
-            ?r inFile ?file .
-            ?r atLine ?line .
-            ?r exceptionType ?exception_type .
-            OPTIONAL { ?r inFunction ?f . ?f name ?func_name }
+            ?r type throw-statement .
+            ?r is-in-file ?file .
+            ?r is-at-line ?line .
+            ?r exception-type ?exception_type .
+            OPTIONAL { ?r is-in-function ?f . ?f has-name ?func_name }
             FILTER ( ?exception_type = "Exception" )
         }
         ORDER BY ?file ?line

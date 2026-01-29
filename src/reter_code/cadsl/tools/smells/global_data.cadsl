@@ -11,13 +11,13 @@ detector global_data(category="code_smell", severity="high") {
     reql {
         SELECT ?a ?target ?value ?module ?line
         WHERE {
-            ?a type oo:Assignment .
+            ?a type assignment .
             ?a target ?target .
-            ?a inModule ?module .
-            OPTIONAL { ?a value ?value }
-            OPTIONAL { ?a atLine ?line }
-            MINUS { ?a inFunction ?f }
-            MINUS { ?a inClass ?c }
+            ?a is-in-module ?module .
+            OPTIONAL { ?a has-value ?value }
+            OPTIONAL { ?a is-at-line ?line }
+            MINUS { ?a is-in-function ?f }
+            MINUS { ?a is-in-class ?c }
             FILTER ( !STRSTARTS(?target, "_") )
             FILTER ( !REGEX(?target, "^[A-Z_]+$") )
         }

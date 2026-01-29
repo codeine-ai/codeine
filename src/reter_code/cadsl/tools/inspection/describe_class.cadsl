@@ -13,12 +13,12 @@ query describe_class() {
     reql {
         SELECT ?c ?name ?file ?line ?docstring ?parent_name
         WHERE {
-            ?c type oo:Class .
-            ?c name ?name .
-            ?c inFile ?file .
-            ?c atLine ?line .
-            OPTIONAL { ?c docstring ?docstring }
-            OPTIONAL { ?c inheritsFrom ?parent . ?parent name ?parent_name }
+            ?c type class .
+            ?c has-name ?name .
+            ?c is-in-file ?file .
+            ?c is-at-line ?line .
+            OPTIONAL { ?c has-docstring ?docstring }
+            OPTIONAL { ?c inherits-from ?parent . ?parent has-name ?parent_name }
             FILTER ( CONTAINS(STR(?c), "{target}") || ?name = "{target}" )
         }
     }

@@ -12,12 +12,12 @@ detector slide_statements(category="refactoring", severity="low") {
     reql {
         SELECT ?m ?name ?class_name ?file ?line ?loc
         WHERE {
-            ?m type oo:Method .
-            ?m name ?name .
-            ?m inFile ?file .
-            ?m atLine ?line .
-            ?m lineCount ?loc .
-            OPTIONAL { ?m definedIn ?c . ?c name ?class_name }
+            ?m type method .
+            ?m has-name ?name .
+            ?m is-in-file ?file .
+            ?m is-at-line ?line .
+            ?m has-line-count ?loc .
+            OPTIONAL { ?m is-defined-in ?c . ?c has-name ?class_name }
             FILTER ( REGEX(?file, "\\.py$") )
             FILTER ( ?loc >= {min_lines} )
         }

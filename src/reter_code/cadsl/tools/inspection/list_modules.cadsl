@@ -11,9 +11,9 @@ query list_modules() {
     reql {
         SELECT ?m ?name ?file
         WHERE {
-            ?m type oo:Module .
-            ?m name ?name .
-            ?m inFile ?file
+            ?m type module .
+            ?m has-name ?name .
+            ?m is-in-file ?file
         }
         ORDER BY ?file
         LIMIT {limit}

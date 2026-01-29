@@ -14,13 +14,13 @@ detector api_surface_review(category="api", severity="info") {
     reql {
         SELECT ?m ?name ?file ?line ?line_count ?class_name ?param_count
         WHERE {
-            ?m type oo:Method .
-            ?m name ?name .
-            ?m inFile ?file .
-            ?m atLine ?line .
-            ?m definedIn ?c .
-            ?c name ?class_name .
-            OPTIONAL { ?m lineCount ?line_count }
+            ?m type method .
+            ?m has-name ?name .
+            ?m is-in-file ?file .
+            ?m is-at-line ?line .
+            ?m is-defined-in ?c .
+            ?c has-name ?class_name .
+            OPTIONAL { ?m has-line-count ?line_count }
             FILTER ( !REGEX(?name, "^_") )
             FILTER ( !REGEX(?file, "test_") )
         }

@@ -10,15 +10,15 @@ query get_type_hints() {
     reql {
         SELECT ?e ?entity_name ?entity_type ?param_name ?param_type ?return_type ?file ?line
         WHERE {
-            { ?e type oo:Method } UNION { ?e type oo:Function }
-            ?e name ?entity_name .
-            ?e inFile ?file .
-            ?e atLine ?line .
-            OPTIONAL { ?e returnType ?return_type }
+            { ?e type method } UNION { ?e type function }
+            ?e has-name ?entity_name .
+            ?e is-in-file ?file .
+            ?e is-at-line ?line .
+            OPTIONAL { ?e has-return-type ?return_type }
             OPTIONAL {
-                ?e hasParameter ?p .
-                ?p name ?param_name .
-                ?p typeAnnotation ?param_type
+                ?e has-parameter ?p .
+                ?p has-name ?param_name .
+                ?p has-type-annotation ?param_type
             }
         }
         ORDER BY ?file ?line

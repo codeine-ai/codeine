@@ -15,19 +15,19 @@ detector pull_up_method(category="refactoring", severity="medium") {
     reql {
         SELECT ?m1 ?name1 ?name2 ?class1 ?class2 ?parent_class ?file ?line
         WHERE {
-            ?m1 type oo:Method .
-            ?m1 name ?name1 .
-            ?m1 inFile ?file .
-            ?m1 atLine ?line .
-            ?m1 definedIn ?c1 .
-            ?c1 name ?class1 .
-            ?m2 type oo:Method .
-            ?m2 name ?name2 .
-            ?m2 definedIn ?c2 .
-            ?c2 name ?class2 .
-            ?c1 inheritsFrom ?parent .
-            ?c2 inheritsFrom ?parent .
-            ?parent name ?parent_class .
+            ?m1 type method .
+            ?m1 has-name ?name1 .
+            ?m1 is-in-file ?file .
+            ?m1 is-at-line ?line .
+            ?m1 is-defined-in ?c1 .
+            ?c1 has-name ?class1 .
+            ?m2 type method .
+            ?m2 has-name ?name2 .
+            ?m2 is-defined-in ?c2 .
+            ?c2 has-name ?class2 .
+            ?c1 inherits-from ?parent .
+            ?c2 inherits-from ?parent .
+            ?parent has-name ?parent_class .
             FILTER(?c1 != ?c2)
             FILTER(?m1 != ?m2)
             FILTER(LEVENSHTEIN(?name1, ?name2) <= {max_name_distance})
@@ -72,19 +72,19 @@ detector pull_up_method_fast(category="refactoring", severity="medium") {
     reql {
         SELECT ?m1 ?name1 ?name2 ?class1 ?class2 ?parent_class ?file ?line
         WHERE {
-            ?m1 type oo:Method .
-            ?m1 name ?name1 .
-            ?m1 inFile ?file .
-            ?m1 atLine ?line .
-            ?m1 definedIn ?c1 .
-            ?c1 name ?class1 .
-            ?m2 type oo:Method .
-            ?m2 name ?name2 .
-            ?m2 definedIn ?c2 .
-            ?c2 name ?class2 .
-            ?c1 inheritsFrom ?parent .
-            ?c2 inheritsFrom ?parent .
-            ?parent name ?parent_class .
+            ?m1 type method .
+            ?m1 has-name ?name1 .
+            ?m1 is-in-file ?file .
+            ?m1 is-at-line ?line .
+            ?m1 is-defined-in ?c1 .
+            ?c1 has-name ?class1 .
+            ?m2 type method .
+            ?m2 has-name ?name2 .
+            ?m2 is-defined-in ?c2 .
+            ?c2 has-name ?class2 .
+            ?c1 inherits-from ?parent .
+            ?c2 inherits-from ?parent .
+            ?parent has-name ?parent_class .
             FILTER(?c1 != ?c2)
             FILTER(?m1 != ?m2)
             FILTER(LEVENSHTEIN(?name1, ?name2) <= {max_name_distance})

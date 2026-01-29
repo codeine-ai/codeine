@@ -11,12 +11,12 @@ detector error_codes_over_exceptions(category="exception_handling", severity="me
     reql {
         SELECT ?f ?name ?file ?line ?return_pattern
         WHERE {
-            { ?f type oo:Function } UNION { ?f type oo:Method }
-            ?f name ?name .
-            ?f inFile ?file .
-            ?f atLine ?line .
-            ?f returnsErrorCode true .
-            OPTIONAL { ?f returnPattern ?return_pattern }
+            { ?f type function } UNION { ?f type method }
+            ?f has-name ?name .
+            ?f is-in-file ?file .
+            ?f is-at-line ?line .
+            ?f returns-error-code true .
+            OPTIONAL { ?f return-pattern ?return_pattern }
         }
         ORDER BY ?file ?line
         LIMIT {limit}

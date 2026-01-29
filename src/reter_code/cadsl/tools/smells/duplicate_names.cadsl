@@ -17,12 +17,12 @@ detector duplicate_names(category="code_smell", severity="medium") {
     reql {
         SELECT ?name1 ?file1 ?name2 ?file2
         WHERE {
-            ?e1 type oo:Class .
-            ?e1 name ?name1 .
-            ?e1 inFile ?file1 .
-            ?e2 type oo:Class .
-            ?e2 name ?name2 .
-            ?e2 inFile ?file2 .
+            ?e1 type class .
+            ?e1 has-name ?name1 .
+            ?e1 is-in-file ?file1 .
+            ?e2 type class .
+            ?e2 has-name ?name2 .
+            ?e2 is-in-file ?file2 .
             FILTER(?e1 != ?e2)
             FILTER(?file1 != ?file2)
             FILTER(LEVENSHTEIN(?name1, ?name2) <= {max_distance})
@@ -64,12 +64,12 @@ detector duplicate_names_fast(category="code_smell", severity="medium") {
     reql {
         SELECT ?name1 ?file1 ?name2 ?file2
         WHERE {
-            ?e1 type oo:Class .
-            ?e1 name ?name1 .
-            ?e1 inFile ?file1 .
-            ?e2 type oo:Class .
-            ?e2 name ?name2 .
-            ?e2 inFile ?file2 .
+            ?e1 type class .
+            ?e1 has-name ?name1 .
+            ?e1 is-in-file ?file1 .
+            ?e2 type class .
+            ?e2 has-name ?name2 .
+            ?e2 is-in-file ?file2 .
             FILTER(?e1 != ?e2)
             FILTER(?file1 != ?file2)
             FILTER(LEVENSHTEIN(?name1, ?name2) <= {max_distance})

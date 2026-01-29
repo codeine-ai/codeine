@@ -20,7 +20,7 @@ Example:
         return (
             p.reql('''
                 SELECT ?m ?name ?file
-                WHERE { ?m type oo:Module . ?m name ?name . ?m inFile ?file }
+                WHERE { ?m type module . ?m has-name ?name . ?m is-in-file ?file }
             ''')
             .select(name="name", file="file", qualified_name="m")
             .order_by("file")

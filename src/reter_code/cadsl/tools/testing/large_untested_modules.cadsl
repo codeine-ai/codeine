@@ -11,8 +11,8 @@ detector large_untested_modules(category="test_coverage", severity="medium") {
     reql {
         SELECT ?file (COUNT(?class) AS ?class_count)
         WHERE {
-            ?class type oo:Class .
-            ?class inFile ?file .
+            ?class type class .
+            ?class is-in-file ?file .
             FILTER ( !REGEX(?file, "test_|tests/|_test\\.py") )
         }
         GROUP BY ?file

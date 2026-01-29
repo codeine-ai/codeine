@@ -14,12 +14,12 @@ detector data_class(category="design", severity="low") {
     reql {
         SELECT ?c ?name ?file ?line (COUNT(?attr) AS ?attr_count) (COUNT(?method) AS ?method_count)
         WHERE {
-            ?c type oo:Class .
-            ?c name ?name .
-            ?c inFile ?file .
-            ?c atLine ?line .
-            OPTIONAL { ?attr type oo:Field . ?attr definedIn ?c }
-            OPTIONAL { ?method type oo:Method . ?method definedIn ?c }
+            ?c type class .
+            ?c has-name ?name .
+            ?c is-in-file ?file .
+            ?c is-at-line ?line .
+            OPTIONAL { ?attr type field . ?attr is-defined-in ?c }
+            OPTIONAL { ?method type method . ?method is-defined-in ?c }
         }
         GROUP BY ?c ?name ?file ?line
         HAVING (?attr_count >= {min_attributes} && ?method_count <= {max_methods})

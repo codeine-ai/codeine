@@ -12,12 +12,12 @@ detector long_parameter_list(category="complexity", severity="low") {
     reql {
         SELECT ?m ?name ?file ?line (COUNT(?param) AS ?param_count)
         WHERE {
-            { ?m type oo:Method } UNION { ?m type oo:Function }
-            ?m name ?name .
-            ?m inFile ?file .
-            ?m atLine ?line .
-            ?param type oo:Parameter .
-            ?param ofFunction ?m
+            { ?m type method } UNION { ?m type function }
+            ?m has-name ?name .
+            ?m is-in-file ?file .
+            ?m is-at-line ?line .
+            ?param type parameter .
+            ?param is-of-function ?m
         }
         GROUP BY ?m ?name ?file ?line
         HAVING (?param_count > {max_params})

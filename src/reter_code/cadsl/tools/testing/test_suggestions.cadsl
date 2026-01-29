@@ -13,16 +13,16 @@ detector test_suggestions(category="test_coverage", severity="medium") {
     reql {
         SELECT ?m ?name ?class_name ?file ?line
         WHERE {
-            ?m type oo:Method .
-            ?m name ?name .
-            ?m definedIn ?c . ?c name ?class_name .
-            ?m inFile ?file .
-            ?m atLine ?line .
+            ?m type method .
+            ?m has-name ?name .
+            ?m is-defined-in ?c . ?c has-name ?class_name .
+            ?m is-in-file ?file .
+            ?m is-at-line ?line .
             FILTER (!STRSTARTS(?name, "_"))
             FILTER (!REGEX(?file, "test"))
             FILTER NOT EXISTS {
                 ?test calls ?m .
-                ?test inFile ?test_file .
+                ?test is-in-file ?test_file .
                 FILTER (REGEX(?test_file, "test"))
             }
         }
@@ -59,16 +59,16 @@ detector test_suggestions_fast(category="test_coverage", severity="medium") {
     reql {
         SELECT ?m ?name ?class_name ?file ?line
         WHERE {
-            ?m type oo:Method .
-            ?m name ?name .
-            ?m definedIn ?c . ?c name ?class_name .
-            ?m inFile ?file .
-            ?m atLine ?line .
+            ?m type method .
+            ?m has-name ?name .
+            ?m is-defined-in ?c . ?c has-name ?class_name .
+            ?m is-in-file ?file .
+            ?m is-at-line ?line .
             FILTER (!STRSTARTS(?name, "_"))
             FILTER (!REGEX(?file, "test"))
             FILTER NOT EXISTS {
                 ?test calls ?m .
-                ?test inFile ?test_file .
+                ?test is-in-file ?test_file .
                 FILTER (REGEX(?test_file, "test"))
             }
         }

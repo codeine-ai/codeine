@@ -11,11 +11,11 @@ detector find_interface_implementations(category="patterns", severity="info") {
     reql {
         SELECT ?c ?class_name ?parent_name ?file ?line
         WHERE {
-            ?c type oo:Class .
-            ?c name ?class_name .
-            ?c inFile ?file .
-            ?c atLine ?line .
-            ?c inheritsFrom ?parent_name .
+            ?c type class .
+            ?c has-name ?class_name .
+            ?c is-in-file ?file .
+            ?c is-at-line ?line .
+            ?c inherits-from ?parent_name .
             FILTER ( REGEX(?parent_name, "Base|Abstract|ABC|Interface|Protocol") )
         }
         ORDER BY ?parent_name ?class_name

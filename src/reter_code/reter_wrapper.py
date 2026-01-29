@@ -424,9 +424,9 @@ class ReterWrapper:
         """
         Load the Object-Oriented meta-ontology first.
 
-        This ontology defines language-independent OO concepts (oo:Class, oo:Function,
-        oo:Method, etc.) that language-specific ontologies extend. Must be loaded
-        before Python and JavaScript ontologies.
+        This ontology defines language-independent OO concepts (class, function,
+        method, etc.) using CNL naming conventions. Must be loaded before
+        Python and JavaScript ontologies.
 
         Loaded with source "oo_ontology" for potential selective forgetting.
         """
@@ -474,7 +474,7 @@ class ReterWrapper:
         try:
             # Get path to CNL ontology file relative to this module
             # Resources are now inside the package: src/reter_code/resources/
-            ontology_path = Path(__file__).parent / "resources" / "python" / "py_ontology.cnl"
+            ontology_path = Path(__file__).parent / "resources" / "py_ontology.cnl"
             debug_log(f"Ontology path: {ontology_path}")
 
             if ontology_path.exists():
@@ -515,7 +515,7 @@ class ReterWrapper:
         try:
             # Get path to CNL ontology file relative to this module
             # Resources are now inside the package: src/reter_code/resources/
-            ontology_path = Path(__file__).parent / "resources" / "javascript" / "js_ontology.cnl"
+            ontology_path = Path(__file__).parent / "resources" / "js_ontology.cnl"
             debug_log(f"JavaScript ontology path: {ontology_path}")
 
             if ontology_path.exists():
@@ -556,7 +556,7 @@ class ReterWrapper:
         try:
             # Get path to CNL ontology file relative to this module
             # Resources are now inside the package: src/reter_code/resources/
-            ontology_path = Path(__file__).parent / "resources" / "html" / "html_ontology.cnl"
+            ontology_path = Path(__file__).parent / "resources" / "html_ontology.cnl"
             debug_log(f"HTML ontology path: {ontology_path}")
 
             if ontology_path.exists():
@@ -597,7 +597,7 @@ class ReterWrapper:
         try:
             # Get path to CNL ontology file relative to this module
             # Resources are now inside the package: src/reter_code/resources/
-            ontology_path = Path(__file__).parent / "resources" / "csharp" / "cs_ontology.cnl"
+            ontology_path = Path(__file__).parent / "resources" / "cs_ontology.cnl"
             debug_log(f"C# ontology path: {ontology_path}")
 
             if ontology_path.exists():
@@ -639,7 +639,7 @@ class ReterWrapper:
         try:
             # Get path to CNL ontology file relative to this module
             # Resources are now inside the package: src/reter_code/resources/
-            ontology_path = Path(__file__).parent / "resources" / "cpp" / "cpp_ontology.cnl"
+            ontology_path = Path(__file__).parent / "resources" / "cpp_ontology.cnl"
             debug_log(f"C++ ontology path: {ontology_path}")
 
             if ontology_path.exists():

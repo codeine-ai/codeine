@@ -1347,7 +1347,7 @@ class RAGIndexManager:
             for i, (source_id, rel_path, md5_hash) in enumerate(python_to_add):
                 try:
                     debug_log(f"[RAG] sync_sources: Collecting Python [{i+1}/{total_python}]: {rel_path}")
-                    # Convert rel_path to inFile format (keep extension)
+                    # Convert rel_path to is-in-file format (keep extension)
                     in_file = rel_path.replace("\\", "/")
                     entities = entities_by_file.get(in_file, [])
                     if entities:
@@ -1401,7 +1401,7 @@ class RAGIndexManager:
             for i, (source_id, rel_path, md5_hash) in enumerate(javascript_to_add):
                 try:
                     debug_log(f"[RAG] sync_sources: Collecting JavaScript [{i+1}/{total_javascript}]: {rel_path}")
-                    # Convert rel_path to inFile format (JavaScript keeps extension)
+                    # Convert rel_path to is-in-file format (JavaScript keeps extension)
                     in_file = rel_path.replace("\\", "/")
                     entities = js_entities_by_file.get(in_file, [])
                     if entities:
@@ -1442,7 +1442,7 @@ class RAGIndexManager:
             for i, (source_id, rel_path, md5_hash) in enumerate(html_to_add):
                 try:
                     debug_log(f"[RAG] sync_sources: Collecting HTML [{i+1}/{total_html}]: {rel_path}")
-                    # Convert rel_path to inDocument format (keeps extension)
+                    # Convert rel_path to is-in-document format (keeps extension)
                     in_doc = rel_path.replace("\\", ".").replace("/", ".")
                     entities = html_entities_by_file.get(in_doc, [])
                     if entities:
@@ -1474,7 +1474,7 @@ class RAGIndexManager:
             for i, (source_id, rel_path, md5_hash) in enumerate(csharp_to_add):
                 try:
                     debug_log(f"[RAG] sync_sources: Collecting C# [{i+1}/{total_csharp}]: {rel_path}")
-                    # Convert rel_path to inFile format (keep extension)
+                    # Convert rel_path to is-in-file format (keep extension)
                     in_file = rel_path.replace("\\", "/")
                     entities = csharp_entities_by_file.get(in_file, [])
                     if entities:
@@ -1506,7 +1506,7 @@ class RAGIndexManager:
             for i, (source_id, rel_path, md5_hash) in enumerate(cpp_to_add):
                 try:
                     debug_log(f"[RAG] sync_sources: Collecting C++ [{i+1}/{total_cpp}]: {rel_path}")
-                    # Convert rel_path to inFile format (keep extension)
+                    # Convert rel_path to is-in-file format (keep extension)
                     in_file = rel_path.replace("\\", "/")
                     entities = cpp_entities_by_file.get(in_file, [])
                     if entities:
@@ -1712,9 +1712,9 @@ class RAGIndexManager:
         else:
             prefix = "py"  # fallback
 
-        # Convert source_id to inFile format
+        # Convert source_id to is-in-file format
         # source_id format: "md5hash|path\\to\\file.py" or "md5hash|path\\to\\file.js" or "md5hash|path\\to\\file.cs"
-        # inFile format: "path.to.file.ext" (all languages keep extension)
+        # is-in-file format: "path.to.file.ext" (all languages keep extension)
         if "|" in source_id:
             _, rel_path = source_id.split("|", 1)
         else:
@@ -1729,12 +1729,12 @@ class RAGIndexManager:
         class_query = f'''
         SELECT DISTINCT ?entity ?name ?line ?endLine ?docstring
         WHERE {{
-            ?entity inFile "{in_file}" .
-            ?entity type {prefix}:Class .
-            ?entity name ?name .
-            ?entity atLine ?line .
-            ?entity endLine ?endLine .
-            OPTIONAL {{ ?entity hasDocstring ?docstring }}
+            ?entity is-in-file "{in_file}" .
+            ?entity type class .
+            ?entity has-name ?name .
+            ?entity is-at-line ?line .
+            ?entity has-end-line ?endLine .
+            OPTIONAL {{ ?entity has-docstring ?docstring }}
         }}
         '''
         try:
@@ -1762,17 +1762,17 @@ class RAGIndexManager:
             logger.debug(f"Class query failed for {source_id}: {e}")
 
         # Query methods
-        # Note: definedIn is required (not OPTIONAL) because REQL OPTIONAL doesn't return bound values
+        # Note: is-defined-in is required (not OPTIONAL) because REQL OPTIONAL doesn't return bound values
         method_query = f'''
         SELECT DISTINCT ?entity ?name ?line ?endLine ?docstring ?className
         WHERE {{
-            ?entity inFile "{in_file}" .
-            ?entity type {prefix}:Method .
-            ?entity name ?name .
-            ?entity atLine ?line .
-            ?entity endLine ?endLine .
-            ?entity definedIn ?className .
-            OPTIONAL {{ ?entity hasDocstring ?docstring }}
+            ?entity is-in-file "{in_file}" .
+            ?entity type method .
+            ?entity has-name ?name .
+            ?entity is-at-line ?line .
+            ?entity has-end-line ?endLine .
+            ?entity is-defined-in ?className .
+            OPTIONAL {{ ?entity has-docstring ?docstring }}
         }}
         '''
         try:
@@ -1802,17 +1802,17 @@ class RAGIndexManager:
             logger.debug(f"Method query failed for {source_id}: {e}")
 
         # Query functions (excluding methods - methods are already indexed separately)
-        # Note: py:Method is_subclass_of py:Function, so we need to exclude methods
+        # Note: method is_subclass_of function, so we need to exclude methods
         func_query = f'''
         SELECT DISTINCT ?entity ?name ?line ?endLine ?docstring
         WHERE {{
-            ?entity inFile "{in_file}" .
-            ?entity type {prefix}:Function .
-            ?entity name ?name .
-            ?entity atLine ?line .
-            ?entity endLine ?endLine .
-            OPTIONAL {{ ?entity hasDocstring ?docstring }}
-            FILTER(NOT EXISTS {{ ?entity type {prefix}:Method }})
+            ?entity is-in-file "{in_file}" .
+            ?entity type function .
+            ?entity has-name ?name .
+            ?entity is-at-line ?line .
+            ?entity has-end-line ?endLine .
+            OPTIONAL {{ ?entity has-docstring ?docstring }}
+            FILTER(NOT EXISTS {{ ?entity type method }})
         }}
         '''
         try:
@@ -2155,9 +2155,9 @@ class RAGIndexManager:
             query = """
                 SELECT DISTINCT ?entity ?literal ?module ?line
                 WHERE {
-                    ?entity hasStringLiteral ?literal .
-                    ?entity inModule ?module .
-                    ?entity atLine ?line
+                    ?entity has-string-literal ?literal .
+                    ?entity is-in-module ?module .
+                    ?entity is-at-line ?line
                 }
             """
             result = reter.reql(query, timeout_ms=60000)
@@ -2317,10 +2317,10 @@ class RAGIndexManager:
             query = """
                 SELECT DISTINCT ?entity ?literal ?module ?line
                 WHERE {
-                    ?entity hasStringLiteral ?literal .
-                    ?entity inModule ?module .
-                    ?entity atLine ?line .
-                    ?entity type js:Function
+                    ?entity has-string-literal ?literal .
+                    ?entity is-in-module ?module .
+                    ?entity is-at-line ?line .
+                    ?entity type function
                 }
             """
             result = reter.reql(query, timeout_ms=60000)
@@ -2817,7 +2817,7 @@ class RAGIndexManager:
         """
         entities = []
 
-        # Convert source_id to inFile format
+        # Convert source_id to is-in-file format
         if "|" in source_id:
             _, rel_path = source_id.split("|", 1)
         else:
@@ -2832,11 +2832,11 @@ class RAGIndexManager:
         script_query = f'''
         SELECT DISTINCT ?entity ?name ?line ?content
         WHERE {{
-            ?entity inDocument "{in_file}" .
-            ?entity type html:Script .
-            OPTIONAL {{ ?entity name ?name }}
-            OPTIONAL {{ ?entity atLine ?line }}
-            OPTIONAL {{ ?entity scriptContent ?content }}
+            ?entity is-in-document "{in_file}" .
+            ?entity type script .
+            OPTIONAL {{ ?entity has-name ?name }}
+            OPTIONAL {{ ?entity is-at-line ?line }}
+            OPTIONAL {{ ?entity has-content ?content }}
         }}
         '''
         try:
@@ -2857,11 +2857,11 @@ class RAGIndexManager:
         handler_query = f'''
         SELECT DISTINCT ?entity ?event ?handler ?line
         WHERE {{
-            ?entity inDocument "{in_file}" .
-            ?entity type html:EventHandler .
-            OPTIONAL {{ ?entity event ?event }}
-            OPTIONAL {{ ?entity handler ?handler }}
-            OPTIONAL {{ ?entity atLine ?line }}
+            ?entity is-in-document "{in_file}" .
+            ?entity type event-handler .
+            OPTIONAL {{ ?entity has-event-name ?event }}
+            OPTIONAL {{ ?entity has-handler-code ?handler }}
+            OPTIONAL {{ ?entity is-at-line ?line }}
         }}
         '''
         try:
@@ -2885,12 +2885,12 @@ class RAGIndexManager:
         form_query = f'''
         SELECT DISTINCT ?entity ?name ?action ?method ?line
         WHERE {{
-            ?entity inDocument "{in_file}" .
-            ?entity type html:Form .
-            OPTIONAL {{ ?entity name ?name }}
-            OPTIONAL {{ ?entity action ?action }}
-            OPTIONAL {{ ?entity method ?method }}
-            OPTIONAL {{ ?entity atLine ?line }}
+            ?entity is-in-document "{in_file}" .
+            ?entity type form .
+            OPTIONAL {{ ?entity has-name ?name }}
+            OPTIONAL {{ ?entity has-action ?action }}
+            OPTIONAL {{ ?entity has-method ?method }}
+            OPTIONAL {{ ?entity is-at-line ?line }}
         }}
         '''
         try:
@@ -2913,19 +2913,19 @@ class RAGIndexManager:
 
         # Query framework directives (Vue, Angular, HTMX, Alpine)
         for framework, concept in [
-            ("vue", "html:VueDirective"),
-            ("angular", "html:AngularDirective"),
-            ("htmx", "html:HtmxAttribute"),
-            ("alpine", "html:AlpineDirective"),
+            ("vue", "vue-directive"),
+            ("angular", "angular-directive"),
+            ("htmx", "htmx-attribute"),
+            ("alpine", "alpine-directive"),
         ]:
             directive_query = f'''
             SELECT DISTINCT ?entity ?directive ?value ?line
             WHERE {{
-                ?entity inDocument "{in_file}" .
+                ?entity is-in-document "{in_file}" .
                 ?entity type {concept} .
-                OPTIONAL {{ ?entity directive ?directive }}
-                OPTIONAL {{ ?entity value ?value }}
-                OPTIONAL {{ ?entity atLine ?line }}
+                OPTIONAL {{ ?entity has-directive-name ?directive }}
+                OPTIONAL {{ ?entity has-directive-value ?value }}
+                OPTIONAL {{ ?entity is-at-line ?line }}
             }}
             '''
             try:
@@ -3205,9 +3205,9 @@ class RAGIndexManager:
             query = f"""
                 SELECT DISTINCT ?entity ?literal ?entityName
                 WHERE {{
-                    ?entity hasStringLiteral ?literal .
-                    ?entity inModule ?module .
-                    ?entity name ?entityName .
+                    ?entity has-string-literal ?literal .
+                    ?entity is-in-module ?module .
+                    ?entity has-name ?entityName .
                     FILTER(CONTAINS(?module, "{module_name}"))
                 }}
             """
@@ -3315,9 +3315,9 @@ class RAGIndexManager:
             query = """
                 SELECT DISTINCT ?entity ?literal ?entityName ?module
                 WHERE {
-                    ?entity hasStringLiteral ?literal .
-                    ?entity inModule ?module .
-                    ?entity name ?entityName .
+                    ?entity has-string-literal ?literal .
+                    ?entity is-in-module ?module .
+                    ?entity has-name ?entityName .
                 }
             """
             result = reter.reql(query, timeout_ms=60000)  # Longer timeout for bulk
@@ -3458,9 +3458,9 @@ class RAGIndexManager:
             query = f"""
                 SELECT DISTINCT ?entity ?literal ?entityName
                 WHERE {{
-                    ?entity hasStringLiteral ?literal .
-                    ?entity inModule ?module .
-                    ?entity name ?entityName .
+                    ?entity has-string-literal ?literal .
+                    ?entity is-in-module ?module .
+                    ?entity has-name ?entityName .
                     FILTER(CONTAINS(?module, "{module_name}"))
                 }}
             """
@@ -3568,9 +3568,9 @@ class RAGIndexManager:
             query = """
                 SELECT DISTINCT ?entity ?literal ?entityName ?module
                 WHERE {
-                    ?entity hasStringLiteral ?literal .
-                    ?entity inModule ?module .
-                    ?entity name ?entityName .
+                    ?entity has-string-literal ?literal .
+                    ?entity is-in-module ?module .
+                    ?entity has-name ?entityName .
                     FILTER(CONTAINS(?module, ".js") || CONTAINS(?module, ".mjs") || CONTAINS(?module, ".cjs"))
                 }
             """
@@ -3926,12 +3926,12 @@ class RAGIndexManager:
         class_query = f'''
         SELECT DISTINCT ?entity ?name ?line ?endLine ?docstring ?inFile
         WHERE {{
-            ?entity type {prefix}:Class .
-            ?entity name ?name .
-            ?entity atLine ?line .
-            ?entity inFile ?inFile .
-            ?entity endLine ?endLine .
-            OPTIONAL {{ ?entity hasDocstring ?docstring }}
+            ?entity type class .
+            ?entity has-name ?name .
+            ?entity is-at-line ?line .
+            ?entity is-in-file ?inFile .
+            ?entity has-end-line ?endLine .
+            OPTIONAL {{ ?entity has-docstring ?docstring }}
         }}
         '''
         try:
@@ -3968,13 +3968,13 @@ class RAGIndexManager:
         method_query = f'''
         SELECT DISTINCT ?entity ?name ?line ?endLine ?docstring ?className ?inFile
         WHERE {{
-            ?entity type {prefix}:Method .
-            ?entity name ?name .
-            ?entity atLine ?line .
-            ?entity inFile ?inFile .
-            ?entity endLine ?endLine .
-            ?entity definedIn ?className .
-            OPTIONAL {{ ?entity hasDocstring ?docstring }}
+            ?entity type method .
+            ?entity has-name ?name .
+            ?entity is-at-line ?line .
+            ?entity is-in-file ?inFile .
+            ?entity has-end-line ?endLine .
+            ?entity is-defined-in ?className .
+            OPTIONAL {{ ?entity has-docstring ?docstring }}
         }}
         '''
         try:
@@ -4013,13 +4013,13 @@ class RAGIndexManager:
         func_query = f'''
         SELECT DISTINCT ?entity ?name ?line ?endLine ?docstring ?inFile
         WHERE {{
-            ?entity type {prefix}:Function .
-            ?entity name ?name .
-            ?entity atLine ?line .
-            ?entity inFile ?inFile .
-            ?entity endLine ?endLine .
-            OPTIONAL {{ ?entity hasDocstring ?docstring }}
-            FILTER(NOT EXISTS {{ ?entity type {prefix}:Method }})
+            ?entity type function .
+            ?entity has-name ?name .
+            ?entity is-at-line ?line .
+            ?entity is-in-file ?inFile .
+            ?entity has-end-line ?endLine .
+            OPTIONAL {{ ?entity has-docstring ?docstring }}
+            FILTER(NOT EXISTS {{ ?entity type method }})
         }}
         '''
         try:
@@ -4057,7 +4057,7 @@ class RAGIndexManager:
         """
         Query ALL HTML entities from RETER in bulk.
 
-        Returns dict mapping inDocument -> list of entities
+        Returns dict mapping is-in-document -> list of entities
         """
         entities_by_file: Dict[str, List[Dict[str, Any]]] = {}
 
@@ -4066,11 +4066,11 @@ class RAGIndexManager:
         script_query = '''
         SELECT DISTINCT ?entity ?name ?line ?content ?inDocument
         WHERE {
-            ?entity type html:Script .
-            ?entity inDocument ?inDocument .
-            OPTIONAL { ?entity name ?name }
-            OPTIONAL { ?entity atLine ?line }
-            OPTIONAL { ?entity scriptContent ?content }
+            ?entity type script .
+            ?entity is-in-document ?inDocument .
+            OPTIONAL { ?entity has-name ?name }
+            OPTIONAL { ?entity is-at-line ?line }
+            OPTIONAL { ?entity has-content ?content }
         }
         '''
         try:
@@ -4097,11 +4097,11 @@ class RAGIndexManager:
         handler_query = '''
         SELECT DISTINCT ?entity ?event ?handler ?line ?inDocument
         WHERE {
-            ?entity type html:EventHandler .
-            ?entity inDocument ?inDocument .
-            OPTIONAL { ?entity event ?event }
-            OPTIONAL { ?entity handler ?handler }
-            OPTIONAL { ?entity atLine ?line }
+            ?entity type event-handler .
+            ?entity is-in-document ?inDocument .
+            OPTIONAL { ?entity has-event-name ?event }
+            OPTIONAL { ?entity has-handler-code ?handler }
+            OPTIONAL { ?entity is-at-line ?line }
         }
         '''
         try:
@@ -4131,12 +4131,12 @@ class RAGIndexManager:
         form_query = '''
         SELECT DISTINCT ?entity ?name ?action ?method ?line ?inDocument
         WHERE {
-            ?entity type html:Form .
-            ?entity inDocument ?inDocument .
-            OPTIONAL { ?entity name ?name }
-            OPTIONAL { ?entity action ?action }
-            OPTIONAL { ?entity method ?method }
-            OPTIONAL { ?entity atLine ?line }
+            ?entity type form .
+            ?entity is-in-document ?inDocument .
+            OPTIONAL { ?entity has-name ?name }
+            OPTIONAL { ?entity has-action ?action }
+            OPTIONAL { ?entity has-method ?method }
+            OPTIONAL { ?entity is-at-line ?line }
         }
         '''
         try:
@@ -4164,20 +4164,20 @@ class RAGIndexManager:
 
         # Bulk query framework directives
         for framework, concept in [
-            ("vue", "html:VueDirective"),
-            ("angular", "html:AngularDirective"),
-            ("htmx", "html:HtmxAttribute"),
-            ("alpine", "html:AlpineDirective"),
+            ("vue", "vue-directive"),
+            ("angular", "angular-directive"),
+            ("htmx", "htmx-attribute"),
+            ("alpine", "alpine-directive"),
         ]:
             debug_log(f"[RAG] _query_all_html_entities_bulk: Querying all {framework} directives...")
             directive_query = f'''
             SELECT DISTINCT ?entity ?directive ?value ?line ?inDocument
             WHERE {{
                 ?entity type {concept} .
-                ?entity inDocument ?inDocument .
-                OPTIONAL {{ ?entity directive ?directive }}
-                OPTIONAL {{ ?entity value ?value }}
-                OPTIONAL {{ ?entity atLine ?line }}
+                ?entity is-in-document ?inDocument .
+                OPTIONAL {{ ?entity has-directive-name ?directive }}
+                OPTIONAL {{ ?entity has-directive-value ?value }}
+                OPTIONAL {{ ?entity is-at-line ?line }}
             }}
             '''
             try:

@@ -12,27 +12,27 @@ detector flag_arguments(category="code_smell", severity="medium") {
         SELECT ?func ?name ?file ?line ?param_name ?class_name
         WHERE {
             {
-                ?func type oo:Function .
-                ?func name ?name .
-                ?func inFile ?file .
-                ?func atLine ?line .
-                ?param ofFunction ?func .
-                ?param name ?param_name .
-                ?param paramType ?ptype .
+                ?func type function .
+                ?func has-name ?name .
+                ?func is-in-file ?file .
+                ?func is-at-line ?line .
+                ?param is-of-function ?func .
+                ?param has-name ?param_name .
+                ?param has-param-type ?ptype .
                 FILTER ( ?ptype = "bool" || ?ptype = "boolean" )
-                OPTIONAL { ?func definedIn ?c . ?c name ?class_name }
+                OPTIONAL { ?func is-defined-in ?c . ?c has-name ?class_name }
             }
             UNION
             {
-                ?func type oo:Method .
-                ?func name ?name .
-                ?func inFile ?file .
-                ?func atLine ?line .
-                ?param ofFunction ?func .
-                ?param name ?param_name .
-                ?param paramType ?ptype .
+                ?func type method .
+                ?func has-name ?name .
+                ?func is-in-file ?file .
+                ?func is-at-line ?line .
+                ?param is-of-function ?func .
+                ?param has-name ?param_name .
+                ?param has-param-type ?ptype .
                 FILTER ( ?ptype = "bool" || ?ptype = "boolean" )
-                OPTIONAL { ?func definedIn ?c . ?c name ?class_name }
+                OPTIONAL { ?func is-defined-in ?c . ?c has-name ?class_name }
             }
         }
         ORDER BY ?file ?line

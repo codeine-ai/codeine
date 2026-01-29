@@ -11,18 +11,18 @@ detector find_factory_pattern(category="patterns", severity="info") {
         SELECT ?e ?name ?entity_type ?file ?line ?creates_type
         WHERE {
             {
-                ?e type oo:Method .
-                ?e isFactoryMethod true
+                ?e type method .
+                ?e is-factory-method true
             }
             UNION
             {
-                ?e type oo:Class .
-                ?e isFactoryClass true
+                ?e type class .
+                ?e is-factory-class true
             }
-            ?e name ?name .
-            ?e inFile ?file .
-            ?e atLine ?line .
-            OPTIONAL { ?e createsType ?creates_type }
+            ?e has-name ?name .
+            ?e is-in-file ?file .
+            ?e is-at-line ?line .
+            OPTIONAL { ?e creates-type ?creates_type }
         }
         ORDER BY ?entity_type ?name
         LIMIT {limit}

@@ -16,17 +16,17 @@ The Python fact extraction (`PythonFactExtractionVisitor.cpp`) emits the followi
 
 | Property | Type | Description | Emitted For |
 |----------|------|-------------|-------------|
-| `atLine` | int | Start line number | Class, Function, Method |
-| `endLine` | int | End line number | Class, Function, Method |
-| `lineCount` | int | `endLine - atLine + 1` | Class, Function, Method |
+| `is-at-line` | int | Start line number | Class, Function, Method |
+| `has-end-line` | int | End line number | Class, Function, Method |
+| `has-line-count` | int | `endLine - atLine + 1` | Class, Function, Method |
 
 **Usage in REQL:**
 ```sql
 SELECT ?m ?name ?line_count
 WHERE {
-    ?m type oo:Method .
-    ?m name ?name .
-    ?m lineCount ?line_count .
+    ?m type method .
+    ?m has-name ?name .
+    ?m has-line-count ?line_count .
 }
 FILTER { ?line_count > 50 }
 ```
@@ -49,10 +49,10 @@ FILTER { ?method_count > 15 }
 ```sql
 SELECT ?c ?name (COUNT(?method) AS ?method_count)
 WHERE {
-    ?c type oo:Class .
-    ?c name ?name .
-    ?method type oo:Method .
-    ?method definedIn ?c .
+    ?c type class .
+    ?c has-name ?name .
+    ?method type method .
+    ?method is-defined-in ?c .
 }
 GROUP BY ?c ?name
 HAVING (?method_count > 15)
@@ -69,10 +69,10 @@ HAVING (?method_count > 15)
 ```sql
 SELECT ?m ?name (COUNT(?param) AS ?param_count)
 WHERE {
-    ?m type oo:Method .
-    ?m name ?name .
-    ?param type oo:Parameter .
-    ?param ofFunction ?m .
+    ?m type method .
+    ?m has-name ?name .
+    ?param type parameter .
+    ?param is-of-function ?m .
 }
 GROUP BY ?m ?name
 HAVING (?param_count > 5)
@@ -89,10 +89,10 @@ HAVING (?param_count > 5)
 ```sql
 SELECT ?c ?name (COUNT(?attr) AS ?attr_count)
 WHERE {
-    ?c type oo:Class .
-    ?c name ?name .
-    ?attr type oo:Field .
-    ?attr definedIn ?c .
+    ?c type class .
+    ?c has-name ?name .
+    ?attr type field .
+    ?attr is-defined-in ?c .
 }
 GROUP BY ?c ?name
 ```
@@ -108,8 +108,8 @@ GROUP BY ?c ?name
 ```sql
 SELECT ?m ?name (COUNT(?caller) AS ?caller_count)
 WHERE {
-    ?m type oo:Method .
-    ?m name ?name .
+    ?m type method .
+    ?m has-name ?name .
     ?caller calls ?m .
 }
 GROUP BY ?m ?name
@@ -126,8 +126,8 @@ GROUP BY ?m ?name
 ```sql
 SELECT ?m ?name (COUNT(?callee) AS ?fanout)
 WHERE {
-    ?m type oo:Method .
-    ?m name ?name .
+    ?m type method .
+    ?m has-name ?name .
     ?m calls ?callee .
 }
 GROUP BY ?m ?name
@@ -144,9 +144,9 @@ GROUP BY ?m ?name
 ```sql
 SELECT ?c ?name (COUNT(?sub) AS ?subclass_count)
 WHERE {
-    ?c type oo:Class .
-    ?c name ?name .
-    ?sub inheritsFrom ?c .
+    ?c type class .
+    ?c has-name ?name .
+    ?sub inherits-from ?c .
 }
 GROUP BY ?c ?name
 ```
@@ -157,11 +157,11 @@ GROUP BY ?c ?name
 ```sql
 SELECT ?c ?name (COUNT(?setter) AS ?setter_count)
 WHERE {
-    ?c type oo:Class .
-    ?c name ?name .
-    ?setter type oo:Method .
-    ?setter definedIn ?c .
-    ?setter name ?setter_name .
+    ?c type class .
+    ?c has-name ?name .
+    ?setter type method .
+    ?setter is-defined-in ?c .
+    ?setter has-name ?setter_name .
     FILTER { STRSTARTS(?setter_name, "set_") || STRSTARTS(?setter_name, "set") }
 }
 GROUP BY ?c ?name
@@ -202,25 +202,25 @@ includes the parameter signature: `module.Class.method(ParamType1,ParamType2)`.
 
 | Property | Description | Available For |
 |----------|-------------|---------------|
-| `name` | Entity name | All entities |
-| `inFile` | Source file path | All entities |
-| `atLine` | Start line | All entities |
-| `endLine` | End line | Class, Function, Method |
-| `lineCount` | Line count | Class, Function, Method |
-| `definedIn` | Parent class | Method, Field |
-| `inheritsFrom` | Parent class(es) | Class |
-| `hasMethod` | Class has method | Class |
-| `hasAttribute` | Class has attribute | Class |
-| `hasParameter` | Function has param | Function, Method |
+| `has-name` | Entity name | All entities |
+| `is-in-file` | Source file path | All entities |
+| `is-at-line` | Start line | All entities |
+| `has-end-line` | End line | Class, Function, Method |
+| `has-line-count` | Line count | Class, Function, Method |
+| `is-defined-in` | Parent class | Method, Field |
+| `inherits-from` | Parent class(es) | Class |
+| `has-method` | Class has method | Class |
+| `has-attribute` | Class has attribute | Class |
+| `has-parameter` | Function has param | Function, Method |
 | `calls` | Calls target | Function, Method |
 | `imports` | Imports module | Module |
-| `returnType` | Return type annotation | Function, Method |
-| `typeAnnotation` | Type annotation | Parameter |
-| `hasType` | Type annotation | Attribute/Field |
-| `hasDecorator` | Decorator name | Function, Method, Class |
-| `hasDocstring` | Has docstring | Function, Method, Class |
-| `isAsync` | Async function | Function, Method |
-| `isAbstract` | Abstract method | Method |
+| `has-return-type` | Return type annotation | Function, Method |
+| `has-type-annotation` | Type annotation | Parameter |
+| `has-type` | Type annotation | Attribute/Field |
+| `has-decorator` | Decorator name | Function, Method, Class |
+| `has-docstring` | Has docstring | Function, Method, Class |
+| `is-async` | Async function | Function, Method |
+| `is-abstract` | Abstract method | Method |
 
 ---
 
@@ -233,27 +233,27 @@ Some metrics not directly emitted can be computed via REQL patterns:
 ```sql
 SELECT ?c1 ?class1 ?c2 ?class2 (COUNT(?shared_name) AS ?shared_methods)
 WHERE {
-    ?c1 type oo:Class . ?c1 name ?class1 .
-    ?c2 type oo:Class . ?c2 name ?class2 .
-    ?m1 type oo:Method . ?m1 definedIn ?c1 . ?m1 name ?shared_name .
-    ?m2 type oo:Method . ?m2 definedIn ?c2 . ?m2 name ?shared_name .
+    ?c1 type class . ?c1 has-name ?class1 .
+    ?c2 type class . ?c2 has-name ?class2 .
+    ?m1 type method . ?m1 is-defined-in ?c1 . ?m1 has-name ?shared_name .
+    ?m2 type method . ?m2 is-defined-in ?c2 . ?m2 has-name ?shared_name .
     FILTER { ?c1 != ?c2 }
 }
 GROUP BY ?c1 ?class1 ?c2 ?class2
 HAVING (?shared_methods >= 3)
 ```
 
-### Global variables (via Assignment without inFunction)
+### Global variables (via Assignment without is-in-function)
 
 ```sql
 SELECT ?a ?target ?file ?line
 WHERE {
-    ?a type {Assignment} .
-    ?a target ?target .
-    ?a inFile ?file .
-    ?a atLine ?line .
-    FILTER NOT EXISTS { ?a inFunction ?f }
-    FILTER NOT EXISTS { ?a inClass ?c }
+    ?a type assignment .
+    ?a has-target ?target .
+    ?a is-in-file ?file .
+    ?a is-at-line ?line .
+    FILTER NOT EXISTS { ?a is-in-function ?f }
+    FILTER NOT EXISTS { ?a is-in-class ?c }
 }
 ```
 
@@ -333,12 +333,12 @@ WHERE {
 reql('''
     SELECT ?c ?name ?file ?line (COUNT(?method) AS ?method_count)
     WHERE {
-        ?c type oo:Class .
-        ?c name ?name .
-        ?c inFile ?file .
-        ?c atLine ?line .
-        ?method type oo:Method .
-        ?method definedIn ?c .
+        ?c type class .
+        ?c has-name ?name .
+        ?c is-in-file ?file .
+        ?c is-at-line ?line .
+        ?method type method .
+        ?method is-defined-in ?c .
     }
     GROUP BY ?c ?name ?file ?line
     HAVING (?method_count >= {min_methods})
@@ -352,12 +352,12 @@ reql('''
 reql('''
     SELECT ?c ?name ?file ?line (COUNT(?method) AS ?method_count) (COUNT(?attr) AS ?attr_count)
     WHERE {
-        ?c type oo:Class .
-        ?c name ?name .
-        ?c inFile ?file .
-        ?c atLine ?line .
-        OPTIONAL { ?method type oo:Method . ?method definedIn ?c }
-        OPTIONAL { ?attr type oo:Field . ?attr definedIn ?c }
+        ?c type class .
+        ?c has-name ?name .
+        ?c is-in-file ?file .
+        ?c is-at-line ?line .
+        OPTIONAL { ?method type method . ?method is-defined-in ?c }
+        OPTIONAL { ?attr type field . ?attr is-defined-in ?c }
     }
     GROUP BY ?c ?name ?file ?line
     HAVING (?attr_count >= {min_attributes} && ?method_count <= {max_methods})
@@ -370,13 +370,13 @@ reql('''
 reql('''
     SELECT ?c ?name ?file ?line (COUNT(?setter) AS ?setter_count)
     WHERE {
-        ?c type oo:Class .
-        ?c name ?name .
-        ?c inFile ?file .
-        ?c atLine ?line .
-        ?setter type oo:Method .
-        ?setter definedIn ?c .
-        ?setter name ?setter_name .
+        ?c type class .
+        ?c has-name ?name .
+        ?c is-in-file ?file .
+        ?c is-at-line ?line .
+        ?setter type method .
+        ?setter is-defined-in ?c .
+        ?setter has-name ?setter_name .
         FILTER { STRSTARTS(?setter_name, "set_") || STRSTARTS(?setter_name, "set") }
     }
     GROUP BY ?c ?name ?file ?line
@@ -390,13 +390,13 @@ reql('''
 reql('''
     SELECT ?m ?name ?file ?line (COUNT(?primitive_param) AS ?primitive_params)
     WHERE {
-        ?m type oo:Method .
-        ?m name ?name .
-        ?m inFile ?file .
-        ?m atLine ?line .
-        ?primitive_param type oo:Parameter .
-        ?primitive_param ofFunction ?m .
-        ?primitive_param typeAnnotation ?ptype .
+        ?m type method .
+        ?m has-name ?name .
+        ?m is-in-file ?file .
+        ?m is-at-line ?line .
+        ?primitive_param type parameter .
+        ?primitive_param is-of-function ?m .
+        ?primitive_param has-type-annotation ?ptype .
         FILTER { REGEX(?ptype, "^(str|int|float|bool|bytes)$") }
     }
     GROUP BY ?m ?name ?file ?line
@@ -404,17 +404,17 @@ reql('''
 ''')
 ```
 
-### Pattern 5: Direct lineCount Query (parser emits this)
+### Pattern 5: Direct has-line-count Query (parser emits this)
 
 ```python
 reql('''
     SELECT ?m ?name ?file ?line ?line_count
     WHERE {
-        ?m type oo:Method .
-        ?m name ?name .
-        ?m inFile ?file .
-        ?m atLine ?line .
-        ?m lineCount ?line_count .
+        ?m type method .
+        ?m has-name ?name .
+        ?m is-in-file ?file .
+        ?m is-at-line ?line .
+        ?m has-line-count ?line_count .
     }
     FILTER { ?line_count > {max_lines} }
 ''')
@@ -445,7 +445,7 @@ When REQL alone can't express the computation, use `.tap()` with Python function
 ```python
 reql('''
     SELECT ?module1 ?module2 ?file1 ?file2
-    WHERE { ?m1 imports ?m2 . ... }
+    WHERE { ?m1 imports ?m2 }
 ''')
 .tap(lambda rows: _detect_cycles_dfs(rows))
 .emit("findings")
@@ -480,8 +480,8 @@ def _detect_cycles_dfs(rows):
 
 ```python
 reql('''
-    SELECT ?c ?class_name ?method_name ...
-    WHERE { ?m definedIn ?c . ?m name ?method_name . }
+    SELECT ?c ?class_name ?method_name
+    WHERE { ?m is-defined-in ?c . ?m has-name ?method_name }
 ''')
 .tap(lambda rows: _find_similar_classes(rows))
 
@@ -509,7 +509,7 @@ def _find_similar_classes(rows):
 
 ```python
 reql('''
-    SELECT ?name ?type ?file WHERE { ?e name ?name . ?e inFile ?file }
+    SELECT ?name ?type ?file WHERE { ?e has-name ?name . ?e is-in-file ?file }
 ''')
 .tap(lambda rows: _group_and_count(rows))
 

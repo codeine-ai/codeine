@@ -13,21 +13,21 @@ query find_callees() {
     reql {
         SELECT ?callee ?callee_name ?callee_file ?callee_line ?call_type
         WHERE {
-            ?caller type oo:Method .
-            ?caller name "{target}" .
+            ?caller type method .
+            ?caller has-name "{target}" .
             {
                 ?caller calls ?callee .
                 BIND("static" AS ?call_type)
             }
             UNION
             {
-                ?caller maybeCalls ?callee .
+                ?caller maybe-calls ?callee .
                 BIND("maybe" AS ?call_type)
             }
-            ?callee type oo:Method .
-            ?callee name ?callee_name .
-            ?callee inFile ?callee_file .
-            ?callee atLine ?callee_line
+            ?callee type method .
+            ?callee has-name ?callee_name .
+            ?callee is-in-file ?callee_file .
+            ?callee is-at-line ?callee_line
         }
         ORDER BY ?callee_file
         LIMIT {limit}

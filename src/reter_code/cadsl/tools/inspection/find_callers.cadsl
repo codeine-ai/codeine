@@ -12,20 +12,20 @@ query find_callers() {
     reql {
         SELECT ?caller ?caller_name ?caller_file ?caller_line ?callee ?call_type
         WHERE {
-            { ?caller type oo:Method } UNION { ?caller type oo:Function }
+            { ?caller type method } UNION { ?caller type function }
             {
                 ?caller calls ?callee .
                 BIND("static" AS ?call_type)
             }
             UNION
             {
-                ?caller maybeCalls ?callee .
+                ?caller maybe-calls ?callee .
                 BIND("maybe" AS ?call_type)
             }
             FILTER(CONTAINS(?callee, "{target}"))
-            ?caller name ?caller_name .
-            ?caller inFile ?caller_file .
-            ?caller atLine ?caller_line
+            ?caller has-name ?caller_name .
+            ?caller is-in-file ?caller_file .
+            ?caller is-at-line ?caller_line
         }
     }
     | select { caller_name, caller_file, caller_line, callee, call_type, qualified_name: caller }

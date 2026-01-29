@@ -10,11 +10,11 @@ detector find_test_fixtures(category="test_coverage", severity="info") {
     reql {
         SELECT ?f ?name ?file ?line ?decorator
         WHERE {
-            ?f type oo:Function .
-            ?f name ?name .
-            ?f inFile ?file .
-            ?f atLine ?line .
-            ?f hasDecorator ?decorator .
+            ?f type function .
+            ?f has-name ?name .
+            ?f is-in-file ?file .
+            ?f is-at-line ?line .
+            ?f has-decorator ?decorator .
             FILTER ( CONTAINS(?decorator, "fixture") )
         }
         ORDER BY ?file ?name

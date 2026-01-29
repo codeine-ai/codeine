@@ -13,17 +13,17 @@ detector complex_untested(category="test_coverage", severity="high") {
     reql {
         SELECT ?e ?name ?class_name ?file ?line ?line_count
         WHERE {
-            { ?e type oo:Method } UNION { ?e type oo:Function }
-            ?e name ?name .
-            ?e inFile ?file .
-            ?e atLine ?line .
-            ?e lineCount ?line_count .
-            OPTIONAL { ?e definedIn ?c . ?c name ?class_name }
+            { ?e type method } UNION { ?e type function }
+            ?e has-name ?name .
+            ?e is-in-file ?file .
+            ?e is-at-line ?line .
+            ?e has-line-count ?line_count .
+            OPTIONAL { ?e is-defined-in ?c . ?c has-name ?class_name }
             FILTER ( ?line_count >= {min_lines} )
             FILTER ( !REGEX(?file, "test") )
             FILTER NOT EXISTS {
                 ?test calls ?e .
-                ?test inFile ?test_file .
+                ?test is-in-file ?test_file .
                 FILTER ( REGEX(?test_file, "test") )
             }
         }
@@ -62,17 +62,17 @@ detector complex_untested_fast(category="test_coverage", severity="high") {
     reql {
         SELECT ?e ?name ?class_name ?file ?line ?line_count
         WHERE {
-            { ?e type oo:Method } UNION { ?e type oo:Function }
-            ?e name ?name .
-            ?e inFile ?file .
-            ?e atLine ?line .
-            ?e lineCount ?line_count .
-            OPTIONAL { ?e definedIn ?c . ?c name ?class_name }
+            { ?e type method } UNION { ?e type function }
+            ?e has-name ?name .
+            ?e is-in-file ?file .
+            ?e is-at-line ?line .
+            ?e has-line-count ?line_count .
+            OPTIONAL { ?e is-defined-in ?c . ?c has-name ?class_name }
             FILTER ( ?line_count >= {min_lines} )
             FILTER ( !REGEX(?file, "test") )
             FILTER NOT EXISTS {
                 ?test calls ?e .
-                ?test inFile ?test_file .
+                ?test is-in-file ?test_file .
                 FILTER ( REGEX(?test_file, "test") )
             }
         }

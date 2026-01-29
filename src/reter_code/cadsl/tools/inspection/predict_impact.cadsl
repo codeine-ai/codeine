@@ -14,21 +14,21 @@ query predict_impact() {
     reql {
         SELECT ?dependent ?dep_name ?dep_file ?dep_line ?call_type
         WHERE {
-            ?t name "{target}" .
-            ?t type oo:Method .
-            ?dependent type oo:Method .
+            ?t has-name "{target}" .
+            ?t type method .
+            ?dependent type method .
             {
                 ?dependent calls ?t .
                 BIND("definite" AS ?call_type)
             }
             UNION
             {
-                ?dependent maybeCalls ?t .
+                ?dependent maybe-calls ?t .
                 BIND("possible" AS ?call_type)
             }
-            ?dependent name ?dep_name .
-            ?dependent inFile ?dep_file .
-            ?dependent atLine ?dep_line
+            ?dependent has-name ?dep_name .
+            ?dependent is-in-file ?dep_file .
+            ?dependent is-at-line ?dep_line
         }
         ORDER BY ?dep_file
         LIMIT {limit}

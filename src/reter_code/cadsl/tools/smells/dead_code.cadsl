@@ -9,17 +9,17 @@ detector dead_code(category="maintenance", severity="low") {
     param include_private: bool = false;
     param limit: int = 100;
 
-    # Only use oo:Method to avoid double-counting (entities have both py:Method and oo:Method)
-    # Check both 'calls' (static resolution) and 'maybeCalls' (probabilistic resolution)
+    # Only use method to avoid double-counting (entities have both method and method)
+    # Check both 'calls' (static resolution) and 'maybe-calls' (probabilistic resolution)
     reql {
         SELECT ?e ?name ?file ?line
         WHERE {
-            ?e type oo:Method .
-            ?e name ?name .
-            ?e inFile ?file .
-            ?e atLine ?line .
+            ?e type method .
+            ?e has-name ?name .
+            ?e is-in-file ?file .
+            ?e is-at-line ?line .
             FILTER NOT EXISTS {
-                { ?caller calls ?e } UNION { ?caller maybeCalls ?e }
+                { ?caller calls ?e } UNION { ?caller maybe-calls ?e }
             }
             FILTER ( !REGEX(?name, "^__") )
             FILTER ( {include_private} || !REGEX(?name, "^_") )

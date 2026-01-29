@@ -199,8 +199,8 @@ execute_cadsl('''
         reql {
             SELECT ?c ?name (COUNT(?m) AS ?method_count)
             WHERE {
-                ?c type oo:Class . ?c name ?name .
-                ?m type oo:Method . ?m definedIn ?c
+                ?c type class . ?c has-name ?name .
+                ?m type method . ?m is-defined-in ?c
             }
             GROUP BY ?c ?name
             HAVING (?method_count > 10)
@@ -277,7 +277,7 @@ operations={
 ```python
 operations={
     "assert": "Person(alice)\nage(alice, 25)",
-    "query": "SELECT ?c WHERE { ?c a py:Class }",
+    "query": "SELECT ?c WHERE { ?c a class }",
     "python_file": "/path/to/file.py",
     "forget_source": "source_id_to_forget"
 }
@@ -448,7 +448,7 @@ thinking(
 **WRONG:**
 ```python
 # Complex REQL that may have syntax errors
-reql(query="SELECT ?c WHERE { ?c a py:Class . ?c py:hasMethod ?m . ?m py:hasName '__init__' }")
+reql(query="SELECT ?c WHERE { ?c type class . ?c has-method ?m . ?m has-name '__init__' }")
 ```
 
 **RIGHT:**

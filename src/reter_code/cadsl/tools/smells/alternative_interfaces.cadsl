@@ -13,14 +13,14 @@ detector alternative_interfaces(category="code_smell", severity="medium") {
     reql {
         SELECT ?c1 ?class1 ?file1 ?line1 ?c2 ?class2 ?file2 ?line2
         WHERE {
-            ?c1 type oo:Class .
-            ?c1 name ?class1 .
-            ?c1 inFile ?file1 .
-            ?c1 atLine ?line1 .
-            ?c2 type oo:Class .
-            ?c2 name ?class2 .
-            ?c2 inFile ?file2 .
-            ?c2 atLine ?line2 .
+            ?c1 type class .
+            ?c1 has-name ?class1 .
+            ?c1 is-in-file ?file1 .
+            ?c1 is-at-line ?line1 .
+            ?c2 type class .
+            ?c2 has-name ?class2 .
+            ?c2 is-in-file ?file2 .
+            ?c2 is-at-line ?line2 .
             FILTER(?c1 != ?c2)
             FILTER(?class1 != ?class2)
             FILTER(LEVENSHTEIN(?class1, ?class2) <= {max_name_distance})

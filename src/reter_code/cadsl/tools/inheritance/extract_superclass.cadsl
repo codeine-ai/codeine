@@ -14,22 +14,22 @@ detector extract_superclass_candidates(category="inheritance", severity="medium"
     reql {
         SELECT ?c1 ?class1 ?c2 ?class2 ?file1 ?line1 ?name1 ?name2
         WHERE {
-            ?c1 type oo:Class .
-            ?c1 name ?class1 .
-            ?c1 inFile ?file1 .
-            ?c1 atLine ?line1 .
-            ?c2 type oo:Class .
-            ?c2 name ?class2 .
-            ?m1 type oo:Method .
-            ?m1 definedIn ?c1 .
-            ?m1 name ?name1 .
-            ?m2 type oo:Method .
-            ?m2 definedIn ?c2 .
-            ?m2 name ?name2 .
+            ?c1 type class .
+            ?c1 has-name ?class1 .
+            ?c1 is-in-file ?file1 .
+            ?c1 is-at-line ?line1 .
+            ?c2 type class .
+            ?c2 has-name ?class2 .
+            ?m1 type method .
+            ?m1 is-defined-in ?c1 .
+            ?m1 has-name ?name1 .
+            ?m2 type method .
+            ?m2 is-defined-in ?c2 .
+            ?m2 has-name ?name2 .
             FILTER(?c1 != ?c2)
             FILTER(LEVENSHTEIN(?name1, ?name2) <= {max_method_distance})
-            FILTER NOT EXISTS { ?c1 inheritsFrom ?c2 }
-            FILTER NOT EXISTS { ?c2 inheritsFrom ?c1 }
+            FILTER NOT EXISTS { ?c1 inherits-from ?c2 }
+            FILTER NOT EXISTS { ?c2 inherits-from ?c1 }
             FILTER(!STRSTARTS(?name1, "_"))
         }
         LIMIT 2000

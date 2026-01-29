@@ -11,15 +11,15 @@ detector find_decorator_usage(category="patterns", severity="info") {
     reql {
         SELECT ?target ?decorator_name ?target_name ?file ?line
         WHERE {
-            { ?target type oo:Class }
+            { ?target type class }
             UNION
-            { ?target type oo:Method }
+            { ?target type method }
             UNION
-            { ?target type oo:Function }
-            ?target hasDecorator ?decorator_name .
-            ?target name ?target_name .
-            ?target inFile ?file .
-            ?target atLine ?line
+            { ?target type function }
+            ?target has-decorator ?decorator_name .
+            ?target has-name ?target_name .
+            ?target is-in-file ?file .
+            ?target is-at-line ?line
         }
         ORDER BY ?decorator_name ?file
         LIMIT {limit}

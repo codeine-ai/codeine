@@ -22,9 +22,9 @@ query generate_annotation_tasks(
 
     reql {
         SELECT ?class ?file ?line WHERE {
-            ?class type oo:Class .
-            ?class inFile ?file .
-            ?class atLine ?line .
+            ?class type class .
+            ?class is-in-file ?file .
+            ?class is-at-line ?line .
             FILTER NOT EXISTS { ?class type user:PresentationLayer }
             FILTER NOT EXISTS { ?class type user:ServiceLayer }
             FILTER NOT EXISTS { ?class type user:DSLLayer }

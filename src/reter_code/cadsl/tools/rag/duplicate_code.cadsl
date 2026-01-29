@@ -16,12 +16,12 @@ detector find_duplicate_code(category="duplication", severity="high") {
     reql {
         SELECT ?e ?name ?file ?line ?line_count ?class_name
         WHERE {
-            { ?e type oo:Method } UNION { ?e type oo:Function }
-            ?e name ?name .
-            ?e inFile ?file .
-            ?e atLine ?line .
-            OPTIONAL { ?e lineCount ?line_count }
-            OPTIONAL { ?e definedIn ?c . ?c name ?class_name }
+            { ?e type method } UNION { ?e type function }
+            ?e has-name ?name .
+            ?e is-in-file ?file .
+            ?e is-at-line ?line .
+            OPTIONAL { ?e has-line-count ?line_count }
+            OPTIONAL { ?e is-defined-in ?c . ?c has-name ?class_name }
         }
     }
     | join {

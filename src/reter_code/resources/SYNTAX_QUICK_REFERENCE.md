@@ -176,14 +176,14 @@ reql("SELECT ?t WHERE { ?t type Task }")  # Missing task: prefix!
 add_knowledge(source="path/to/file.py", type="python")
 
 # Query for classes
-reql("SELECT ?class WHERE { ?class type py:Class }", type="reql")
+reql("SELECT ?class WHERE { ?class type class }", type="reql")
 
 # Query for methods
-reql("SELECT ?method WHERE { ?method type py:Method }", type="reql")
+reql("SELECT ?method WHERE { ?method type method }", type="reql")
 
 # Find methods in a class
 reql("""
-    SELECT ?method WHERE { ?method definedIn 'MyClass' }
+    SELECT ?method WHERE { ?method is-defined-in 'MyClass' }
 """, type="reql")
 ```
 

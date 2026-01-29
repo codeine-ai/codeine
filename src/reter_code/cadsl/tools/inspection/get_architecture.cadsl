@@ -10,10 +10,10 @@ query get_architecture() {
     reql {
         SELECT ?file (COUNT(?class) AS ?class_count) (COUNT(?func) AS ?function_count) (COUNT(?import) AS ?import_count)
         WHERE {
-            ?m type oo:Module .
-            ?m inFile ?file .
-            OPTIONAL { ?class type oo:Class . ?class inFile ?file }
-            OPTIONAL { ?func type oo:Function . ?func inFile ?file }
+            ?m type module .
+            ?m is-in-file ?file .
+            OPTIONAL { ?class type class . ?class is-in-file ?file }
+            OPTIONAL { ?func type function . ?func is-in-file ?file }
             OPTIONAL { ?m imports ?import }
         }
         GROUP BY ?file

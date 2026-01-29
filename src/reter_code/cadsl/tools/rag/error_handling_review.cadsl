@@ -13,13 +13,13 @@ detector error_handling_review(category="reliability", severity="medium") {
     reql {
         SELECT ?m ?name ?file ?line ?line_count ?class_name ?exc_name
         WHERE {
-            ?m type oo:Method .
-            ?m name ?name .
-            ?m inFile ?file .
-            ?m atLine ?line .
-            OPTIONAL { ?m definedIn ?c . ?c name ?class_name }
-            OPTIONAL { ?m lineCount ?line_count }
-            OPTIONAL { ?m raises ?exc . ?exc name ?exc_name }
+            ?m type method .
+            ?m has-name ?name .
+            ?m is-in-file ?file .
+            ?m is-at-line ?line .
+            OPTIONAL { ?m is-defined-in ?c . ?c has-name ?class_name }
+            OPTIONAL { ?m has-line-count ?line_count }
+            OPTIONAL { ?m raises ?exc . ?exc has-name ?exc_name }
             FILTER ( !REGEX(?file, "test_") )
         }
     }

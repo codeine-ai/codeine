@@ -23,23 +23,23 @@ RIGHT:  FILTER(!CONTAINS(?x, "str"))
 RIGHT:  FILTER(NOT EXISTS { ?x deleted true })
 
 ### Triple patterns need dots between them
-WRONG:  ?x type py:Class ?x name ?n
-RIGHT:  ?x type py:Class . ?x name ?n
+WRONG:  ?x type class ?x has-name ?n
+RIGHT:  ?x type class . ?x has-name ?n
 
 ### Semicolon for same subject
-RIGHT:  ?x type py:Class ; name ?n ; inFile ?f
+RIGHT:  ?x type class ; has-name ?n ; is-in-file ?f
 
 ### UNION must be inside WHERE braces
-WRONG:  WHERE { ?x type A } UNION { ?x type B }
-RIGHT:  WHERE { { ?x type A } UNION { ?x type B } }
+WRONG:  WHERE { ?x type class } UNION { ?x type method }
+RIGHT:  WHERE { { ?x type class } UNION { ?x type method } }
 
 ### Aggregate with alias needs parentheses
 WRONG:  SELECT COUNT(?x) AS ?count WHERE ...
 RIGHT:  SELECT (COUNT(?x) AS ?count) WHERE ...
 
 ### String literals use quotes
-RIGHT:  ?x name "MyClass"
-RIGHT:  ?x name 'MyClass'
+RIGHT:  ?x has-name "MyClass"
+RIGHT:  ?x has-name 'MyClass'
 
 ### HAVING clause needs parentheses
 WRONG:  HAVING ?count > 5
@@ -54,3 +54,18 @@ LEVENSHTEIN returns edit distance (integer), use in comparisons:
 RIGHT:  FILTER(LEVENSHTEIN(?name1, ?name2) <= 2)
 RIGHT:  FILTER(LEVENSHTEIN(?name, 'expected') < 3)
 WRONG:  FILTER(LEVENSHTEIN(?name1, ?name2))  -- must compare to a value
+
+## CNL Entity Types (NO prefixes)
+- `class`, `method`, `function`, `constructor`
+- `field`, `property`, `parameter`
+- `module`, `namespace`, `import`
+- `catch-clause`, `try-block`, `finally-clause`
+
+## CNL Predicates (hyphenated-lowercase)
+- `has-name` - Entity name
+- `is-in-file` - Source file path
+- `is-at-line` - Line number
+- `is-defined-in` - Parent class/module
+- `inherits-from` - Class inheritance
+- `calls` - Function calls another
+- `has-docstring` - Documentation string

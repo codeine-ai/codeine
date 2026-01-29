@@ -12,15 +12,15 @@ detector move_method(category="refactoring", severity="medium") {
     reql {
         SELECT ?m ?name ?class_name ?file ?line ?target_class ?external_usage
         WHERE {
-            ?m type oo:Method .
-            ?m name ?name .
-            ?m inFile ?file .
-            ?m atLine ?line .
-            ?m definedIn ?c .
-            ?c name ?class_name .
-            ?m primaryExternalClass ?target .
-            ?target name ?target_class .
-            ?m externalUsageRatio ?external_usage .
+            ?m type method .
+            ?m has-name ?name .
+            ?m is-in-file ?file .
+            ?m is-at-line ?line .
+            ?m is-defined-in ?c .
+            ?c has-name ?class_name .
+            ?m primary-external-class ?target .
+            ?target has-name ?target_class .
+            ?m external-usage-ratio ?external_usage .
             FILTER ( ?external_usage > {threshold} )
         }
         ORDER BY DESC(?external_usage)

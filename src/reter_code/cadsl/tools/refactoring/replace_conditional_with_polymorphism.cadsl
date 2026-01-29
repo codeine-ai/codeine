@@ -12,12 +12,12 @@ detector replace_conditional_with_polymorphism(category="refactoring", severity=
     reql {
         SELECT ?m ?name ?class_name ?file ?line ?branch_count
         WHERE {
-            ?m type oo:Method .
-            ?m name ?name .
-            ?m inFile ?file .
-            ?m atLine ?line .
-            OPTIONAL { ?m definedIn ?c . ?c name ?class_name }
-            ?m branchCount ?branch_count .
+            ?m type method .
+            ?m has-name ?name .
+            ?m is-in-file ?file .
+            ?m is-at-line ?line .
+            OPTIONAL { ?m is-defined-in ?c . ?c has-name ?class_name }
+            ?m has-branch-count ?branch_count .
             FILTER ( ?branch_count >= {min_branches} )
         }
         ORDER BY DESC(?branch_count)

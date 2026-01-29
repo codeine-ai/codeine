@@ -12,12 +12,12 @@ query list_functions() {
     reql {
         SELECT ?f ?name ?file ?line ?returnType
         WHERE {
-            ?f type oo:Function .
-            ?f name ?name .
-            ?f inFile ?file .
-            ?f atLine ?line .
-            OPTIONAL { ?f returnType ?returnType }
-            FILTER NOT EXISTS { ?f definedIn ?class }
+            ?f type function .
+            ?f has-name ?name .
+            ?f is-in-file ?file .
+            ?f is-at-line ?line .
+            OPTIONAL { ?f has-return-type ?returnType }
+            FILTER NOT EXISTS { ?f is-defined-in ?class }
             FILTER ( "{module}" = "" || CONTAINS(?file, "{module}") )
         }
         ORDER BY ?name

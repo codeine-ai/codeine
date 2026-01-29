@@ -11,14 +11,14 @@ detector encapsulate_collection(category="refactoring", severity="medium") {
     reql {
         SELECT ?m ?name ?class_name ?file ?line ?return_type ?attr_name
         WHERE {
-            ?m type oo:Method .
-            ?m name ?name .
-            ?m definedIn ?c .
-            ?c name ?class_name .
-            ?m inFile ?file .
-            ?m atLine ?line .
-            ?m returnType ?return_type .
-            ?m returnsAttribute ?attr_name .
+            ?m type method .
+            ?m has-name ?name .
+            ?m is-defined-in ?c .
+            ?c has-name ?class_name .
+            ?m is-in-file ?file .
+            ?m is-at-line ?line .
+            ?m has-return-type ?return_type .
+            ?m returns-attribute ?attr_name .
             FILTER ( REGEX(?return_type, "list|dict|set|List|Dict|Set|Collection") )
             FILTER ( STRSTARTS(?name, "get") || ?name = ?attr_name )
         }

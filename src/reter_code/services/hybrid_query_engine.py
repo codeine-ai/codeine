@@ -445,17 +445,17 @@ def handle_get_reql_grammar() -> str:
 {grammar}
 
 ## Key Points:
-- Use `type` predicate for entity types: `?x type oo:Class`
-- Use `oo:` prefix ONLY for types (oo:Class, oo:Method, oo:Function)
-- Predicates have NO prefix: `name`, `inFile`, `definedIn`, `calls`, `inheritsFrom`
+- Use `type` predicate for entity types: `?x type class`
+- Use `oo:` prefix ONLY for types (class, method, function)
+- Predicates have NO prefix: `has-name`, `is-in-file`, `is-defined-in`, `calls`, `inherits-from`
 - FILTER requires parentheses: `FILTER(?count > 5)`
-- Patterns separated by dots: `?x type oo:Class . ?x name ?n`
+- Patterns separated by dots: `?x type class . ?x has-name ?n`
 
 ## Type vs Concept:
-- `?x type oo:Class` - Filter with subsumption (matches py:Class, cpp:Class, etc.)
+- `?x type class` - Filter with subsumption (matches class, class, etc.)
 - `?x type ?t` - Returns ALL types (asserted + inferred) - MULTIPLE rows per entity
 - `?x concept ?t` - Returns ONLY asserted type - ONE row per entity
-- Use `concept` when you need the concrete type string (e.g., "py:Method")
+- Use `concept` when you need the concrete type string (e.g., "method")
 - CRITICAL: When using `concept` with FILTER in UNION queries, include the variable in SELECT!
 """
 
@@ -829,34 +829,34 @@ Use REGEX with case-insensitive flag "i" to match semantic concepts:
   FILTER(REGEX(?name, "main|run|start|serve|execute", "i"))
 
 ## ENTITY TYPES (oo: prefix for cross-language)
-- oo:Class, oo:Method, oo:Function, oo:Module
-- oo:Constructor, oo:Field, oo:Parameter
-- oo:Import, oo:CatchClause, oo:Decorator
+- class, method, function, module
+- constructor, field, parameter
+- import, catch-clause, attribute
 
-## COMMON PREDICATES (NO prefix)
-- `name` - Entity name
-- `inFile` - Source file path
-- `atLine` - Line number
-- `definedIn` - Parent class/module
-- `inheritsFrom` - Class inheritance
+## COMMON PREDICATES (NO prefix, CNL hyphenated format)
+- `has-name` - Entity name
+- `is-in-file` - Source file path
+- `is-at-line` - Line number
+- `is-defined-in` - Parent class/module
+- `inherits-from` - Class inheritance
 - `calls` - Function calls another
-- `docstring` - Documentation string
+- `has-docstring` - Documentation string
 
 ## SYNTAX RULES
-1. Type patterns: `?x type oo:Class` (NOT `?x oo:Class`)
-2. Predicates have NO prefix: `name`, `inFile`, `definedIn`
+1. Type patterns: `?x type class` (NOT `?x class`)
+2. Predicates have NO prefix: `has-name`, `is-in-file`, `is-defined-in`
 3. FILTER needs parentheses: `FILTER(?count > 5)`
-4. Separate patterns with dots: `?x type oo:Class . ?x name ?n`
+4. Separate patterns with dots: `?x type class . ?x has-name ?n`
 
 ## SEMANTIC QUERY PATTERNS
 
 Find entry points and main functions:
 ```
 SELECT ?func ?name ?file ?line WHERE {
-    ?func type oo:Function .
-    ?func name ?name .
-    ?func inFile ?file .
-    ?func atLine ?line .
+    ?func type function .
+    ?func has-name ?name .
+    ?func is-in-file ?file .
+    ?func is-at-line ?line .
     FILTER(REGEX(?name, "main|run|start|entry|serve|execute|handle|app", "i"))
 }
 ```
@@ -864,9 +864,9 @@ SELECT ?func ?name ?file ?line WHERE {
 Find server/service classes:
 ```
 SELECT ?class ?name ?file WHERE {
-    ?class type oo:Class .
-    ?class name ?name .
-    ?class inFile ?file .
+    ?class type class .
+    ?class has-name ?name .
+    ?class is-in-file ?file .
     FILTER(REGEX(?name, "server|service|handler|controller|api|app|endpoint|router", "i"))
 }
 ```
@@ -874,9 +874,9 @@ SELECT ?class ?name ?file WHERE {
 Find test classes:
 ```
 SELECT ?class ?name ?file WHERE {
-    ?class type oo:Class .
-    ?class name ?name .
-    ?class inFile ?file .
+    ?class type class .
+    ?class has-name ?name .
+    ?class is-in-file ?file .
     FILTER(REGEX(?name, "^Test|Test$|Spec$|_test", "i"))
 }
 ```
@@ -888,8 +888,8 @@ SELECT ?class ?name ?file WHERE {
 Example - Find large classes:
 ```
 SELECT ?class ?name (COUNT(?method) AS ?method_count) WHERE {
-    ?class type oo:Class . ?class name ?name .
-    ?method type oo:Method . ?method definedIn ?class
+    ?class type class . ?class has-name ?name .
+    ?method type method . ?method is-defined-in ?class
 }
 GROUP BY ?class ?name
 HAVING (?method_count > 10)
@@ -899,8 +899,8 @@ ORDER BY DESC(?method_count)
 ## UNION RULES (CRITICAL)
 - UNION must be INSIDE WHERE clause
 - ALL UNION arms MUST bind the SAME variables!
-  WRONG: `{ ?x name ?n } UNION { ?x parent ?p }` <- different vars!
-  RIGHT: `{ ?x name ?n } UNION { ?x name ?n }` <- same vars
+  WRONG: `{ ?x has-name ?n } UNION { ?x parent ?p }` <- different vars!
+  RIGHT: `{ ?x has-name ?n } UNION { ?x has-name ?n }` <- same vars
 
 ## NOT SUPPORTED
 - BIND(...AS ?var) - NOT available
@@ -920,19 +920,19 @@ You have tools available to help you:
 
 CRITICAL RULES:
 1. CADSL uses `query`, `detector`, or `diagram` as tool types
-2. Inside reql {} blocks, use `type` predicate with oo: prefix: `?x type oo:Class`
-3. Entity types use `oo:` prefix: `oo:Class`, `oo:Method`, `oo:Module`, `oo:Function`
-4. Predicates have NO prefix: `name`, `inFile`, `definedIn`, `calls`, `imports`
+2. Inside reql {} blocks, use `type` predicate with oo: prefix: `?x type class`
+3. Entity types use `oo:` prefix: `class`, `method`, `module`, `function`
+4. Predicates have NO prefix (CNL hyphenated): `has-name`, `is-in-file`, `is-defined-in`, `calls`, `imports`
 5. Pipeline steps use `|` operator: `| filter { }`, `| emit { }`
 
 COMMON MISTAKE - NEVER do this in REQL blocks:
-  WRONG: `?m1 oo:Module .`           <- missing `type` predicate!
-  RIGHT: `?m1 type oo:Module .`      <- always include `type`
+  WRONG: `?m1 module .`           <- missing `type` predicate!
+  RIGHT: `?m1 type module .`      <- always include `type`
 
 TYPE vs CONCEPT:
-- `?x type oo:Method` - Filter with subsumption (matches py:Method, etc.)
+- `?x type method` - Filter with subsumption (matches method, etc.)
 - `?x type ?t` - Returns ALL types (asserted + inferred) - MULTIPLE rows per entity
-- `?x concept ?t` - Returns ONLY asserted type - ONE row per entity (e.g., "py:Method")
+- `?x concept ?t` - Returns ONLY asserted type - ONE row per entity (e.g., "method")
 - CRITICAL: When using `concept` with FILTER in UNION queries, include the variable in SELECT!
 
 RECOMMENDED: Call get_example() to see the EXACT syntax used in working examples.

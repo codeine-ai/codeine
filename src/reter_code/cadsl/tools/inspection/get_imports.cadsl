@@ -10,10 +10,10 @@ query get_imports() {
     reql {
         SELECT ?i ?module ?imported ?line
         WHERE {
-            ?i type oo:Import .
-            ?i inModule ?module .
+            ?i type import .
+            ?i is-in-module ?module .
             ?i imports ?imported .
-            OPTIONAL { ?i atLine ?line }
+            OPTIONAL { ?i is-at-line ?line }
         }
         ORDER BY ?module ?imported
         LIMIT {limit}

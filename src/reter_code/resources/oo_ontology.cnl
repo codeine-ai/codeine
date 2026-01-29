@@ -2,41 +2,228 @@
 % Language-independent concepts for semantic code analysis
 %
 % This ontology defines generic OO concepts that language-specific ontologies
-% (py_ontology.cnl, js_ontology.cnl) extend via subsumption relationships.
+% extend via subsumption relationships.
 %
-% Example: py:Class is a oo:Class
-%          js:Class is a oo:Class
+% Example: Every python-class is a class.
+%          Every csharp-class is a class.
 %
-% This allows queries like "FIND ?c WHERE oo:Class(?c)" to match both
-% Python and JavaScript classes.
+% This allows queries like "FIND ?c WHERE class(?c)" to match classes from
+% all supported languages.
+%
+% Naming Convention:
+%   - Concepts: hyphenated-lowercase (e.g., try-block, catch-clause)
+%   - Roles: hyphenated-lowercase forming natural sentences
+%   - Instances: Capital-Case (e.g., My-Class, Main-Module)
 
 % ============================================================================
 % Core Entity Hierarchy
 % ============================================================================
 
-Every `oo:Method` is a `oo:Function`.
-Every `oo:Constructor` is a `oo:Method`.
-Every `oo:Destructor` is a `oo:Method`.
+% Callable entities
+Every method is a function.
+Every constructor is a method.
+Every destructor is a method.
+Every arrow-function is a function.
+
+% Type entities
+Every interface is a type.
+Every class is a type.
+Every struct is a type.
+Every union is a type.
+Every enum is a type.
+Every delegate is a type.
+Every type-alias is a type.
+Every type-def is a type.
+Every template is a type.
+
+% Member entities
+Every field is a member.
+Every property is a member.
+Every event is a member.
+
+% Module entities
+Every module is a source-unit.
+Every compilation-unit is a source-unit.
+Every translation-unit is a source-unit.
 
 % ============================================================================
 % Statement Hierarchy
 % ============================================================================
 
-% Base statement type - language-specific statements extend this
-% oo:Statement is the root for all statement types
+% Exception handling statements
+Every catch-clause is a statement.
+Every except-handler is a catch-clause.
+Every finally-clause is a statement.
+Every try-block is a statement.
+Every try-else-block is a statement.
+Every throw-statement is a statement.
+Every raise-statement is a throw-statement.
 
-% Exception handling
-Every `oo:CatchClause` is a `oo:Statement`.
-Every `oo:FinallyClause` is a `oo:Statement`.
-Every `oo:TryBlock` is a `oo:Statement`.
-Every `oo:ThrowStatement` is a `oo:Statement`.
+% Control flow statements
+Every return-statement is a statement.
+Every with-statement is a statement.
 
-% Control flow
-Every `oo:ReturnStatement` is a `oo:Statement`.
+% Other statements
+Every assignment is a statement.
 
 % ============================================================================
-% Reference Tracking
+% Containment Relationships (is-X-of pattern)
 % ============================================================================
 
-% References track variable/parameter usages within code
-% oo:Reference is the base type for all reference facts
+% These form natural sentences: "Method-1 is-defined-in Class-1"
+% Every method is-defined-in exactly one type.
+% Every field is-defined-in exactly one type.
+% Every parameter is-parameter-of exactly one function.
+
+% ============================================================================
+% Ownership Relationships (has-X pattern)
+% ============================================================================
+
+% These form natural sentences: "Class-1 has-method Method-1"
+% Every class has-method at-least zero method.
+% Every class has-field at-least zero field.
+% Every function has-parameter at-least zero parameter.
+% Every try-block has-catch-clause at-least zero catch-clause.
+% Every try-block has-finally-clause at-most one finally-clause.
+
+% ============================================================================
+% Behavioral Relationships (action verb pattern)
+% ============================================================================
+
+% Call relationships - transitive for call graph analysis
+% If X calls something that calls Y then X transitively-calls Y.
+
+% Creation relationships
+% Every constructor creates exactly one type.
+
+% Access relationships
+% Every method reads at-least zero field.
+% Every method writes at-least zero field.
+
+% ============================================================================
+% Inheritance Relationships
+% ============================================================================
+
+% Inheritance is transitive
+% If X inherits-from something that inherits-from Y then X inherits-from Y.
+
+% Type inference through inheritance
+% If X is-instance-of something that inherits-from Y then Y is-type-of X.
+
+% ============================================================================
+% Language-Specific Subsumption (for backward compatibility)
+% ============================================================================
+
+% Python
+Every python-class is a class.
+Every python-method is a method.
+Every python-function is a function.
+Every python-module is a module.
+Every python-import is an import.
+Every python-parameter is a parameter.
+Every python-attribute is a field.
+
+% C#
+Every csharp-class is a class.
+Every csharp-method is a method.
+Every csharp-interface is an interface.
+Every csharp-struct is a struct.
+Every csharp-enum is an enum.
+Every csharp-property is a property.
+Every csharp-field is a field.
+Every csharp-constructor is a constructor.
+Every csharp-event is an event.
+Every csharp-delegate is a delegate.
+Every csharp-namespace is a namespace.
+Every csharp-parameter is a parameter.
+
+% C++
+Every cpp-class is a class.
+Every cpp-method is a method.
+Every cpp-function is a function.
+Every cpp-struct is a struct.
+Every cpp-union is a union.
+Every cpp-enum is an enum.
+Every cpp-constructor is a constructor.
+Every cpp-destructor is a destructor.
+Every cpp-field is a field.
+Every cpp-template is a template.
+Every cpp-namespace is a namespace.
+Every cpp-parameter is a parameter.
+Every cpp-macro is a macro.
+
+% JavaScript/TypeScript
+Every javascript-class is a class.
+Every javascript-method is a method.
+Every javascript-function is a function.
+Every javascript-interface is an interface.
+Every javascript-enum is an enum.
+Every javascript-field is a field.
+Every javascript-property is a property.
+Every javascript-constructor is a constructor.
+Every javascript-module is a module.
+Every javascript-parameter is a parameter.
+Every javascript-arrow-function is an arrow-function.
+
+% ============================================================================
+% Code Quality Concepts (for detectors)
+% ============================================================================
+
+% God class - class with too many methods/responsibilities
+Every god-class is a class.
+
+% Long method - method with too many lines
+Every long-method is a method.
+
+% Feature envy - method using more features of another class
+Every feature-envy-method is a method.
+
+% Data class - class with only getters/setters
+Every data-class is a class.
+
+% ============================================================================
+% Architectural Concepts (for validation)
+% ============================================================================
+
+% Layers
+Every presentation-layer is a layer.
+Every service-layer is a layer.
+Every data-access-layer is a layer.
+Every infrastructure-layer is a layer.
+
+% Patterns
+Every singleton is a class.
+Every factory is a class.
+Every adapter is a class.
+Every observer is a class.
+Every strategy is a class.
+
+% ============================================================================
+% HTML/Document Entity Hierarchy
+% ============================================================================
+
+% Document structure
+Every document is a source-unit.
+Every element is an entity.
+Every script is an entity.
+Every script-reference is an entity.
+Every style-sheet is an entity.
+
+% Forms and inputs
+Every form is an element.
+Every form-input is an element.
+Every link is an element.
+Every meta is an element.
+Every image is an element.
+Every iframe is an element.
+
+% Event handling
+Every event-handler is an entity.
+Every data-attribute is an entity.
+
+% Framework directives
+Every framework-indicator is an entity.
+Every vue-directive is a framework-indicator.
+Every angular-directive is a framework-indicator.
+Every htmx-attribute is a framework-indicator.
+Every alpine-directive is a framework-indicator.

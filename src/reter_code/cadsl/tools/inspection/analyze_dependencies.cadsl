@@ -10,12 +10,12 @@ query analyze_dependencies() {
     reql {
         SELECT ?m ?module_name ?imports_name ?file
         WHERE {
-            ?m type oo:Module .
-            ?m name ?module_name .
-            ?m inFile ?file .
+            ?m type module .
+            ?m has-name ?module_name .
+            ?m is-in-file ?file .
             OPTIONAL {
                 ?m imports ?imported .
-                ?imported name ?imports_name
+                ?imported has-name ?imports_name
             }
         }
         ORDER BY ?module_name

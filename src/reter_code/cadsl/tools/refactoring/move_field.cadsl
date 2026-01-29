@@ -12,15 +12,15 @@ detector move_field(category="refactoring", severity="medium") {
     reql {
         SELECT ?attr ?name ?class_name ?target_class ?file ?line ?own_usage ?external_usage
         WHERE {
-            ?attr type oo:Attribute .
-            ?attr name ?name .
-            ?attr definedIn ?c .
-            ?c name ?class_name .
-            ?attr inFile ?file .
-            ?attr atLine ?line .
-            ?attr ownClassUsage ?own_usage .
-            ?attr externalClassUsage ?external_usage .
-            ?attr topExternalClass ?target_class .
+            ?attr type attribute .
+            ?attr has-name ?name .
+            ?attr is-defined-in ?c .
+            ?c has-name ?class_name .
+            ?attr is-in-file ?file .
+            ?attr is-at-line ?line .
+            ?attr own-class-usage ?own_usage .
+            ?attr external-class-usage ?external_usage .
+            ?attr top-external-class ?target_class .
             FILTER ( !STRSTARTS(?name, "_") )
         }
         LIMIT {limit}

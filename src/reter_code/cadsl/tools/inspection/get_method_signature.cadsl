@@ -10,16 +10,16 @@ query get_method_signature() {
     reql {
         SELECT ?m ?name ?file ?line ?return_type ?param_name ?param_type ?param_default
         WHERE {
-            { ?m type oo:Method } UNION { ?m type oo:Function }
-            ?m name ?name .
-            ?m inFile ?file .
-            ?m atLine ?line .
-            OPTIONAL { ?m returnType ?return_type }
+            { ?m type method } UNION { ?m type function }
+            ?m has-name ?name .
+            ?m is-in-file ?file .
+            ?m is-at-line ?line .
+            OPTIONAL { ?m has-return-type ?return_type }
             OPTIONAL {
-                ?m hasParameter ?p .
-                ?p name ?param_name .
-                OPTIONAL { ?p typeAnnotation ?param_type }
-                OPTIONAL { ?p defaultValue ?param_default }
+                ?m has-parameter ?p .
+                ?p has-name ?param_name .
+                OPTIONAL { ?p has-type-annotation ?param_type }
+                OPTIONAL { ?p has-default-value ?param_default }
             }
             FILTER ( ?name = "{target}" || CONTAINS(STR(?m), "{target}") )
         }

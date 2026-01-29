@@ -18,7 +18,7 @@ The following is the complete REQL grammar. Your generated queries MUST conform 
 ### Triple Patterns
 Basic pattern: `subject predicate object`
 - Variables: `?var` or `$var`
-- Identifiers: `ClassName`, `propertyName`, `py:Class`
+- Identifiers: `class`, `method`, `has-name` (CNL hyphenated-lowercase)
 - Literals: `'string'`, `"string"`, `42`, `3.14`, `true`, `false`
 - Keyword `a` is shorthand for `type`
 
@@ -26,54 +26,21 @@ Basic pattern: `subject predicate object`
 
 There are TWO ways to work with entity types:
 
-1. **`type` predicate with concrete type** - Filter with ontology subsumption:
-   - `?x type oo:Class` - Matches py:Class, cpp:Class, cs:Class, js:Class (subsumption!)
-   - `?x type py:Method` - Matches only Python methods
+1. **`type` predicate with concrete type** - Filter entities:
+   - `?x type class` - Matches all classes
+   - `?x type method` - Matches all methods
    - Use for filtering entities by type in WHERE clauses
 
-2. **`type` predicate with variable** - Returns ALL types (asserted + inferred):
-   - `?x type ?t` - Returns MULTIPLE rows per entity (py:Method, oo:Method, oo:Function, etc.)
-   - Includes all inferred types from subsumption hierarchy
-   - Use when you need the full type hierarchy
+2. **`type` predicate with variable** - Returns the type:
+   - `?x type ?t` - Binds the entity's type to ?t
 
 3. **`concept` attribute** - Returns ONLY the asserted (stored) type:
    - `?x concept ?t` - Returns ONE row per entity with the actual stored type
-   - Example: Returns "py:Method" (not oo:Method, oo:Function, etc.)
    - Use when you need the concrete type string
-
-**Comparison:**
-| Pattern | Returns | Rows per entity |
-|---------|---------|-----------------|
-| `?x type oo:Method` | Entities of type (filter) | N/A |
-| `?x type ?t` | All types (asserted + inferred) | Multiple |
-| `?x concept ?t` | Only asserted type | One |
-
-**When to use which:**
-- Filter by type (with subsumption): `?x type oo:Method`
-- Get actual/concrete type string: `?x concept ?t`
-- See full type hierarchy: `?x type ?t`
-
-**CRITICAL FOR FILTER**: When using `concept` with FILTER in UNION queries with patterns
-outside UNION blocks, you MUST include the variable in SELECT:
-```
-# WRONG - will fail with "variable not found"
-SELECT ?x ?name WHERE {
-    { ?x calls ?y } UNION { ?x maybeCalls ?y }
-    ?x concept ?type .
-    FILTER(CONTAINS(?type, "Method"))
-}
-
-# CORRECT - concept variable included in SELECT
-SELECT ?x ?name ?type WHERE {
-    { ?x calls ?y } UNION { ?x maybeCalls ?y }
-    ?x concept ?type .
-    FILTER(CONTAINS(?type, "Method"))
-}
-```
 
 ### Pattern Separators
 - Use `.` (dot) between triple patterns
-- Use `;` for same subject with different predicates: `?x type Class ; name ?n`
+- Use `;` for same subject with different predicates: `?x type class ; has-name ?n`
 - Use `,` for same subject+predicate with multiple objects
 
 ### Graph Patterns
@@ -103,231 +70,203 @@ SELECT ?x ?name ?type WHERE {
 - `LIMIT n`
 - `OFFSET n`
 
-## Multi-Language Support via OO Meta-Ontology
+## CNL Entity Types (hyphenated-lowercase, NO prefixes)
 
-RETER supports multiple programming languages through ontology subsumption:
-- `oo:` - Object-Oriented meta-ontology (matches ALL languages)
-- `py:` - Python-specific
-- `cpp:` - C++-specific
-- `cs:` - C#-specific
-- `js:` - JavaScript/TypeScript-specific
+### Core OO Entities
+- `class` - Class definition
+- `method` - Method
+- `function` - Function
+- `constructor` - Constructor
+- `destructor` - Destructor
+- `field` - Field/attribute
+- `property` - Property
+- `parameter` - Parameter
+- `variable` - Variable
 
-### How Subsumption Works
-Each language-specific type extends the OO meta-ontology:
-- `py:Class is_subclass_of oo:Class`
-- `cpp:Class is_subclass_of oo:Class`
-- `cs:Class is_subclass_of oo:Class`
-- `js:Class is_subclass_of oo:Class`
+### Type System
+- `interface` - Interface definition
+- `struct` - Struct
+- `union` - Union
+- `enum` - Enumeration
+- `enum-member` - Enum member
+- `type-alias` - Type alias
+- `template` - Template
+- `delegate` - Delegate
 
-**IMPORTANT**: Use `oo:` prefix for cross-language queries (default). Use language-specific
-prefixes (py:, cpp:, cs:, js:) only when specifically asked about one language.
+### Module/File Types
+- `module` - Module
+- `compilation-unit` - Compilation unit
+- `translation-unit` - Translation unit
+- `namespace` - Namespace
 
-### OO Meta-Ontology Concepts (use for cross-language queries)
-- `oo:Module` - Module/compilation unit (py:Module, cpp:TranslationUnit, cs:CompilationUnit, js:Module)
-- `oo:Class` - Class definition (py:Class, cpp:Class, cpp:Struct, cs:Class, cs:Struct, js:Class)
-- `oo:Interface` - Interface definition (cs:Interface, js:Interface)
-- `oo:Function` - Function (py:Function, cpp:Function, cs:Function, js:Function, js:ArrowFunction)
-- `oo:Method` - Method (py:Method, cpp:Method, cs:Method, js:Method)
-- `oo:Constructor` - Constructor (py:Method with isConstructor, cpp:Constructor, cs:Constructor, js:Constructor)
-- `oo:Destructor` - Destructor (cpp:Destructor)
-- `oo:Field` - Field/attribute (py:Attribute, cpp:Field, cs:Field, cs:Property, js:Field)
-- `oo:Parameter` - Parameter (py:Parameter, cpp:Parameter, cs:Parameter, js:Parameter)
-- `oo:Import` - Import statement (py:Import, cpp:UsingDirective, cs:Using, js:Import)
-- `oo:Enum` - Enumeration (py:Enum, cpp:Enum, cpp:EnumClass, cs:Enum, js:Enum)
-- `oo:Decorator` - Decorator/attribute (py:Decorator, cs:Attribute)
-- `oo:Namespace` - Namespace (cpp:Namespace, cs:Namespace, js:Namespace)
+### Import/Export
+- `import` - Import statement
+- `using` - Using directive
+- `include` - Include directive
+- `export` - Export
 
-### Exception Handling (all languages)
-- `oo:TryBlock` - Try block
-- `oo:CatchClause` - Catch/except clause
-- `oo:FinallyClause` - Finally clause
-- `oo:ThrowStatement` - Throw/raise statement
+### Exception Handling
+- `try-block` - Try block
+- `catch-clause` - Catch/except clause
+- `except-handler` - Exception handler (Python)
+- `finally-clause` - Finally clause
+- `throw-statement` - Throw statement
+- `raise-statement` - Raise statement (Python)
 
-### Literals (for magic number detection)
-- `oo:Literal` - Base literal type
-- Language-specific: cpp:IntegerLiteral, cpp:StringLiteral, cs:Literal, etc.
+### Other Types
+- `return-statement` - Return statement
+- `with-statement` - With statement (context manager)
+- `assignment` - Assignment
+- `literal` - Literal value
+- `arrow-function` - Arrow function
 
-### Common Predicates (work across all languages)
-- `name` - Entity name (string)
-- `inFile` - Source file path
-- `atLine` - Line number
-- `definedIn` - Class/module where defined
-- `inheritsFrom` - Class inheritance
-- `calls` - Function/method calls another (unified across all languages)
-- `hasParameter` - Function has parameter
-- `ofFunction` - Parameter belongs to function
-- `visibility` - "public", "protected", "private"
+## CNL Predicates (hyphenated-lowercase)
 
-NOTE: Entity IDs ARE the fully qualified names. For methods with overloads,
-the ID includes the parameter signature: `Module.Class.method(ParamType1,ParamType2)`.
-Use `STR(?entity)` to access the qualified name when needed in FILTER expressions.
+### Identity
+- `has-name` - Entity name (string)
+- `has-language` - Programming language
+- `has-source` - Source identifier
 
-### Import Predicates (oo:Import, py:Import, js:Import, cs:Using)
-- `modulePath` - The imported module/package path (e.g., "watchdog.observers", "os.path")
-- `imports` - Specific names imported from the module (e.g., "Observer", "join")
-- `inModule` - Module containing the import statement
-- `atLine` - Line number of the import
+### Location
+- `is-in-file` - Source file path
+- `is-at-line` - Line number
+- `is-at-column` - Column number
+- `has-end-line` - End line number
+- `has-line-count` - Number of lines
 
-Example - Find modules importing watchdog:
-```
-SELECT ?module ?path WHERE {
-    ?imp type py:Import .
-    ?imp modulePath ?path .
-    ?imp inModule ?module .
-    FILTER(CONTAINS(?path, "watchdog"))
-}
-```
+### Containment (is-X pattern)
+- `is-defined-in` - Class/module where defined
+- `is-in-module` - Module containing entity
+- `is-in-namespace` - Namespace containing entity
+- `is-in-class` - Class containing entity
+- `is-of-function` - Function containing parameter
 
-## Python-Specific Predicates (py: prefix)
+### Relationships (action verbs)
+- `inherits-from` - Class inheritance
+- `implements` - Interface implementation
+- `calls` - Function/method calls another
+- `maybe-calls` - Potential call (dynamic)
+- `imports` - Import relationship
 
-- `inModule` - Module containing entity
-- `hasDecorator` - Has decorator (string)
-- `hasDocstring` - Has docstring
-- `hasType` - Type annotation
-- `isAsync` - Async function/method
-- `isProperty` - Has @property decorator
-- `isClassMethod` - Has @classmethod decorator
-- `isStaticMethod` - Has @staticmethod decorator
-- `isAbstract` - Has @abstractmethod decorator
-- `isDataClass` - Has @dataclass decorator
-- `isConstructor` - Is __init__ method
+### Ownership (has-X pattern)
+- `has-method` - Class has method
+- `has-field` - Class has field
+- `has-parameter` - Function has parameter
+- `has-decorator` - Has decorator/attribute
+- `has-docstring` - Has documentation string
 
-## C++-Specific Concepts (cpp: prefix)
+### Boolean Modifiers (is-X pattern)
+- `is-static` - Static member
+- `is-abstract` - Abstract
+- `is-async` - Async function/method
+- `is-private` - Private visibility
+- `is-constructor` - Is a constructor
+- `is-virtual` - Virtual method
+- `is-override` - Override method
 
-- `cpp:TranslationUnit` - C++ source file
-- `cpp:Namespace` - Namespace
-- `cpp:Class`, `cpp:Struct` - Class/struct definitions
-- `cpp:Function`, `cpp:Method` - Functions and methods
-- `cpp:Constructor`, `cpp:Destructor` - Special methods
-- `cpp:Operator` - Operator overloads
-- `cpp:Field` - Member variables
-- `cpp:TemplateClass`, `cpp:TemplateFunction` - Templates
-- `cpp:Enum`, `cpp:EnumClass` - Enumerations
+### Type Information
+- `has-type-annotation` - Type annotation
+- `has-return-type` - Return type
+- `has-parameter-type` - Parameter type
+- `has-access-modifier` - Access modifier (public/protected/private)
+- `has-parameter-count` - Number of parameters
 
-## C#-Specific Concepts (cs: prefix)
-
-- `cs:CompilationUnit` - C# source file
-- `cs:Namespace` - Namespace
-- `cs:Class`, `cs:Struct`, `cs:Interface` - Type definitions
-- `cs:Method`, `cs:Constructor` - Methods
-- `cs:Property`, `cs:Field`, `cs:Event` - Members
-- `cs:Delegate` - Delegate types
-- `cs:Attribute` - Attributes (decorators)
-- `cs:Enum` - Enumerations
-
-## JavaScript/TypeScript-Specific Concepts (js: prefix)
-
-- `js:Module` - JS/TS module
-- `js:Class` - Class definition
-- `js:Function`, `js:ArrowFunction` - Functions
-- `js:Method`, `js:Constructor` - Methods
-- `js:Field` - Class fields
-- `js:Interface` - TypeScript interface
-- `js:TypeAlias` - TypeScript type alias
-- `js:Enum`, `js:EnumMember` - TypeScript enums
-- `js:Namespace` - TypeScript namespace
-- `js:Import`, `js:Export` - Module imports/exports
+### Import Predicates
+- `has-module-path` - Imported module path
+- `has-module-name` - Module name
 
 ## Example REQL Queries
 
-### Cross-Language: Find all large classes (any language)
+### Find all large classes
 ```
 SELECT ?class ?name ?file (COUNT(?method) AS ?method_count) WHERE {
-    ?class type oo:Class .
-    ?class name ?name .
-    ?class inFile ?file .
-    ?method type oo:Method .
-    ?method definedIn ?class
+    ?class type class .
+    ?class has-name ?name .
+    ?class is-in-file ?file .
+    ?method type method .
+    ?method is-defined-in ?class
 }
 GROUP BY ?class ?name ?file
 HAVING (?method_count >= 20)
 ORDER BY DESC(?method_count)
 ```
 
-### Cross-Language: Find all functions with many parameters
+### Find all functions with many parameters
 ```
 SELECT ?func ?name ?file (COUNT(?param) AS ?param_count) WHERE {
-    ?func type oo:Function .
-    ?func name ?name .
-    ?func inFile ?file .
-    ?param type oo:Parameter .
-    ?param ofFunction ?func
+    ?func type function .
+    ?func has-name ?name .
+    ?func is-in-file ?file .
+    ?param type parameter .
+    ?param is-of-function ?func
 }
 GROUP BY ?func ?name ?file
 HAVING (?param_count >= 5)
 ORDER BY DESC(?param_count)
 ```
 
-### Cross-Language: Find all exception handlers
+### Find all exception handlers
 ```
 SELECT ?catch ?file ?line WHERE {
-    ?catch type oo:CatchClause .
-    ?catch inFile ?file .
-    ?catch atLine ?line
+    ?catch type catch-clause .
+    ?catch is-in-file ?file .
+    ?catch is-at-line ?line
 }
 ```
 
-### Cross-Language: Find class inheritance
+### Find class inheritance
 ```
 SELECT ?child ?childName ?parent WHERE {
-    ?child type oo:Class .
-    ?child name ?childName .
-    ?child inheritsFrom ?parent
+    ?child type class .
+    ?child has-name ?childName .
+    ?child inherits-from ?parent
 }
 ORDER BY ?childName
 ```
 
-### Cross-Language: Find all constructors
+### Find all constructors
 ```
 SELECT ?ctor ?className ?file WHERE {
-    ?ctor type oo:Constructor .
-    ?ctor definedIn ?class .
-    ?class name ?className .
-    ?ctor inFile ?file
+    ?ctor type constructor .
+    ?ctor is-defined-in ?class .
+    ?class has-name ?className .
+    ?ctor is-in-file ?file
 }
 ```
 
-### Python Only: Find async functions
+### Find async functions
 ```
 SELECT ?func ?name WHERE {
-    ?func type py:Method .
-    ?func name ?name .
-    ?func isAsync true
+    ?func type method .
+    ?func has-name ?name .
+    ?func is-async true
 }
 ```
 
-### Python Only: Find abstract classes
+### Find abstract classes
 ```
 SELECT ?class ?name WHERE {
-    ?class type py:Class .
-    ?class name ?name .
-    ?class inheritsFrom ?base .
-    FILTER(CONTAINS(?base, "ABC"))
+    ?class type class .
+    ?class has-name ?name .
+    ?class is-abstract true
 }
 ```
 
-### Cross-Language: Find imports of a specific module
+### Find imports of a specific module
 ```
 SELECT ?module ?path WHERE {
-    ?imp type oo:Import .
-    ?imp modulePath ?path .
-    ?imp inModule ?module .
+    ?imp type import .
+    ?imp has-module-path ?path .
+    ?imp is-in-module ?module .
     FILTER(CONTAINS(?path, "os"))
-}
-```
-
-### Count entities by language type
-```
-SELECT (COUNT(?class) AS ?count) WHERE {
-    ?class type cpp:Class
 }
 ```
 
 ### Find methods with similar names (using LEVENSHTEIN)
 ```
 SELECT ?m1 ?m2 ?name1 ?name2 WHERE {
-    ?m1 type oo:Method . ?m1 name ?name1 .
-    ?m2 type oo:Method . ?m2 name ?name2 .
+    ?m1 type method . ?m1 has-name ?name1 .
+    ?m2 type method . ?m2 has-name ?name2 .
     FILTER(?m1 != ?m2)
     FILTER(LEVENSHTEIN(?name1, ?name2) <= 2)
 }
@@ -339,16 +278,14 @@ Given a natural language question about code, generate a valid REQL query.
 
 IMPORTANT:
 1. Return ONLY the REQL query, no explanations
-2. Use `oo:` prefix for cross-language queries (default behavior)
-3. Use language-specific prefixes (py:, cpp:, cs:, js:) only when the user asks about a specific language
+2. Use CNL hyphenated-lowercase types: `class`, `method`, `function` (NO prefixes like oo: or py:)
+3. Use CNL hyphenated predicates: `has-name`, `is-in-file`, `is-defined-in`
 4. Use proper REQL syntax with periods between patterns
 5. If the question is ambiguous, make reasonable assumptions
 6. Use SELECT DISTINCT when queries might return duplicates
-7. For Python async methods/functions, use `isAsync true` (NOT hasDecorator "async")
+7. For async methods/functions, use `is-async true`
 8. UNION must be INSIDE the WHERE clause: `{ pattern1 } UNION { pattern2 } .`
    CRITICAL: All UNION arms MUST bind the SAME variables! Each arm must produce identical schema.
-   Bad:  `{ ?x type A . ?x name ?n } UNION { ?x type B . ?x parent ?p }` (different vars: ?n vs ?p)
-   Good: `{ ?x type A . ?x name ?n } UNION { ?x type B . ?x name ?n }` (same vars in both)
-9. The `calls` predicate works uniformly across all languages for call graph analysis
-10. Use `inFile` (not `inModule`) for file path filtering across all languages
+9. The `calls` predicate works uniformly for call graph analysis
+10. Use `is-in-file` for file path filtering
 11. REQL does NOT support comments - do NOT include `#` or `//` comments in your query

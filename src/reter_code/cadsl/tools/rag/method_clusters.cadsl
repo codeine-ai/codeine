@@ -15,12 +15,12 @@ query find_similar_methods() {
     reql {
         SELECT ?m ?name ?class_name ?file ?line
         WHERE {
-            ?m type oo:Method .
-            ?m name ?name .
-            ?m inFile ?file .
-            ?m atLine ?line .
-            ?m definedIn ?c .
-            ?c name ?class_name .
+            ?m type method .
+            ?m has-name ?name .
+            ?m is-in-file ?file .
+            ?m is-at-line ?line .
+            ?m is-defined-in ?c .
+            ?c has-name ?class_name .
             FILTER(!STRSTARTS(?name, "_"))
             FILTER(!STRSTARTS(?name, "test_"))
         }

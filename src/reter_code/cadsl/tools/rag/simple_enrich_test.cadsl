@@ -9,9 +9,9 @@ query test_rag_enrich() {
     reql {
         SELECT ?f ?name ?file
         WHERE {
-            ?f type oo:Function .
-            ?f name ?name .
-            ?f inFile ?file .
+            ?f type function .
+            ?f has-name ?name .
+            ?f is-in-file ?file .
         }
         LIMIT 3
     }

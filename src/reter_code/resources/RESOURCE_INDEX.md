@@ -222,7 +222,7 @@ Execute CADSL queries including **hybrid queries** with `rag_enrich`:
 ```python
 execute_cadsl("""
 query find_similar_methods() {
-    reql { SELECT ?m ?name WHERE { ?m type oo:Method . ?m name ?name } }
+    reql { SELECT ?m ?name WHERE { ?m type method . ?m has-name ?name } }
     | rag_enrich { query: "{name}", top_k: 3, mode: best }
     | emit { results }
 }

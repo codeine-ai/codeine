@@ -14,14 +14,14 @@ detector semantic_dead_code(category="maintenance", severity="medium") {
     reql {
         SELECT ?e ?name ?file ?line ?line_count ?class_name
         WHERE {
-            ?e type oo:Method .
-            ?e name ?name .
-            ?e inFile ?file .
-            ?e atLine ?line .
-            ?e definedIn ?c .
-            ?c name ?class_name .
-            OPTIONAL { ?e lineCount ?line_count }
-            FILTER NOT EXISTS { { ?caller calls ?e } UNION { ?caller maybeCalls ?e } }
+            ?e type method .
+            ?e has-name ?name .
+            ?e is-in-file ?file .
+            ?e is-at-line ?line .
+            ?e is-defined-in ?c .
+            ?c has-name ?class_name .
+            OPTIONAL { ?e has-line-count ?line_count }
+            FILTER NOT EXISTS { { ?caller calls ?e } UNION { ?caller maybe-calls ?e } }
             FILTER ( !REGEX(?name, "^__") )
             FILTER ( !REGEX(?name, "^test_") )
             FILTER ( !REGEX(?file, "test_") )

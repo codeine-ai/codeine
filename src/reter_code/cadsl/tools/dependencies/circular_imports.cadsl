@@ -11,13 +11,13 @@ detector find_circular_imports(category="dependencies", severity="high") {
     reql {
         SELECT ?module1 ?module2 ?file1 ?file2
         WHERE {
-            ?m1 type oo:Module .
-            ?m1 name ?module1 .
-            ?m1 inFile ?file1 .
+            ?m1 type module .
+            ?m1 has-name ?module1 .
+            ?m1 is-in-file ?file1 .
             ?m1 imports ?m2 .
-            ?m2 type oo:Module .
-            ?m2 name ?module2 .
-            ?m2 inFile ?file2
+            ?m2 type module .
+            ?m2 has-name ?module2 .
+            ?m2 is-in-file ?file2
         }
     }
     | select { module1, module2, file1, file2 }

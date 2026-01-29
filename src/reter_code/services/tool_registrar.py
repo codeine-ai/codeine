@@ -247,8 +247,8 @@ class ToolRegistrar:
                 warnings: Any warnings about source validity
 
             Examples:
-                - "SELECT ?c ?name WHERE { ?c type oo:Class . ?c name ?name }"
-                - "SELECT ?m WHERE { ?m type oo:Method . ?m definedIn ?c . ?c name 'MyClass' }"
+                - "SELECT ?c ?name WHERE { ?c type class . ?c has-name ?name }"
+                - "SELECT ?m WHERE { ?m type method . ?m is-defined-in ?c . ?c has-name 'MyClass' }"
             """
             try:
                 require_default_instance()
@@ -794,8 +794,8 @@ class ToolRegistrar:
                         reql {
                             SELECT ?c ?name (COUNT(?m) AS ?method_count)
                             WHERE {
-                                ?c type oo:Class . ?c name ?name .
-                                ?m type oo:Method . ?m definedIn ?c
+                                ?c type class . ?c has-name ?name .
+                                ?m type method . ?m is-defined-in ?c
                             }
                             GROUP BY ?c ?name
                             HAVING (?method_count > 10)

@@ -86,11 +86,11 @@ def get_reql_grammar() -> str:
 {grammar}
 
 ## Key Points:
-- Use `type` predicate for entity types: `?x type oo:Class`
-- Use `oo:` prefix ONLY for types (oo:Class, oo:Method, oo:Function)
-- Predicates have NO prefix: `name`, `inFile`, `definedIn`, `calls`, `inheritsFrom`
+- Use `type` predicate for entity types: `?x type class`
+- Use `oo:` prefix ONLY for types (class, method, function)
+- Predicates have NO prefix: `has-name`, `is-in-file`, `is-defined-in`, `calls`, `inherits-from`
 - FILTER requires parentheses: `FILTER(?count > 5)`
-- Patterns separated by dots: `?x type oo:Class . ?x name ?n`
+- Patterns separated by dots: `?x type class . ?x has-name ?n`
 - UNION: All arms MUST bind the SAME variables
 """
 
@@ -209,15 +209,15 @@ REQL_SYSTEM_PROMPT_TEMPLATE = """You are a REQL query generator. Generate valid 
 - `Grep` - Search codebase to cross-check findings. CRITICAL: ALWAYS specify a `path` parameter to limit search scope (e.g., path="reter_code/src"). Never call Grep without a path - results will exceed buffer limits and fail.
 
 ## ENTITY TYPES (oo: prefix)
-- oo:Class, oo:Method, oo:Function, oo:Module, oo:Import
+- class, method, function, module, import
 
-## COMMON PREDICATES (NO prefix)
-- name, inFile, atLine, definedIn, inheritsFrom, maybeCalls, imports
+## COMMON PREDICATES (NO prefix, CNL hyphenated format)
+- has-name, is-in-file, is-at-line, is-defined-in, inherits-from, maybe-calls, imports
 
 ## SYNTAX RULES
-1. Type patterns: `?x type oo:Class`
+1. Type patterns: `?x type class`
 2. FILTER needs parentheses: `FILTER(?count > 5)`
-3. Patterns separated by dots: `?x type oo:Class . ?x name ?n`
+3. Patterns separated by dots: `?x type class . ?x has-name ?n`
 
 ## SEMANTIC MAPPING (use REGEX for these concepts)
 - "entry points" -> FILTER(REGEX(?name, "main|run|start|serve|execute|app|handle", "i"))
@@ -225,9 +225,9 @@ REQL_SYSTEM_PROMPT_TEMPLATE = """You are a REQL query generator. Generate valid 
 - "interactions/calls" -> use `maybeCalls` or `imports` predicates
 
 ## TYPE vs CONCEPT
-- `?x type oo:Class` - Filter with subsumption (matches py:Class, cpp:Class, etc.)
+- `?x type class` - Filter with subsumption (matches class, class, etc.)
 - `?x type ?t` - Returns ALL types (asserted + inferred) - MULTIPLE rows per entity
-- `?x concept ?t` - Returns ONLY asserted type - ONE row (e.g., "py:Method")
+- `?x concept ?t` - Returns ONLY asserted type - ONE row (e.g., "method")
 
 ## UNION RULES (CRITICAL)
 ALL UNION arms MUST bind the EXACT SAME variables!
@@ -288,7 +288,7 @@ Use `create_task` step to generate tasks in RETER session from query results:
 
 ```cadsl
 query generate_tasks() {{
-    reql {{ SELECT ?class ?file ?line WHERE {{ ?class type oo:Class . ?class inFile ?file . ?class atLine ?line }} LIMIT 10 }}
+    reql {{ SELECT ?class ?file ?line WHERE {{ ?class type class . ?class is-in-file ?file . ?class is-at-line ?line }} LIMIT 10 }}
     | create_task {{
         name: "Task for {{class}}",           // Template with {{field}} placeholders
         category: "annotation",              // annotation, feature, bug, refactor, test, docs, research
@@ -311,7 +311,7 @@ Use `python` step for complex logic that can't be expressed in map/filter:
 
 ```cadsl
 query with_python() {{
-    reql {{ SELECT ?class ?file WHERE {{ ?class type oo:Class . ?class inFile ?file }} }}
+    reql {{ SELECT ?class ?file WHERE {{ ?class type class . ?class is-in-file ?file }} }}
     | python {{{{
         # Determine layer based on file path patterns
         for row in rows:
@@ -329,8 +329,8 @@ query with_python() {{
 ## CRITICAL SYNTAX RULES
 1. REQL blocks do NOT support # comments - use NO comments inside reql {{ ... }} blocks
 2. Use REGEX() not MATCHES: `FILTER(REGEX(?name, "pattern", "i"))`
-3. Entity types use `oo:` prefix: `oo:Class`, `oo:Method`
-4. Predicates have NO prefix: `name`, `inFile`, `definedIn`
+3. Entity types use plain names: `class`, `method`, `function`
+4. Predicates use CNL hyphenated format: `has-name`, `is-in-file`, `is-defined-in`
 5. Pipeline steps use `|` operator
 6. **NEVER use `when {{ {{param}} == true }}`** - use simple filter steps instead
 

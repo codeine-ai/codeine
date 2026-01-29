@@ -13,12 +13,12 @@ detector inline_class(category="refactoring", severity="low") {
     reql {
         SELECT ?c ?name ?file ?line (COUNT(?method) AS ?method_count) (COUNT(?attr) AS ?attr_count)
         WHERE {
-            ?c type oo:Class .
-            ?c name ?name .
-            ?c inFile ?file .
-            ?c atLine ?line .
-            OPTIONAL { ?method type oo:Method . ?method definedIn ?c }
-            OPTIONAL { ?attr type oo:Field . ?attr definedIn ?c }
+            ?c type class .
+            ?c has-name ?name .
+            ?c is-in-file ?file .
+            ?c is-at-line ?line .
+            OPTIONAL { ?method type method . ?method is-defined-in ?c }
+            OPTIONAL { ?attr type field . ?attr is-defined-in ?c }
             FILTER ( !REGEX(?name, "Exception$|Error$|Config$|Settings$") )
         }
         GROUP BY ?c ?name ?file ?line

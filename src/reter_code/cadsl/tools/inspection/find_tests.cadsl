@@ -15,10 +15,10 @@ query find_tests() {
     reql {
         SELECT ?t ?test_name ?file ?line
         WHERE {
-            ?t type oo:Function .
-            ?t name ?test_name .
-            ?t inFile ?file .
-            ?t atLine ?line .
+            ?t type function .
+            ?t has-name ?test_name .
+            ?t is-in-file ?file .
+            ?t is-at-line ?line .
             FILTER(REGEX(?test_name, "^test_|^Test|_test$"))
         }
         ORDER BY ?file ?line

@@ -10,13 +10,13 @@ detector untested_functions(category="test_coverage", severity="medium") {
     reql {
         SELECT ?f ?name ?file ?line ?line_count
         WHERE {
-            ?f type oo:Function .
-            ?f name ?name .
-            ?f inFile ?file .
-            ?f atLine ?line .
-            OPTIONAL { ?f lineCount ?line_count }
+            ?f type function .
+            ?f has-name ?name .
+            ?f is-in-file ?file .
+            ?f is-at-line ?line .
+            OPTIONAL { ?f has-line-count ?line_count }
             FILTER ( !REGEX(?name, "^_") && !REGEX(?file, "test_|_test\\.py") )
-            MINUS { ?test calls ?f . ?test inFile ?test_file . FILTER ( REGEX(?test_file, "test_") ) }
+            MINUS { ?test calls ?f . ?test is-in-file ?test_file . FILTER ( REGEX(?test_file, "test_") ) }
         }
         ORDER BY DESC(?line_count)
         LIMIT {limit}

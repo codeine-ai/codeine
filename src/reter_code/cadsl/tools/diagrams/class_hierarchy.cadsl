@@ -12,13 +12,13 @@ diagram class_hierarchy() {
     reql {
         SELECT ?class ?class_name ?parent ?parent_name ?file ?line
         WHERE {
-            ?class type oo:Class .
-            ?class name ?class_name .
-            ?class inFile ?file .
-            ?class atLine ?line .
+            ?class type class .
+            ?class has-name ?class_name .
+            ?class is-in-file ?file .
+            ?class is-at-line ?line .
             OPTIONAL {
-                ?class inheritsFrom ?parent .
-                ?parent name ?parent_name
+                ?class inherits-from ?parent .
+                ?parent has-name ?parent_name
             }
         }
         ORDER BY ?class_name

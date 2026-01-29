@@ -25,8 +25,8 @@ You can query the extracted semantic structure using REQL.
 result = reasoner.reql("""
     SELECT ?method ?name
     WHERE {
-        ?method concept "py:Method" .
-        ?method name ?name
+        ?method type method .
+        ?method has-name ?name
     }
 """)
 
@@ -52,30 +52,30 @@ Note: Entity IDs ARE the qualified names. For methods with overloads, the ID
 includes the parameter signature: `module.Class.method(ParamType1,ParamType2)`.
 
 ### 1. Classes
-- `concept: "py:Class"`
-- `name: str` - Simple class name
+- `type: class`
+- `has-name: str` - Simple class name
 - Entity ID = qualified name (e.g., `mymodule.MyClass`)
-- `atLine: str` - Line number where defined
-- `atColumn: str` - Column number
-- `hasDocstring: str` - Class docstring (if present)
+- `is-at-line: str` - Line number where defined
+- `is-at-column: str` - Column number
+- `has-docstring: str` - Class docstring (if present)
 
 ### 2. Methods
-- `concept: "py:Method"`
-- `name: str` - Method name
+- `type: method`
+- `has-name: str` - Method name
 - Entity ID = qualified name with signature (e.g., `mymodule.MyClass.method_name(arg1_type,arg2_type)`)
-- `definedIn: str` - Parent class qualified name
-- `atLine: str` - Line number
-- `returnType: str` - Return type annotation (if present)
-- `hasDocstring: str` - Method docstring (if present)
-- `hasDecorator: str` - Decorator name (if present)
+- `is-defined-in: str` - Parent class qualified name
+- `is-at-line: str` - Line number
+- `has-return-type: str` - Return type annotation (if present)
+- `has-docstring: str` - Method docstring (if present)
+- `has-decorator: str` - Decorator name (if present)
 
 ### 3. Parameters
-- `concept: "py:Parameter"`
-- `name: str` - Parameter name
-- `ofFunction: str` - Method qualified name
-- `position: str` - Position in parameter list
-- `typeAnnotation: str` - Type annotation (if present)
-- `defaultValue: str` - Default value (if present)
+- `type: parameter`
+- `has-name: str` - Parameter name
+- `is-of-function: str` - Method qualified name
+- `has-position: str` - Position in parameter list
+- `has-type-annotation: str` - Type annotation (if present)
+- `has-default-value: str` - Default value (if present)
 
 ### 4. Call Relationships
 - `calls: str` - Method A calls Method B
@@ -89,9 +89,9 @@ includes the parameter signature: `module.Class.method(ParamType1,ParamType2)`.
 result = reasoner.reql("""
     SELECT ?method ?name
     WHERE {
-        ?method concept "py:Method" .
-        ?method definedIn "mymodule.MyClass" .
-        ?method name ?name
+        ?method type method .
+        ?method is-defined-in "mymodule.MyClass" .
+        ?method has-name ?name
     }
 """)
 
@@ -104,20 +104,20 @@ for method_id, method_name in rows:
 
 ```python
 result = reasoner.reql("""
-    SELECT ?param ?name ?type ?position
+    SELECT ?param ?name ?type ?has-position
     WHERE {
-        ?param concept "py:Parameter" .
-        ?param ofFunction "mymodule.MyClass.add" .
-        ?param name ?name .
-        ?param typeAnnotation ?type .
-        ?param position ?position
+        ?param type parameter .
+        ?param is-of-function "mymodule.MyClass.add" .
+        ?param has-name ?name .
+        ?param has-type-annotation ?type .
+        ?param has-position ?has-position
     }
-    ORDER BY ?position
+    ORDER BY ?has-position
 """)
 
 rows = query_to_rows(result)
-for param_id, param_name, param_type, position in rows:
-    print(f"Parameter {position}: {param_name}: {param_type}")
+for param_id, param_name, param_type, has-position in rows:
+    print(f"Parameter {has-position}: {param_name}: {param_type}")
 ```
 
 ### Pattern 3: Find Methods with Specific Return Type
@@ -126,9 +126,9 @@ for param_id, param_name, param_type, position in rows:
 result = reasoner.reql("""
     SELECT ?method ?name
     WHERE {
-        ?method concept "py:Method" .
-        ?method returnType "int" .
-        ?method name ?name
+        ?method type method .
+        ?method has-return-type "int" .
+        ?method has-name ?name
     }
 """)
 
@@ -158,9 +158,9 @@ for caller, callee in rows:
 result = reasoner.reql("""
     SELECT ?method ?name ?line
     WHERE {
-        ?method concept "py:Method" .
-        ?method name ?name .
-        ?method atLine ?line
+        ?method type method .
+        ?method has-name ?name .
+        ?method is-at-line ?line
     }
     ORDER BY ?line
 """)
@@ -176,9 +176,9 @@ for method_id, method_name, line_num in rows:
 result = reasoner.reql("""
     SELECT ?method ?name ?decorator
     WHERE {
-        ?method concept "py:Method" .
-        ?method name ?name .
-        ?method hasDecorator ?decorator
+        ?method type method .
+        ?method has-name ?name .
+        ?method has-decorator ?decorator
     }
 """)
 
@@ -193,10 +193,10 @@ for method_id, method_name, decorator in rows:
 result = reasoner.reql("""
     SELECT ?method ?param ?paramName ?default
     WHERE {
-        ?param concept "py:Parameter" .
-        ?param ofFunction ?method .
-        ?param name ?paramName .
-        ?param defaultValue ?default
+        ?param type parameter .
+        ?param is-of-function ?method .
+        ?param has-name ?paramName .
+        ?param has-default-value ?default
     }
 """)
 
@@ -211,9 +211,9 @@ for method, param_id, param_name, default in rows:
 result = reasoner.reql("""
     SELECT ?class ?name ?docstring
     WHERE {
-        ?class concept "py:Class" .
-        ?class name ?name .
-        ?class hasDocstring ?docstring
+        ?class type class .
+        ?class has-name ?name .
+        ?class has-docstring ?docstring
     }
 """)
 
@@ -256,7 +256,7 @@ for (caller,) in rows:
 
 ✅ **Structural Elements**:
 - All methods including `__init__` and magic methods
-- Method parameters with names, types, positions
+- Method parameters with names, types, has-positions
 - Line and column numbers for all elements
 - Return type annotations
 - Call relationships between methods
@@ -282,14 +282,14 @@ for (caller,) in rows:
 
 **Wrong**:
 ```python
-result = reasoner.reql("SELECT ?method WHERE { ?method concept 'py:Method' }")
+result = reasoner.reql("SELECT ?method WHERE { ?method type method }")
 for row in result:  # ❌ PyArrow Table is not iterable this way
     print(row['?method'])
 ```
 
 **Correct**:
 ```python
-result = reasoner.reql("SELECT ?method WHERE { ?method concept 'py:Method' }")
+result = reasoner.reql("SELECT ?method WHERE { ?method type method }")
 methods = result.column('?method').to_pylist()  # ✅ Access by column
 for method_id in methods:
     print(method_id)
@@ -303,7 +303,7 @@ for method_id in methods:
 result = reasoner.reql("""
     SELECT ?method
     WHERE {
-        ?method definedIn "MyClass"  # ❌ Missing module prefix
+        ?method is-defined-in "MyClass"  # ❌ Missing module prefix
     }
 """)
 ```
@@ -314,7 +314,7 @@ result = reasoner.reql("""
 result = reasoner.reql("""
     SELECT ?method
     WHERE {
-        ?method definedIn "mymodule.MyClass"  # ✅ Full path
+        ?method is-defined-in "mymodule.MyClass"  # ✅ Full path
     }
 """)
 ```
@@ -327,8 +327,8 @@ result = reasoner.reql("""
 result = reasoner.reql("""
     SELECT ?var ?value
     WHERE {
-        ?var concept "py:Variable" .  # ❌ Variables not extracted
-        ?var assignedValue ?value
+        ?var type variable .  # ❌ Variables not extracted
+        ?var has-assigned-value ?value
     }
 """)
 ```
@@ -339,8 +339,8 @@ result = reasoner.reql("""
 result = reasoner.reql("""
     SELECT ?param ?default
     WHERE {
-        ?param concept "py:Parameter" .  # ✅ Parameters ARE extracted
-        ?param defaultValue ?default
+        ?param type parameter .  # ✅ Parameters ARE extracted
+        ?param has-default-value ?default
     }
 """)
 ```
@@ -351,10 +351,10 @@ result = reasoner.reql("""
 ```python
 # Assuming all methods have return types
 result = reasoner.reql("""
-    SELECT ?method ?returnType
+    SELECT ?method ?has-return-type
     WHERE {
-        ?method concept "py:Method" .
-        ?method returnType ?returnType  # ❌ Will miss methods without type hints
+        ?method type method .
+        ?method has-return-type ?has-return-type  # ❌ Will miss methods without type hints
     }
 """)
 ```
@@ -363,10 +363,10 @@ result = reasoner.reql("""
 ```python
 # Use OPTIONAL for predicates that may not exist
 result = reasoner.reql("""
-    SELECT ?method ?returnType
+    SELECT ?method ?has-return-type
     WHERE {
-        ?method concept "py:Method" .
-        OPTIONAL { ?method returnType ?returnType }  # ✅ Returns NULL if missing
+        ?method type method .
+        OPTIONAL { ?method has-return-type ?has-return-type }  # ✅ Returns NULL if missing
     }
 """)
 ```
@@ -401,16 +401,16 @@ result = reasoner.reql("""
 
 **Problem**: Query for methods in a class returns nothing
 
-**Solution**: Ensure you're using the `definedIn` predicate with the fully qualified class name:
+**Solution**: Ensure you're using the `is-defined-in` predicate with the fully qualified class name:
 
 ```python
 # Correct pattern
 result = reasoner.reql("""
     SELECT ?method ?name
     WHERE {
-        ?method concept "py:Method" .
-        ?method definedIn "mymodule.MyClass" .  # ✅ Full qualified name
-        ?method name ?name
+        ?method type method .
+        ?method is-defined-in "mymodule.MyClass" .  # ✅ Full qualified name
+        ?method has-name ?name
     }
 """)
 ```
@@ -469,8 +469,8 @@ print(f"Loaded {wme_count} facts")
 result = reasoner.reql("""
     SELECT ?method ?name
     WHERE {
-        ?method concept "py:Method" .
-        ?method name ?name
+        ?method type method .
+        ?method has-name ?name
     }
 """)
 
@@ -481,15 +481,15 @@ for name in names:
 
 # Query 2: Find parameters of 'add' method
 result = reasoner.reql("""
-    SELECT ?name ?type ?position
+    SELECT ?name ?type ?has-position
     WHERE {
-        ?param concept "py:Parameter" .
-        ?param ofFunction "calculator.Calculator.add" .
-        ?param name ?name .
-        ?param typeAnnotation ?type .
-        ?param position ?position
+        ?param type parameter .
+        ?param is-of-function "calculator.Calculator.add" .
+        ?param has-name ?name .
+        ?param has-type-annotation ?type .
+        ?param has-position ?has-position
     }
-    ORDER BY ?position
+    ORDER BY ?has-position
 """)
 
 print("\nParameters of 'add' method:")
@@ -538,19 +538,19 @@ for callee in callees:
 
 ```python
 result = reasoner.reql("""
-    SELECT ?attr ?name ?type ?visibility
+    SELECT ?attr ?name ?type ?has-visibility
     WHERE {
-        ?attr concept "py:Attribute" .
-        ?attr definedIn "mymodule.MyClass" .
-        ?attr name ?name .
-        ?attr hasType ?type .
-        ?attr visibility ?visibility
+        ?attr type field .
+        ?attr is-defined-in "mymodule.MyClass" .
+        ?attr has-name ?name .
+        ?attr has-type ?type .
+        ?attr has-visibility ?has-visibility
     }
 """)
 
 rows = query_to_rows(result)
-for attr_id, attr_name, attr_type, visibility in rows:
-    print(f"{visibility} attribute: {attr_name}: {attr_type}")
+for attr_id, attr_name, attr_type, has-visibility in rows:
+    print(f"{has-visibility} attribute: {attr_name}: {attr_type}")
 ```
 
 **Output**:
@@ -566,11 +566,11 @@ private attribute: __secret: mymodule.SecretManager
 result = reasoner.reql("""
     SELECT ?class ?attr ?name ?type
     WHERE {
-        ?attr concept "py:Attribute" .
-        ?attr definedIn ?class .
-        ?attr name ?name .
-        ?attr visibility "public" .
-        OPTIONAL { ?attr hasType ?type }
+        ?attr type field .
+        ?attr is-defined-in ?class .
+        ?attr has-name ?name .
+        ?attr has-visibility "public" .
+        OPTIONAL { ?attr has-type ?type }
     }
 """)
 
@@ -587,10 +587,10 @@ for class_name, attr_id, attr_name, attr_type in rows:
 result = reasoner.reql("""
     SELECT ?class ?name
     WHERE {
-        ?attr concept "py:Attribute" .
-        ?attr definedIn ?class .
-        ?attr name ?name .
-        ?attr visibility "protected"
+        ?attr type field .
+        ?attr is-defined-in ?class .
+        ?attr has-name ?name .
+        ?attr has-visibility "protected"
     }
 """)
 
@@ -598,10 +598,10 @@ result = reasoner.reql("""
 result = reasoner.reql("""
     SELECT ?class ?name
     WHERE {
-        ?attr concept "py:Attribute" .
-        ?attr definedIn ?class .
-        ?attr name ?name .
-        ?attr visibility "private"
+        ?attr type field .
+        ?attr is-defined-in ?class .
+        ?attr has-name ?name .
+        ?attr has-visibility "private"
     }
 """)
 ```
@@ -615,8 +615,8 @@ result = reasoner.reql("""
     SELECT ?caller ?caller_name ?callee ?callee_name
     WHERE {
         ?caller calls ?callee .
-        ?caller name ?caller_name .
-        ?callee name ?callee_name
+        ?caller has-name ?caller_name .
+        ?callee has-name ?callee_name
     }
 """)
 
@@ -639,10 +639,10 @@ initialize calls load_all_plugins
 result = reasoner.reql("""
     SELECT ?class ?attr_name
     WHERE {
-        ?attr concept "py:Attribute" .
-        ?attr definedIn ?class .
-        ?attr name ?attr_name .
-        ?attr hasType ?type .
+        ?attr type field .
+        ?attr is-defined-in ?class .
+        ?attr has-name ?attr_name .
+        ?attr has-type ?type .
         FILTER(REGEX(?type, "PluginManager"))
     }
 """)
@@ -689,11 +689,11 @@ for (callee,) in rows:
 
 | Predicate | Type | Description |
 |-----------|------|-------------|
-| `concept` | `"py:Attribute"` | Identifies an attribute |
+| `type` | `field` | Identifies a field/attribute |
 | `name` | `str` | Attribute name (e.g., `"manager"`) |
-| `definedIn` | `str` | Qualified class name (standardized with methods) |
-| `hasType` | `str` | Inferred type (qualified name) |
-| `visibility` | `str` | `"public"`, `"protected"`, or `"private"` |
+| `is-defined-in` | `str` | Qualified class name (standardized with methods) |
+| `has-type` | `str` | Inferred type (qualified name) |
+| `has-visibility` | `str` | `"public"`, `"protected"`, or `"private"` |
 
 ### Type Tracking Example:
 
@@ -719,48 +719,48 @@ After loading, you can query:
 ### What's NEW (2025-11-28):
 
 ✅ **Exception Handling Facts**:
-- `py:TryBlock` - Try statement blocks with metadata
-- `py:ExceptHandler` - Exception handlers with detection flags
-- `py:TryElseBlock` - Try-else blocks
-- `py:FinallyBlock` - Finally blocks with RAII detection
-- `py:RaiseStatement` - Raise statements with exception info
-- `py:ReturnStatement` - Return statements with error code detection
-- `py:WithStatement` - Context manager (with) statements
-- `py:ContextManager` - Individual context managers in with statements
+- `try-block` - Try statement blocks with metadata
+- `except-handler` - Exception handlers with detection flags
+- `try-else-block` - Try-else blocks
+- `finally-block` - Finally blocks with RAII detection
+- `raise-statement` - Raise statements with exception info
+- `return-statement` - Return statements with error code detection
+- `with-statement` - Context manager (with) statements
+- `context-manager` - Individual context managers in with statements
 
 ### Exception Handling Predicates
 
 | Concept | Predicate | Type | Description |
 |---------|-----------|------|-------------|
-| `py:TryBlock` | `inFunction` | `str` | Function containing the try block |
-| | `atLine` | `str` | Line number |
-| | `hasExceptHandlers` | `str` | Number of except handlers |
-| | `hasElse` | `bool` | Has else block |
-| | `hasFinally` | `bool` | Has finally block |
-| `py:ExceptHandler` | `inTryBlock` | `str` | Parent try block |
-| | `exceptionType` | `str` | Caught exception type |
-| | `aliasName` | `str` | Exception alias (e.g., `as e`) |
-| | `atLine` | `str` | Line number |
-| | `isSilentSwallow` | `bool` | Empty/pass handler (code smell!) |
-| | `isGeneralExcept` | `bool` | Catches broad exception type |
-| | `isBareExcept` | `bool` | Bare except clause |
-| `py:RaiseStatement` | `inFunction` | `str` | Function containing raise |
-| | `exceptionType` | `str` | Raised exception type |
-| | `atLine` | `str` | Line number |
-| | `isGeneralException` | `bool` | Raises broad exception type |
-| | `isReraise` | `bool` | Bare raise (re-raise) |
-| `py:ReturnStatement` | `inFunction` | `str` | Function containing return |
-| | `atLine` | `str` | Line number |
-| | `returnValue` | `str` | Returned value |
-| | `looksLikeErrorCode` | `bool` | Returns -1, None, False (smell!) |
-| `py:WithStatement` | `inFunction` | `str` | Function containing with |
-| | `atLine` | `str` | Line number |
-| `py:ContextManager` | `inWithStatement` | `str` | Parent with statement |
+| `try-block` | `is-in-function` | `str` | Function containing the try block |
+| | `is-at-line` | `str` | Line number |
+| | `has-except-handlers` | `str` | Number of except handlers |
+| | `has-else` | `bool` | Has else block |
+| | `has-finally` | `bool` | Has finally block |
+| `except-handler` | `is-in-try-block` | `str` | Parent try block |
+| | `has-exception-type` | `str` | Caught exception type |
+| | `has-alias-name` | `str` | Exception alias (e.g., `as e`) |
+| | `is-at-line` | `str` | Line number |
+| | `is-silent-swallow` | `bool` | Empty/pass handler (code smell!) |
+| | `is-general-except` | `bool` | Catches broad exception type |
+| | `is-bare-except` | `bool` | Bare except clause |
+| `raise-statement` | `is-in-function` | `str` | Function containing raise |
+| | `has-exception-type` | `str` | Raised exception type |
+| | `is-at-line` | `str` | Line number |
+| | `is-general-exception` | `bool` | Raises broad exception type |
+| | `is-reraise` | `bool` | Bare raise (re-raise) |
+| `return-statement` | `is-in-function` | `str` | Function containing return |
+| | `is-at-line` | `str` | Line number |
+| | `has-return-value` | `str` | Returned value |
+| | `looks-like-error-code` | `bool` | Returns -1, None, False (smell!) |
+| `with-statement` | `is-in-function` | `str` | Function containing with |
+| | `is-at-line` | `str` | Line number |
+| `context-manager` | `is-in-with-statement` | `str` | Parent with statement |
 | | `expression` | `str` | Context manager expression |
-| | `aliasName` | `str` | Alias (e.g., `as f`) |
-| `py:FinallyBlock` | `inTryBlock` | `str` | Parent try block |
-| | `atLine` | `str` | Line number |
-| | `isRAIICleanup` | `bool` | Manual cleanup (could use with) |
+| | `has-alias-name` | `str` | Alias (e.g., `as f`) |
+| `finally-block` | `is-in-try-block` | `str` | Parent try block |
+| | `is-at-line` | `str` | Line number |
+| | `is-raii-cleanup` | `bool` | Manual cleanup (could use with) |
 
 ### Pattern 17: Find Silent Exception Swallowing
 
@@ -770,11 +770,11 @@ Find dangerous `except: pass` patterns that hide errors:
 result = reasoner.reql("""
     SELECT ?handler ?try_block ?exception_type ?line
     WHERE {
-        ?handler concept "py:ExceptHandler" .
-        ?handler isSilentSwallow "true" .
-        ?handler inTryBlock ?try_block .
-        ?handler atLine ?line .
-        OPTIONAL { ?handler exceptionType ?exception_type }
+        ?handler type except-handler .
+        ?handler is-silent-swallow "true" .
+        ?handler is-in-try-block ?try_block .
+        ?handler is-at-line ?line .
+        OPTIONAL { ?handler has-exception-type ?exception_type }
     }
 """)
 
@@ -792,12 +792,12 @@ Find code catching overly broad exceptions:
 result = reasoner.reql("""
     SELECT ?handler ?exception_type ?line ?function
     WHERE {
-        ?handler concept "py:ExceptHandler" .
-        ?handler isGeneralExcept "true" .
-        ?handler exceptionType ?exception_type .
-        ?handler atLine ?line .
-        ?handler inTryBlock ?try .
-        ?try inFunction ?function
+        ?handler type except-handler .
+        ?handler is-general-except "true" .
+        ?handler has-exception-type ?exception_type .
+        ?handler is-at-line ?line .
+        ?handler is-in-try-block ?try .
+        ?try is-in-function ?function
     }
 """)
 
@@ -814,11 +814,11 @@ Find code that raises Exception, BaseException, etc:
 result = reasoner.reql("""
     SELECT ?raise ?exception_type ?line ?function
     WHERE {
-        ?raise concept "py:RaiseStatement" .
-        ?raise isGeneralException "true" .
-        ?raise exceptionType ?exception_type .
-        ?raise inFunction ?function .
-        ?raise atLine ?line
+        ?raise type raise-statement .
+        ?raise is-general-exception "true" .
+        ?raise has-exception-type ?exception_type .
+        ?raise is-in-function ?function .
+        ?raise is-at-line ?line
     }
 """)
 
@@ -835,11 +835,11 @@ Find functions returning error codes instead of raising exceptions:
 result = reasoner.reql("""
     SELECT ?return ?value ?line ?function
     WHERE {
-        ?return concept "py:ReturnStatement" .
-        ?return looksLikeErrorCode "true" .
-        ?return returnValue ?value .
-        ?return inFunction ?function .
-        ?return atLine ?line
+        ?return type return-statement .
+        ?return looks-like-error-code "true" .
+        ?return has-return-value ?value .
+        ?return is-in-function ?function .
+        ?return is-at-line ?line
     }
 """)
 
@@ -856,9 +856,9 @@ Find all with statement usages:
 result = reasoner.reql("""
     SELECT ?with ?function ?line
     WHERE {
-        ?with concept "py:WithStatement" .
-        ?with inFunction ?function .
-        ?with atLine ?line
+        ?with type with-statement .
+        ?with is-in-function ?function .
+        ?with is-at-line ?line
     }
 """)
 
@@ -875,11 +875,11 @@ Find manual cleanup in finally that should use `with`:
 result = reasoner.reql("""
     SELECT ?finally ?try_block ?line ?function
     WHERE {
-        ?finally concept "py:FinallyBlock" .
-        ?finally isRAIICleanup "true" .
-        ?finally inTryBlock ?try_block .
-        ?finally atLine ?line .
-        ?try_block inFunction ?function
+        ?finally type finally-block .
+        ?finally is-raii-cleanup "true" .
+        ?finally is-in-try-block ?try_block .
+        ?finally is-at-line ?line .
+        ?try_block is-in-function ?function
     }
 """)
 
@@ -896,11 +896,11 @@ Find `except:` without specifying exception type:
 result = reasoner.reql("""
     SELECT ?handler ?line ?function
     WHERE {
-        ?handler concept "py:ExceptHandler" .
-        ?handler isBareExcept "true" .
-        ?handler atLine ?line .
-        ?handler inTryBlock ?try .
-        ?try inFunction ?function
+        ?handler type except-handler .
+        ?handler is-bare-except "true" .
+        ?handler is-at-line ?line .
+        ?handler is-in-try-block ?try .
+        ?try is-in-function ?function
     }
 """)
 
@@ -920,12 +920,12 @@ function_name = "mymodule.MyClass.process"
 try_result = reasoner.reql(f"""
     SELECT ?try ?line ?handlers ?has_else ?has_finally
     WHERE {{
-        ?try concept "py:TryBlock" .
-        ?try inFunction "{function_name}" .
-        ?try atLine ?line .
-        ?try hasExceptHandlers ?handlers .
-        OPTIONAL {{ ?try hasElse ?has_else }} .
-        OPTIONAL {{ ?try hasFinally ?has_finally }}
+        ?try type try-block .
+        ?try is-in-function "{function_name}" .
+        ?try is-at-line ?line .
+        ?try has-except-handlers ?handlers .
+        OPTIONAL {{ ?try has-else ?has_else }} .
+        OPTIONAL {{ ?try has-finally ?has_finally }}
     }}
 """)
 
@@ -933,10 +933,10 @@ try_result = reasoner.reql(f"""
 raise_result = reasoner.reql(f"""
     SELECT ?raise ?exception_type ?line
     WHERE {{
-        ?raise concept "py:RaiseStatement" .
-        ?raise inFunction "{function_name}" .
-        ?raise atLine ?line .
-        OPTIONAL {{ ?raise exceptionType ?exception_type }}
+        ?raise type raise-statement .
+        ?raise is-in-function "{function_name}" .
+        ?raise is-at-line ?line .
+        OPTIONAL {{ ?raise has-exception-type ?exception_type }}
     }}
 """)
 
@@ -944,9 +944,9 @@ raise_result = reasoner.reql(f"""
 with_result = reasoner.reql(f"""
     SELECT ?with ?line
     WHERE {{
-        ?with concept "py:WithStatement" .
-        ?with inFunction "{function_name}" .
-        ?with atLine ?line
+        ?with type with-statement .
+        ?with is-in-function "{function_name}" .
+        ?with is-at-line ?line
     }}
 """)
 ```
@@ -959,10 +959,10 @@ Find `raise` without arguments (re-raising caught exception):
 result = reasoner.reql("""
     SELECT ?raise ?line ?function
     WHERE {
-        ?raise concept "py:RaiseStatement" .
-        ?raise isReraise "true" .
-        ?raise inFunction ?function .
-        ?raise atLine ?line
+        ?raise type raise-statement .
+        ?raise is-reraise "true" .
+        ?raise is-in-function ?function .
+        ?raise is-at-line ?line
     }
 """)
 
@@ -1003,26 +1003,26 @@ reasoner.load_python_code(code, "fileproc")
 # Find all issues
 silent_swallows = reasoner.reql("""
     SELECT ?line WHERE {
-        ?h concept "py:ExceptHandler" .
-        ?h isSilentSwallow "true" .
-        ?h atLine ?line
+        ?h type except-handler .
+        ?h is-silent-swallow "true" .
+        ?h is-at-line ?line
     }
 """)
 
 error_codes = reasoner.reql("""
     SELECT ?line ?value WHERE {
-        ?r concept "py:ReturnStatement" .
-        ?r looksLikeErrorCode "true" .
-        ?r atLine ?line .
-        ?r returnValue ?value
+        ?r type return-statement .
+        ?r looks-like-error-code "true" .
+        ?r is-at-line ?line .
+        ?r has-return-value ?value
     }
 """)
 
 bare_excepts = reasoner.reql("""
     SELECT ?line WHERE {
-        ?h concept "py:ExceptHandler" .
-        ?h isBareExcept "true" .
-        ?h atLine ?line
+        ?h type except-handler .
+        ?h is-bare-except "true" .
+        ?h is-at-line ?line
     }
 """)
 ```

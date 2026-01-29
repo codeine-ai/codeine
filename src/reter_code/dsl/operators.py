@@ -205,8 +205,8 @@ def merge(*pipelines: Pipeline) -> MergeStep:
     Merge results from multiple pipelines.
 
     Example:
-        classes = reql("SELECT ?c WHERE { ?c type oo:Class }")
-        functions = reql("SELECT ?f WHERE { ?f type oo:Function }")
+        classes = reql("SELECT ?c WHERE { ?c type class }")
+        functions = reql("SELECT ?f WHERE { ?f type function }")
 
         all_entities = merge(classes, functions)
 
@@ -382,7 +382,7 @@ def parallel(*steps: Step) -> ParallelStep:
 
     Example:
         pipeline = (
-            reql("SELECT ?c WHERE { ?c type oo:Class }")
+            reql("SELECT ?c WHERE { ?c type class }")
             >> parallel(
                 count_methods,
                 count_attributes,

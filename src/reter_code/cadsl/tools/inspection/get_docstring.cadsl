@@ -10,12 +10,12 @@ query get_docstring() {
     reql {
         SELECT ?e ?name ?docstring ?file ?line ?type
         WHERE {
-            { ?e type oo:Class } UNION { ?e type oo:Method } UNION { ?e type oo:Function }
+            { ?e type class } UNION { ?e type method } UNION { ?e type function }
             ?e type ?type .
-            ?e name ?name .
-            ?e inFile ?file .
-            ?e atLine ?line .
-            OPTIONAL { ?e docstring ?docstring }
+            ?e has-name ?name .
+            ?e is-in-file ?file .
+            ?e is-at-line ?line .
+            OPTIONAL { ?e has-docstring ?docstring }
             FILTER ( CONTAINS(?name, "{target}") || CONTAINS(?e, "{target}") )
         }
     }

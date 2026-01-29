@@ -10,13 +10,13 @@ detector find_public_api(category="patterns", severity="info") {
     reql {
         SELECT ?e ?name ?file ?line ?docstring
         WHERE {
-            { ?e type oo:Class }
+            { ?e type class }
             UNION
-            { ?e type oo:Function }
-            ?e name ?name .
-            ?e inFile ?file .
-            ?e atLine ?line .
-            OPTIONAL { ?e docstring ?docstring }
+            { ?e type function }
+            ?e has-name ?name .
+            ?e is-in-file ?file .
+            ?e is-at-line ?line .
+            OPTIONAL { ?e has-docstring ?docstring }
             FILTER ( !REGEX(?name, "^_") && REGEX(?file, "[.]py$") )
         }
         ORDER BY ?file ?name

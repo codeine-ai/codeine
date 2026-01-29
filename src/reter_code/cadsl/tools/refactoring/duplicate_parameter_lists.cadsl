@@ -15,13 +15,13 @@ detector duplicate_parameter_lists(category="refactoring", severity="medium") {
     reql {
         SELECT ?m ?name ?class_name ?file ?line (COUNT(?p) AS ?param_count)
         WHERE {
-            ?m type oo:Method .
-            ?m name ?name .
-            ?m inFile ?file .
-            ?m atLine ?line .
-            ?p type oo:Parameter .
-            ?p ofFunction ?m .
-            OPTIONAL { ?m definedIn ?c . ?c name ?class_name }
+            ?m type method .
+            ?m has-name ?name .
+            ?m is-in-file ?file .
+            ?m is-at-line ?line .
+            ?p type parameter .
+            ?p is-of-function ?m .
+            OPTIONAL { ?m is-defined-in ?c . ?c has-name ?class_name }
             FILTER(!STRSTARTS(?name, "_"))
             FILTER(!STRSTARTS(?name, "test_"))
         }

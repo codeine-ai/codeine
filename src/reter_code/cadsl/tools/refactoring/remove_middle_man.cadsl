@@ -12,15 +12,15 @@ detector remove_middle_man(category="refactoring", severity="low") {
     reql {
         SELECT ?c ?name ?file ?line ?delegate ?delegate_class (COUNT(?delegation) AS ?delegation_count)
         WHERE {
-            ?c type oo:Class .
-            ?c name ?name .
-            ?c inFile ?file .
-            ?c atLine ?line .
-            ?delegation type oo:Method .
-            ?delegation definedIn ?c .
+            ?c type class .
+            ?c has-name ?name .
+            ?c is-in-file ?file .
+            ?c is-at-line ?line .
+            ?delegation type method .
+            ?delegation is-defined-in ?c .
             ?delegation calls ?target .
-            ?target definedIn ?delegate .
-            ?delegate name ?delegate_class .
+            ?target is-defined-in ?delegate .
+            ?delegate has-name ?delegate_class .
             FILTER ( ?delegate != ?c )
         }
         GROUP BY ?c ?name ?file ?line ?delegate ?delegate_class

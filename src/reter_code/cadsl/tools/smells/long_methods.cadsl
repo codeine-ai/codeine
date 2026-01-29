@@ -12,12 +12,12 @@ detector long_methods(category="size", severity="medium") {
     reql {
         SELECT ?m ?name ?class_name ?file ?line ?line_count
         WHERE {
-            ?m type oo:Method .
-            ?m name ?name .
-            ?m inFile ?file .
-            ?m atLine ?line .
-            ?m lineCount ?line_count .
-            OPTIONAL { ?m definedIn ?c . ?c name ?class_name }
+            ?m type method .
+            ?m has-name ?name .
+            ?m is-in-file ?file .
+            ?m is-at-line ?line .
+            ?m has-line-count ?line_count .
+            OPTIONAL { ?m is-defined-in ?c . ?c has-name ?class_name }
             FILTER ( ?line_count > {max_lines} )
         }
         ORDER BY DESC(?line_count)

@@ -13,10 +13,10 @@ detector find_orphan_helpers(category="dead_code", severity="medium") {
     reql {
         SELECT ?f ?name ?file ?line
         WHERE {
-            ?f type oo:Function .
-            ?f name ?name .
-            ?f inFile ?file .
-            ?f atLine ?line .
+            ?f type function .
+            ?f has-name ?name .
+            ?f is-in-file ?file .
+            ?f is-at-line ?line .
             FILTER(STRSTARTS(?name, "_"))
             FILTER(!STRSTARTS(?name, "__"))
         }

@@ -31,7 +31,7 @@ def query(name: str, description: str = "") -> Callable:
         @query("list_modules")
         def list_modules(p: Pipeline) -> Pipeline:
             return (
-                p.reql("SELECT ?m ?name WHERE { ?m type oo:Module }")
+                p.reql("SELECT ?m ?name WHERE { ?m type module }")
                 .select("name", "file")
                 .emit("modules")
             )

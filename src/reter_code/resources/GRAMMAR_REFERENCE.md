@@ -169,7 +169,7 @@ has hasChild where Person
 # Manchester syntax (NEW)
 hasChild some Thing
 worksFor exists Company
-hasMethod some py:Method
+has-method some method
 ```
 
 Used in subsumptions:
@@ -479,7 +479,7 @@ if Employee(object e) also salary(object e, var s) also greaterThan(var s, 10000
 
 **5. Multiple condition inference:**
 ```
-if Class(object c) also hasMethod(object c, object m1) also hasMethod(object c, object m2) also distinct(object m1, object m2) then hasMultipleMethods(object c, true)
+if Class(object c) also has-method(object c, object m1) also has-method(object c, object m2) also distinct(object m1, object m2) then has-multiple-methods(object c, true)
 ```
 
 #### Syntax Comparison
@@ -723,7 +723,7 @@ result = query_logic(query="hasChild >= 2 Person")
 # Same as above - Manchester syntax
 
 # Complex expressions with Manchester syntax (NEW)
-result = query_logic(query="py:Class and (hasMethod some py:Method)")
+result = query_logic(query="class and (has-method some method)")
 # Returns Python classes that have at least one method
 
 # Mixed syntax
@@ -803,7 +803,7 @@ if is_true_logic(axiom="hasChild some Doctor")["result"]:
     print("Someone has a Doctor child")
 
 # Check Python classes with methods - Manchester syntax (NEW)
-if is_true_logic(axiom="py:Class and (hasMethod some py:Method)")["result"]:
+if is_true_logic(axiom="class and (has-method some method)")["result"]:
     print("At least one Python class has methods")
 ```
 
@@ -1168,15 +1168,15 @@ SELECT ?person ?age WHERE {
 ```sparql
 # Find methods with similar names (edit distance ≤ 2)
 SELECT ?m1 ?m2 ?name1 ?name2 WHERE {
-  ?m1 type oo:Method . ?m1 name ?name1 .
-  ?m2 type oo:Method . ?m2 name ?name2 .
+  ?m1 type method . ?m1 name ?name1 .
+  ?m2 type method . ?m2 name ?name2 .
   FILTER(?m1 != ?m2)
   FILTER(LEVENSHTEIN(?name1, ?name2) <= 2)
 }
 
 # Find potential typos in class names
 SELECT ?class ?name WHERE {
-  ?class type oo:Class . ?class name ?name .
+  ?class type class . ?class name ?name .
   FILTER(LEVENSHTEIN(?name, 'UserService') <= 2)
 }
 ```

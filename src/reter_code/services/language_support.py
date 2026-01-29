@@ -1,21 +1,21 @@
 """
 Language Support Module for Multi-Language Code Analysis.
 
-This module provides utilities for language-independent code analysis by managing
-ontology prefixes (oo:, py:, js:) used in REQL queries.
+This module provides utilities for language-independent code analysis.
 
-NOTE: REQL queries should use explicit prefixes directly (e.g., oo:Class, py:Method).
-The placeholder resolution mechanism has been removed.
+NOTE: REQL queries use CNL (Controlled Natural Language) naming conventions:
+- Types use plain lowercase names: class, method, function
+- Predicates use hyphenated format: has-name, is-in-file, is-defined-in, inherits-from
 
 Usage:
     from reter_code.services.language_support import LanguageSupport, lang
 
-    # Get prefix for a language
+    # Get prefix for a language (legacy support)
     prefix = LanguageSupport.get_prefix("python")  # Returns "py"
     prefix = LanguageSupport.get_prefix("oo")      # Returns "oo" (default)
 
-    # Build relation string
-    relation = lang.relation("inheritsFrom", "py")  # Returns 'py:inheritsFrom'
+    # Build relation string (legacy support)
+    relation = lang.relation("inherits-from", "py")  # Returns 'py:inherits-from'
 """
 
 from typing import Literal, Optional, Dict, List
@@ -199,14 +199,14 @@ class LanguageSupport:
         "DataAttribute": EntityMapping("CodeEntity", html="DataAttribute"),
     }
 
-    # Common relationships (same name but different prefix)
+    # Common relationships and attributes (CNL hyphenated format)
     RELATIONSHIPS = [
-        "inheritsFrom", "calls", "callsTransitive", "imports", "importsTransitive",
-        "definedIn", "hasMethod", "inheritsMethod", "hasParameter", "ofFunction",
-        "hasField", "hasAttribute", "inModule", "containsClass", "containsFunction",
-        "hasDocstring", "undocumented", "isStatic", "isAsync", "isPrivate",
-        "hasName", "lineNumber", "lineCount", "hasDecorator", "hasType",
-        "visibility", "parameterCount", "methodCount"
+        "inherits-from", "calls", "calls-transitive", "imports", "imports-transitive",
+        "is-defined-in", "has-method", "inherits-method", "has-parameter", "is-of-function",
+        "has-field", "has-attribute", "is-in-module", "contains-class", "contains-function",
+        "has-docstring", "is-undocumented", "is-static", "is-async", "is-private",
+        "has-name", "is-at-line", "has-line-count", "has-decorator", "has-type-annotation",
+        "has-access-modifier", "has-parameter-count", "has-method-count"
     ]
 
     @classmethod
@@ -226,11 +226,11 @@ class LanguageSupport:
         Build a relation/property string.
 
         Args:
-            rel: Relationship name (e.g., "inheritsFrom", "hasMethod")
+            rel: Relationship name (e.g., "inherits-from", "has-method")
             language: Target language
 
         Returns:
-            Fully qualified relation string (e.g., "py:inheritsFrom")
+            Fully qualified relation string (e.g., "py:inherits-from")
         """
         prefix = cls.get_prefix(language)
         return f"{prefix}:{rel}"
@@ -242,12 +242,12 @@ class LanguageSupport:
 
         Args:
             subj: Subject variable (e.g., "?method")
-            rel: Relationship name (e.g., "definedIn")
+            rel: Relationship name (e.g., "is-defined-in")
             obj: Object variable or value (e.g., "?class")
             language: Target language
 
         Returns:
-            REQL clause (e.g., '?method py:definedIn ?class')
+            REQL clause (e.g., '?method py:is-defined-in ?class')
         """
         relation = cls.relation(rel, language)
         return f'{subj} {relation} {obj}'

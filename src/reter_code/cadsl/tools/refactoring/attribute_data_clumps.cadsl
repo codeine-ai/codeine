@@ -14,18 +14,18 @@ detector attribute_data_clumps(category="refactoring", severity="medium") {
     reql {
         SELECT ?c1 ?class1 ?c2 ?class2 ?file1 ?line1 ?attr1 ?attr2
         WHERE {
-            ?c1 type oo:Class .
-            ?c1 name ?class1 .
-            ?c1 inFile ?file1 .
-            ?c1 atLine ?line1 .
-            ?a1 type oo:Field .
-            ?a1 definedIn ?c1 .
-            ?a1 name ?attr1 .
-            ?c2 type oo:Class .
-            ?c2 name ?class2 .
-            ?a2 type oo:Field .
-            ?a2 definedIn ?c2 .
-            ?a2 name ?attr2 .
+            ?c1 type class .
+            ?c1 has-name ?class1 .
+            ?c1 is-in-file ?file1 .
+            ?c1 is-at-line ?line1 .
+            ?a1 type field .
+            ?a1 is-defined-in ?c1 .
+            ?a1 has-name ?attr1 .
+            ?c2 type class .
+            ?c2 has-name ?class2 .
+            ?a2 type field .
+            ?a2 is-defined-in ?c2 .
+            ?a2 has-name ?attr2 .
             FILTER(?c1 != ?c2)
             FILTER(LEVENSHTEIN(?attr1, ?attr2) <= {max_attr_distance})
             FILTER(!STRSTARTS(?attr1, "_"))
