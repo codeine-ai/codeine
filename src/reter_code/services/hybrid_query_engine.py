@@ -38,8 +38,8 @@ class CADSLToolMetadata:
     """
     Metadata extracted from a CADSL tool file.
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     name: str
     file_path: Path
@@ -69,9 +69,9 @@ class CADSLToolIndex:
     Uses sentence-transformers embeddings for semantic similarity matching.
     Scans CADSL tool files and creates embeddings for efficient search.
 
-    @reter: ServiceLayer(self)
-    @reter: QueryEngine(self)
-    @reter: dependsOn(self, reter_code.services.EmbeddingService)
+    @reter-cnl: This is-in-layer Service-Layer.
+    @reter-cnl: This is a query-engine.
+    @reter-cnl: This depends-on `reter_code.services.EmbeddingService`.
     """
 
     def __init__(self, tools_dir: Optional[Path] = None):
@@ -640,8 +640,8 @@ class QueryType(Enum):
     """
     Types of queries the hybrid engine can handle.
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     REQL = "reql"           # Simple structural queries
     CADSL = "cadsl"         # Complex pipelines, graph algorithms
@@ -653,8 +653,8 @@ class SimilarTool:
     """
     A similar CADSL tool found via case-based reasoning.
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     name: str
     score: float
@@ -676,8 +676,8 @@ class QueryClassification:
     """
     Result of classifying a natural language query.
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     query_type: QueryType
     confidence: float
@@ -1200,8 +1200,8 @@ class HybridQueryResult:
     """
     Result of executing a hybrid query.
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     success: bool
     results: List[Dict[str, Any]]

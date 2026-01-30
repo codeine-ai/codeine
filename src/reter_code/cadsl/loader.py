@@ -36,8 +36,8 @@ class LoadResult:
     """
     Result of loading CADSL tools.
 
-    @reter: DSLLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a value-object.
     """
     success: bool
     tools_loaded: int = 0
@@ -62,8 +62,8 @@ class RegisteredToolSpec:
     This wraps a CADSL ToolSpec and provides the interface expected
     by the Registry class.
 
-    @reter: DSLLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a value-object.
     """
     name: str
     type: "ToolType"
@@ -81,8 +81,8 @@ class ToolType:
     """
     Tool type enum compatible with registry.
 
-    @reter: DSLLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a value-object.
     """
     QUERY = "query"
     DETECTOR = "detector"
@@ -101,8 +101,8 @@ class ParamSpec:
     """
     Parameter specification compatible with registry.
 
-    @reter: DSLLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a value-object.
     """
     name: str
     type: type

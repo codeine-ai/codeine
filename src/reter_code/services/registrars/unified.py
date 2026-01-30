@@ -26,8 +26,8 @@ class ItemsQueryFilters:
     """
     Filter parameters for querying items.
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     item_type: Optional[str] = None
     status: Optional[str] = None
@@ -51,8 +51,8 @@ class UnifiedToolsRegistrar(ToolRegistrarBase):
     """
     Registers unified thinking system tools with FastMCP.
 
-    @reter: ServiceLayer(self)
-    @reter: Registrar(self)
+    @reter-cnl: This is-in-layer Service-Layer.
+    @reter-cnl: This is a registrar.
     """
 
     def __init__(self, instance_manager, persistence_service, tools_filter=None):

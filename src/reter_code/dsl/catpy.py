@@ -40,8 +40,8 @@ class Functor(ABC, Generic[T]):
       1) Identity:     fmap(id)      == id
       2) Composition:  fmap(g)∘fmap(f) == fmap(g∘f)
 
-    @reter: DSLLayer(self)
-    @reter: Typeclass(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a type-class.
     """
 
     @abstractmethod
@@ -68,8 +68,8 @@ class Applicative(Functor[T], ABC):
       3) Interchange:  u.ap(pure(y)) == pure(lambda f: f(y)).ap(u)
       4) Composition:  pure(compose).ap(u).ap(v).ap(w) == u.ap(v.ap(w))
 
-    @reter: DSLLayer(self)
-    @reter: Typeclass(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a type-class.
     """
 
     @classmethod
@@ -103,8 +103,8 @@ class Monad(Applicative[T], ABC):
       2) Right identity: m.bind(pure)    == m
       3) Associativity:  m.bind(f).bind(g) == m.bind(lambda x: f(x).bind(g))
 
-    @reter: DSLLayer(self)
-    @reter: Typeclass(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a type-class.
     """
 
     @abstractmethod
@@ -140,8 +140,8 @@ class Maybe(Monad[T], ABC):
       - fmap applies a function only when a value exists.
       - bind sequences computations that may fail/return Nothing.
 
-    @reter: DSLLayer(self)
-    @reter: Monad(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a monad.
     """
 
     @classmethod
@@ -171,8 +171,8 @@ class Maybe(Monad[T], ABC):
 class Just(Maybe[T]):
     """Represents a present value in a Maybe context.
 
-    @reter: DSLLayer(self)
-    @reter: Monad(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a monad.
     """
     value: T
 
@@ -198,8 +198,8 @@ class Just(Maybe[T]):
 class Nothing(Maybe[Any]):
     """Represents an absent value in a Maybe context.
 
-    @reter: DSLLayer(self)
-    @reter: Monad(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a monad.
     """
     def bind(self, f: Callable[[Any], Maybe[U]]) -> Maybe[U]:
         return self  # type: ignore[return-value]
@@ -226,8 +226,8 @@ class Result(Monad[T], ABC, Generic[T, E]):
 
     Prefer Result over Maybe when you want to keep *why* it failed.
 
-    @reter: DSLLayer(self)
-    @reter: Monad(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a monad.
     """
 
     @classmethod
@@ -263,8 +263,8 @@ class Result(Monad[T], ABC, Generic[T, E]):
 class Ok(Result[T, E]):
     """Represents a successful result.
 
-    @reter: DSLLayer(self)
-    @reter: Monad(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a monad.
     """
     value: T
 
@@ -289,8 +289,8 @@ class Ok(Result[T, E]):
 class Err(Result[Any, E]):
     """Represents a failed result with error information.
 
-    @reter: DSLLayer(self)
-    @reter: Monad(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a monad.
     """
     error: E
 
@@ -317,8 +317,8 @@ class ListF(Monad[T]):
     A thin wrapper over an immutable tuple that behaves like a list
     but participates in the typeclasses in a principled way.
 
-    @reter: DSLLayer(self)
-    @reter: Monad(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a monad.
     """
     items: Tuple[T, ...]
 
@@ -418,8 +418,8 @@ def flip(f: Callable[[T, U], V]) -> Callable[[U, T], V]:
 class PipelineError:
     """Error that occurred during pipeline execution.
 
-    @reter: DSLLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a value-object.
     """
     step: str
     message: str

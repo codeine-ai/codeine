@@ -29,8 +29,8 @@ class ConditionalStep(Step[T, T]):
     If the condition is not met, the step is skipped and data passes through
     unchanged.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     inner_step: Step[T, T]
     condition: Callable[[], bool]
@@ -122,8 +122,8 @@ class BranchStep(Step[T, U]):
 
     If condition is true, executes then_step, otherwise executes else_step.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     condition: Callable[[T], bool]
     then_step: Step[T, U]
@@ -186,8 +186,8 @@ class MergeStep(Step[Any, List]):
     """
     Merge results from multiple pipelines.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     pipelines: List[Pipeline]
     merge_fn: Callable[[List[Any]], Any]
@@ -239,8 +239,8 @@ def merge(*pipelines: Pipeline) -> MergeStep:
 class IdentityStep(Step[T, T]):
     """Pass-through step that returns input unchanged.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
 
     def execute(self, data: T) -> PipelineResult[T]:
@@ -266,8 +266,8 @@ class TapStep(Step[T, T]):
 
     Useful for logging, debugging, or triggering external actions.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     fn: Callable[[T], None]
 
@@ -307,8 +307,8 @@ class CatchStep(Step[T, T]):
     """
     Error handling step that catches errors and returns a default.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     handler: Callable[[Err], T]
 
@@ -351,8 +351,8 @@ class ParallelStep(Step[T, List]):
 
     Results are collected into a list.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     steps: List[Step]
 
@@ -433,8 +433,8 @@ def compose(*steps: Step) -> Step:
     class ComposedStep(Step):
         """Composed step that executes inner steps in sequence.
 
-        @reter: DSLLayer(self)
-        @reter: Step(self)
+        @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+        @reter-cnl: This is a step.
         """
         inner_steps: List[Step]
 

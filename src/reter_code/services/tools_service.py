@@ -36,8 +36,8 @@ class ToolsRegistrar(ToolRegistrarBase):
     """
     Registers all RETER tools directly with FastMCP.
 
-    @reter: ServiceLayer(self)
-    @reter: Registrar(self)
+    @reter-cnl: This is-in-layer Service-Layer.
+    @reter-cnl: This is a registrar.
 
     Delegates to specialized registrar classes for each tool category.
     Extends ToolRegistrarBase for common functionality (_get_reter,

@@ -27,8 +27,8 @@ class Language(Enum):
     """
     Supported programming languages for code analysis.
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     OO = "oo"           # Object-Oriented meta-ontology (language-independent)
     PYTHON = "py"       # Python
@@ -76,8 +76,8 @@ class EntityMapping:
     """
     Maps generic OO concepts to language-specific concepts.
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     oo: str           # Generic OO concept
     py: Optional[str] = None  # Python-specific (defaults to oo)
@@ -105,8 +105,8 @@ class LanguageSupport:
     """
     Central class for managing language-specific ontology prefixes.
 
-    @reter: UtilityLayer(self)
-    @reter: Utility(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a utility.
 
     This enables language-independent code analysis tools by abstracting
     the ontology prefix (oo:, py:, js:) from the query logic.

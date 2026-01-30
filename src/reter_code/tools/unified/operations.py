@@ -19,8 +19,8 @@ class OperationsHandler:
     """
     Handles operations dict from thinking() calls.
 
-    @reter: ServiceLayer(self)
-    @reter: Handler(self)
+    @reter-cnl: This is-in-layer Service-Layer.
+    @reter-cnl: This is a handler.
 
     Operations are processed in order:
     1. RETER knowledge operations

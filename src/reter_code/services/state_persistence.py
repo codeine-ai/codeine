@@ -38,9 +38,9 @@ class StatePersistenceService:
     - Track and query knowledge sources
     - Manage automatic snapshots directory
 
-    @reter: ServiceLayer(self)
-    @reter: PersistenceComponent(self)
-    @reter: dependsOn(self, reter_code.services.InstanceManager)
+    @reter-cnl: This is-in-layer Service-Layer.
+    @reter-cnl: This is a persistence-component.
+    @reter-cnl: This depends-on `reter_code.services.InstanceManager`.
     """
 
     def __init__(self, instance_manager: InstanceManager):

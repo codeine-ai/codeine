@@ -19,8 +19,8 @@ class ThoughtType(str, Enum):
     """
     Type of logical thinking step.
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     REASONING = "reasoning"          # General reasoning (default)
     ASSERTION = "assertion"          # Adding facts or axioms
@@ -35,8 +35,8 @@ class LogicType(str, Enum):
     """
     Type of logic system.
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     DL = "dl"                # Description Logic
     REQL = "reql"            # RETER Query Language
@@ -51,8 +51,8 @@ class WME(BaseModel):
     """
     Working Memory Element - Basic fact unit.
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     subject: str
     predicate: str
@@ -66,8 +66,8 @@ class Inference(BaseModel):
     """
     Represents a derived fact with justification.
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     fact: WME
     rule: str
@@ -80,8 +80,8 @@ class LogicalThought(BaseModel):
     """
     Single thought in logical reasoning chain (mirrors Sequential Thinking).
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     thought_id: UUID = Field(default_factory=uuid4)
     thought: str  # The reasoning step description
@@ -117,8 +117,8 @@ class LogicalSession(BaseModel):
     """
     Logical reasoning session with thought history.
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     session_id: UUID = Field(default_factory=uuid4)
     goal: Optional[str] = None
@@ -141,8 +141,8 @@ class OntologyInfo(BaseModel):
     """
     Metadata about loaded ontology.
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     namespace: str
     source: str
@@ -156,8 +156,8 @@ class PythonAnalysis(BaseModel):
     """
     Results from Python code analysis.
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     module_name: str
     file_path: Optional[str] = None
@@ -176,8 +176,8 @@ class LogicalThinkingInput(BaseModel):
     """
     Input for logical_thinking tool - mirrors Sequential Thinking.
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     thought: str = Field(..., description="Your current reasoning step")
     next_thought_needed: bool
@@ -217,8 +217,8 @@ class ThinkingRequest(BaseModel):
     Combines instance_name with all LogicalThinkingInput fields to reduce
     parameter passing complexity (Fowler's "Introduce Parameter Object" pattern).
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     instance_name: str
     thought: str = Field(..., description="Your current reasoning step")
@@ -244,8 +244,8 @@ class AddKnowledgeInput(BaseModel):
     RETER is an incremental reasoner - knowledge accumulates, not replaces.
     Each call adds facts/rules to the existing knowledge base.
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     source: str = Field(..., description="File path or ontology content to add")
     type: Literal["ontology", "python", "facts"] = "ontology"
@@ -255,8 +255,8 @@ class AddKnowledgeInput(BaseModel):
 class QuickQueryInput(BaseModel):
     """Auxiliary tool for quick queries
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     query: str
     type: Literal["reql", "dl", "pattern"] = "reql"
@@ -265,8 +265,8 @@ class QuickQueryInput(BaseModel):
 class ForgetSourceInput(BaseModel):
     """Input for forget_source tool
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     source: str = Field(..., description="Source identifier to forget")
 
@@ -274,8 +274,8 @@ class ForgetSourceInput(BaseModel):
 class SaveStateInput(BaseModel):
     """Input for save_state tool
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     filename: str = Field(..., description="Path to save file")
 
@@ -283,8 +283,8 @@ class SaveStateInput(BaseModel):
 class LoadStateInput(BaseModel):
     """Input for load_state tool
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     filename: str = Field(..., description="Path to load file")
 
@@ -296,8 +296,8 @@ class LoadStateInput(BaseModel):
 class LogicalThinkingOutput(BaseModel):
     """Output for logical_thinking tool
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     thought_number: int
     total_thoughts: int
@@ -320,8 +320,8 @@ class AddKnowledgeOutput(BaseModel):
     Reports how many facts/rules were incrementally added to RETER.
     items_added accumulates with each call - knowledge persists!
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     success: bool
     items_added: int = 0  # Renamed from items_loaded - emphasizes incremental nature
@@ -333,8 +333,8 @@ class AddKnowledgeOutput(BaseModel):
 class QueryOutput(BaseModel):
     """Output for query tools
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     success: bool
     results: Optional[Dict[str, Any]] = None
@@ -346,8 +346,8 @@ class QueryOutput(BaseModel):
 class ForgetSourceOutput(BaseModel):
     """Output for forget_source tool
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     success: bool
     message: str
@@ -357,8 +357,8 @@ class ForgetSourceOutput(BaseModel):
 class StateOperationOutput(BaseModel):
     """Output for save/load state operations
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     success: bool
     filename: str
@@ -369,8 +369,8 @@ class StateOperationOutput(BaseModel):
 class ConsistencyCheckOutput(BaseModel):
     """Output for consistency check
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     consistent: bool
     contradictions: List[str] = Field(default_factory=list)

@@ -18,8 +18,8 @@ class CodeEntity:
     """
     Represents a code entity extracted from source files.
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     entity_type: str  # "class", "method", "function"
     name: str
@@ -39,8 +39,8 @@ class CommentBlock:
     """
     Represents a comment block extracted from source files.
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     comment_type: str  # "inline", "block", "todo", "fixme", "note", "warning"
     content: str
@@ -56,8 +56,8 @@ class ContentExtractor:
     """
     Extracts source code content from files using line numbers.
 
-    @reter: ServiceLayer(self)
-    @reter: Extractor(self)
+    @reter-cnl: This is-in-layer Service-Layer.
+    @reter-cnl: This is a extractor.
 
     Works with RETER query results that provide file paths and line numbers.
     Maintains a file cache to avoid repeated disk reads during batch operations.

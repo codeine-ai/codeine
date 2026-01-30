@@ -22,8 +22,8 @@ class SQLiteSessionStore:
     """
     Base class for SQLite-based session storage.
 
-    @reter: ServiceLayer(self)
-    @reter: Repository(self)
+    @reter-cnl: This is-in-layer Service-Layer.
+    @reter-cnl: This is a repository.
 
     Features:
     - Connection pooling with thread-local connections

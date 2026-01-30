@@ -22,8 +22,8 @@ from lark import Tree, Token
 class Severity(Enum):
     """Severity level for validation issues.
 
-    @reter: DSLLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a value-object.
     """
     ERROR = "error"      # Must be fixed, blocks compilation
     WARNING = "warning"  # Should be fixed, but allows compilation
@@ -34,8 +34,8 @@ class Severity(Enum):
 class ValidationIssue:
     """Represents a validation issue found in CADSL code.
 
-    @reter: DSLLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a value-object.
     """
     severity: Severity
     message: str
@@ -61,8 +61,8 @@ class ValidationIssue:
 class ValidationResult:
     """Result of validating a CADSL parse tree.
 
-    @reter: DSLLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a value-object.
     """
     valid: bool
     issues: List[ValidationIssue] = field(default_factory=list)
@@ -132,8 +132,8 @@ class CADSLValidator:
             for issue in result.issues:
                 print(issue)
 
-    @reter: DSLLayer(self)
-    @reter: Validator(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a validator.
     """
 
     def __init__(self, strict: bool = False):

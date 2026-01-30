@@ -28,8 +28,8 @@ class SystemToolsRegistrar(ToolRegistrarBase):
     """
     Registers the unified system management tool.
 
-    @reter: ServiceLayer(self)
-    @reter: Registrar(self)
+    @reter-cnl: This is-in-layer Service-Layer.
+    @reter-cnl: This is a registrar.
     """
 
     def __init__(self, instance_manager, persistence_service, default_manager=None, reter_ops=None):

@@ -30,8 +30,8 @@ class ReterError(Exception):
     """
     Base exception for all RETER operations.
 
-    @reter: UtilityLayer(self)
-    @reter: Exception(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a exception.
     """
     pass
 
@@ -40,8 +40,8 @@ class ReterFileError(ReterError):
     """
     Exception for file-related RETER operations (save/load).
 
-    @reter: UtilityLayer(self)
-    @reter: Exception(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a exception.
     """
     pass
 
@@ -50,8 +50,8 @@ class ReterFileNotFoundError(ReterFileError):
     """
     Raised when a RETER snapshot file is not found.
 
-    @reter: UtilityLayer(self)
-    @reter: Exception(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a exception.
     """
     pass
 
@@ -60,8 +60,8 @@ class ReterSaveError(ReterFileError):
     """
     Raised when saving RETER network fails.
 
-    @reter: UtilityLayer(self)
-    @reter: Exception(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a exception.
     """
     pass
 
@@ -70,8 +70,8 @@ class ReterLoadError(ReterFileError):
     """
     Raised when loading RETER network fails.
 
-    @reter: UtilityLayer(self)
-    @reter: Exception(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a exception.
     """
     pass
 
@@ -80,8 +80,8 @@ class ReterQueryError(ReterError):
     """
     Exception for query-related RETER operations.
 
-    @reter: UtilityLayer(self)
-    @reter: Exception(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a exception.
     """
     pass
 
@@ -90,8 +90,8 @@ class ReterOntologyError(ReterError):
     """
     Exception for ontology/knowledge loading errors.
 
-    @reter: UtilityLayer(self)
-    @reter: Exception(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a exception.
     """
     pass
 
@@ -100,8 +100,8 @@ class DefaultInstanceNotInitialised(ReterError):
     """
     Raised when attempting to access RETER before initialization is complete.
 
-    @reter: UtilityLayer(self)
-    @reter: Exception(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a exception.
 
     This exception is thrown by ReterWrapper and RAGIndexManager when:
     - Server is starting up and background initialization hasn't completed
@@ -372,9 +372,9 @@ class ReterWrapper:
     - Selective forgetting by source ID
     - Persistent semantic memory for AI agents
 
-    @reter: InfrastructureLayer(self)
-    @reter: ReasoningEngine(self)
-    @reter: dependsOn(self, reter.Reter)
+    @reter-cnl: This is-in-layer Infrastructure-Layer.
+    @reter-cnl: This is a reasoning-engine.
+    @reter-cnl: This depends-on `reter.Reter`.
     """
 
     def __init__(self, load_ontology: bool = True) -> None:

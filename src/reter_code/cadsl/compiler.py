@@ -71,9 +71,9 @@ class ExpressionCompiler:
     - Function calls
     - Arithmetic operations
 
-    @reter: DSLLayer(self)
-    @reter: Compiler(self)
-    @reter: partOf(self, reter_code.cadsl)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a compiler.
+    @reter-cnl: This is-part-of `reter_code.cadsl`.
     """
 
     def __init__(self):
@@ -423,8 +423,8 @@ class ConditionCompiler:
     - Membership: in [list], in {param}
     - Null checks: is null, is not null
 
-    @reter: DSLLayer(self)
-    @reter: Compiler(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a compiler.
     """
 
     def __init__(self):
@@ -665,8 +665,8 @@ class ObjectExprCompiler:
     - Spread operator: {...row, extra: value}
     - String interpolation: "text {field}"
 
-    @reter: DSLLayer(self)
-    @reter: Compiler(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a compiler.
     """
 
     def __init__(self):

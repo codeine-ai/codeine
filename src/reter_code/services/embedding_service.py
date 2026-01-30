@@ -70,9 +70,9 @@ class EmbeddingService:
         provider: Provider type ("local", "voyage", "openai")
         embedding_dim: Dimension of embeddings produced
 
-    @reter: InfrastructureLayer(self)
-    @reter: MLComponent(self)
-    @reter: hasProvider(self, "sentence-transformers")
+    @reter-cnl: This is-in-layer Infrastructure-Layer.
+    @reter-cnl: This is a machine-learning-component.
+    @reter-cnl: This has-provider "sentence-transformers".
     """
 
     # Model configurations
@@ -582,8 +582,8 @@ class LightweightEmbeddingService(EmbeddingService):
     """
     Lightweight embedding service for testing without heavy dependencies.
 
-    @reter: ServiceLayer(self)
-    @reter: Service(self)
+    @reter-cnl: This is-in-layer Service-Layer.
+    @reter-cnl: This is a service.
 
     Uses hash-based embeddings that maintain some semantic properties
     (same text = same embedding) but are NOT suitable for production.

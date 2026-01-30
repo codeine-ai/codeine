@@ -13,8 +13,8 @@ class ThoughtInput:
     """
     Input parameters for creating a thought in the thinking session.
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
 
     Groups all parameters needed to create a thought item,
     reducing parameter passing overhead and improving type safety.

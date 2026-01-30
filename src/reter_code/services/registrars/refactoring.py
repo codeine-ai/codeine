@@ -48,8 +48,8 @@ class RecommenderToolsRegistrar(ToolRegistrarBase):
     """
     Registers the unified recommender tool with FastMCP.
 
-    @reter: ServiceLayer(self)
-    @reter: Registrar(self)
+    @reter-cnl: This is-in-layer Service-Layer.
+    @reter-cnl: This is a registrar.
     """
 
     def __init__(self, instance_manager, persistence_service, default_manager=None, tools_filter=None):

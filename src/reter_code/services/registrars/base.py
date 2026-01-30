@@ -86,8 +86,8 @@ class ToolRegistrarBase:
     """
     Base class with common functionality for tool registrars.
 
-    @reter: ServiceLayer(self)
-    @reter: Registrar(self)
+    @reter-cnl: This is-in-layer Service-Layer.
+    @reter-cnl: This is a registrar.
     """
 
     def __init__(self, instance_manager, persistence_service, tools_filter: Optional[Set[str]] = None):

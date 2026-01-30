@@ -33,8 +33,8 @@ class BackgroundInitializer:
     """
     Handles background initialization of the default RETER instance.
 
-    @reter: ServiceLayer(self)
-    @reter: Manager(self)
+    @reter-cnl: This is-in-layer Service-Layer.
+    @reter-cnl: This is a manager.
 
     Runs in a separate thread to avoid blocking MCP server startup.
 
@@ -337,8 +337,8 @@ class BackgroundSyncTask:
     """
     Handles background file synchronization.
 
-    @reter: ServiceLayer(self)
-    @reter: Task(self)
+    @reter-cnl: This is-in-layer Service-Layer.
+    @reter-cnl: This is a task.
 
     Triggered when file changes are detected (via file watcher or manual check).
     """

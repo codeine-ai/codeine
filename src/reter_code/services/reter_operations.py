@@ -26,8 +26,8 @@ class ReterOperations:
     """
     Service for core RETER knowledge operations.
 
-    @reter: ServiceLayer(self)
-    @reter: Service(self)
+    @reter-cnl: This is-in-layer Service-Layer.
+    @reter-cnl: This is a service.
 
     This service handles:
     - Adding knowledge incrementally (ontology, Python code)

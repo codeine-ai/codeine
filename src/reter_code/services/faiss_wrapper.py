@@ -37,8 +37,8 @@ class SearchResult:
     """
     Result from a FAISS search operation.
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     vector_id: int
     distance: float
@@ -50,8 +50,8 @@ class ClusterInfo:
     """
     Information about a cluster of similar vectors.
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     cluster_id: int
     centroid: np.ndarray
@@ -64,8 +64,8 @@ class FAISSWrapper:
     """
     Low-level wrapper for FAISS operations.
 
-    @reter: InfrastructureLayer(self)
-    @reter: Wrapper(self)
+    @reter-cnl: This is-in-layer Infrastructure-Layer.
+    @reter-cnl: This is a wrapper.
 
     Handles index creation, vector operations, and persistence.
     Uses IndexIDMap to support vector deletion (required for incremental updates).

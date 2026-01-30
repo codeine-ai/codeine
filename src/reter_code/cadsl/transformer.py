@@ -29,8 +29,8 @@ from .compiler import (
 class ParamSpec:
     """Specification for a tool parameter.
 
-    @reter: DSLLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a value-object.
     """
     name: str
     type: str
@@ -46,8 +46,8 @@ class ToolSpec:
 
     Contains all the information needed to create and execute a pipeline.
 
-    @reter: DSLLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a value-object.
     """
     name: str
     tool_type: str  # "query", "detector", "diagram"
@@ -78,10 +78,10 @@ class CADSLTransformer:
 
     The ToolSpec can then be converted to executable Pipeline objects.
 
-    @reter: DSLLayer(self)
-    @reter: ASTTransformer(self)
-    @reter: dependsOn(self, reter_code.cadsl.ExpressionCompiler)
-    @reter: partOf(self, reter_code.cadsl)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a abstract-syntax-tree-transformer.
+    @reter-cnl: This depends-on `reter_code.cadsl.ExpressionCompiler`.
+    @reter-cnl: This is-part-of `reter_code.cadsl`.
     """
 
     def __init__(self):
@@ -1690,8 +1690,8 @@ class PipelineBuilder:
     This separates the AST transformation from Pipeline construction,
     allowing for different target Pipeline implementations.
 
-    @reter: DSLLayer(self)
-    @reter: Builder(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a builder.
     """
 
     def __init__(self):
@@ -2056,8 +2056,8 @@ class WhenStep:
 
     Syntax: when { condition } step
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
 
     def __init__(self, condition, inner_step_spec):
@@ -2119,8 +2119,8 @@ class UnlessStep:
 
     Syntax: unless { condition } step
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
 
     def __init__(self, condition, inner_step_spec):
@@ -2157,8 +2157,8 @@ class BranchStep:
 
     Syntax: branch { condition } then step [else step]
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
 
     def __init__(self, condition, then_step_spec, else_step_spec=None):
@@ -2201,8 +2201,8 @@ class CatchStep:
     Note: This step wraps the pipeline execution, catching any errors
     and returning the default value instead.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
 
     def __init__(self, default_fn):
@@ -2224,8 +2224,8 @@ class ParallelStep:
 
     Results from all steps are collected into a list.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
 
     def __init__(self, step_specs):
@@ -2286,8 +2286,8 @@ class GraphCyclesStep:
 
     Uses DFS to detect cycles and returns a list of cycles found.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
 
     def __init__(self, from_field, to_field):
@@ -2359,8 +2359,8 @@ class GraphClosureStep:
 
     Returns all reachable nodes from each source node.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
 
     def __init__(self, from_field, to_field, max_depth=10):
@@ -2426,8 +2426,8 @@ class GraphTraverseStep:
 
     Syntax: graph_traverse { from: field, to: field, algorithm: bfs, max_depth: 10 }
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
 
     def __init__(self, from_field, to_field, algorithm="bfs", max_depth=10, root=None):
@@ -2548,8 +2548,8 @@ class CollectStep:
 
     Operations: set, list, first, last, count, sum, avg, min, max
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
 
     def __init__(self, by: str, fields: dict):
@@ -2621,8 +2621,8 @@ class NestStep:
 
     Syntax: nest { parent: field, child: field, root: expr, max_depth: 10 }
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
 
     def __init__(self, parent: str, child: str, root=None, max_depth=10, children_key="children"):
@@ -2693,8 +2693,8 @@ class RenderTableStep:
 
     Syntax: render_table { format: markdown, columns: [name, count], title: "Summary" }
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
 
     def __init__(self, format="markdown", columns=None, title=None, totals=False,
@@ -2858,8 +2858,8 @@ class RenderChartStep:
 
     Syntax: render_chart { type: bar, x: category, y: count, format: mermaid }
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
 
     def __init__(self, chart_type="bar", x=None, y=None, series=None, title=None,
@@ -2991,8 +2991,8 @@ class RenderMermaidStep:
     Syntax: render_mermaid { type: flowchart, nodes: name, edges: from -> to }
     Supports: flowchart, sequence, class, gantt, state, er, pie
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
 
     def __init__(self, mermaid_type, nodes=None, edges_from=None, edges_to=None, direction="TB",
@@ -3297,8 +3297,8 @@ class PivotStep:
 
     Syntax: pivot { rows: field, cols: field, value: field, aggregate: sum }
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
 
     def __init__(self, rows, cols, value, aggregate="sum"):
@@ -3373,8 +3373,8 @@ class ComputeStep:
 
     Syntax: compute { ratio: a / b, pct: ratio * 100 }
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
 
     def __init__(self, computations):
@@ -3413,8 +3413,8 @@ class JoinStep:
 
     Supports all PyArrow join types: inner, left, right, outer, semi, anti.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
 
     def __init__(self, left_key, right_source_spec, right_key, join_type="inner"):
@@ -3565,8 +3565,8 @@ class MergeSource:
 
     Executes all sources (with their steps) and concatenates their results.
 
-    @reter: DSLLayer(self)
-    @reter: Source(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a source.
     """
 
     def __init__(self, source_specs):
@@ -3701,8 +3701,8 @@ class CrossJoinStep:
     Creates all pairs from input rows. With unique_pairs=true, generates (n*(n-1))/2 pairs.
     Uses PyArrow for efficient vectorized operations.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
 
     def __init__(self, unique_pairs=True, exclude_self=True, left_prefix="left_", right_prefix="right_"):
@@ -3781,8 +3781,8 @@ class SetSimilarityStep:
     - overlap: |intersection| / min(|A|, |B|)
     - cosine: |intersection| / sqrt(|A| * |B|)
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
 
     def __init__(self, left_col, right_col, sim_type="jaccard", output="similarity",
@@ -3861,8 +3861,8 @@ class StringMatchStep:
     - levenshtein: Calculate edit distance (requires output_distance)
     - contains: Check if one contains the other
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
 
     def __init__(self, left_col, right_col, match_type="common_affix", min_length=3,
@@ -3983,8 +3983,8 @@ class RagEnrichStep:
 
     Uses batching for performance optimization.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
 
     def __init__(self, query_template, top_k=1, threshold=None, mode="best",
@@ -4191,8 +4191,8 @@ class CreateTaskStep:
     - batch_size: Number of tasks to create per batch
     - dry_run: If true, returns task data without creating tasks
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
 
     def __init__(self, name_template, category="annotation", priority="medium",
@@ -4375,8 +4375,8 @@ class PythonStep:
     - ctx: Execution context with params
     - result: Must be set to the output value
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
 
     def __init__(self, code: str):

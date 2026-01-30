@@ -101,8 +101,8 @@ def ensure_list(data: Union[pa.Table, List[Dict[str, Any]]]) -> List[Dict[str, A
 class ArrowSource(ABC):
     """Base class for sources that return Arrow tables.
 
-    @reter: DSLLayer(self)
-    @reter: Source(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a source.
     """
 
     @abstractmethod
@@ -119,8 +119,8 @@ class ArrowREQLSource(ArrowSource):
     - class, method, function (language-independent)
     - Predicates use hyphenated format: is-in-file, has-name, is-defined-in
 
-    @reter: DSLLayer(self)
-    @reter: Source(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a source.
     """
     query: str
 
@@ -150,8 +150,8 @@ class ArrowREQLSource(ArrowSource):
 class ArrowRAGSource(ArrowSource):
     """RAG source that returns Arrow table.
 
-    @reter: DSLLayer(self)
-    @reter: Source(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a source.
     """
     operation: Literal["search", "duplicates", "clusters"]
     params: Dict[str, Any] = field(default_factory=dict)
@@ -230,8 +230,8 @@ class ArrowRAGSource(ArrowSource):
 class ArrowValueSource(ArrowSource):
     """Literal value source as Arrow table.
 
-    @reter: DSLLayer(self)
-    @reter: Source(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a source.
     """
     value: Union[List[Dict], pa.Table]
 
@@ -243,8 +243,8 @@ class ArrowValueSource(ArrowSource):
 class ArrowMergeSource(ArrowSource):
     """Merge multiple sources (UNION ALL).
 
-    @reter: DSLLayer(self)
-    @reter: Source(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a source.
     """
     sources: List[ArrowSource]
 
@@ -277,8 +277,8 @@ class ArrowMergeSource(ArrowSource):
 class ArrowStep(ABC):
     """Base class for steps that operate on Arrow tables.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
 
     @abstractmethod
@@ -291,8 +291,8 @@ class ArrowStep(ABC):
 class ArrowFilterStep(ArrowStep):
     """Filter rows using Arrow compute expressions.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     condition: str  # Expression like "count > 10"
 
@@ -387,8 +387,8 @@ class ArrowFilterStep(ArrowStep):
 class ArrowSelectStep(ArrowStep):
     """Select and rename columns.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     fields: Dict[str, str]  # output_name -> source_name
 
@@ -420,8 +420,8 @@ class ArrowSelectStep(ArrowStep):
 class ArrowOrderByStep(ArrowStep):
     """Sort table by column.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     field_name: str
     descending: bool = False
@@ -451,8 +451,8 @@ class ArrowOrderByStep(ArrowStep):
 class ArrowLimitStep(ArrowStep):
     """Limit number of rows.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     count: int
 
@@ -468,8 +468,8 @@ class ArrowLimitStep(ArrowStep):
 class ArrowOffsetStep(ArrowStep):
     """Skip first N rows.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     count: int
 
@@ -481,8 +481,8 @@ class ArrowOffsetStep(ArrowStep):
 class ArrowUniqueStep(ArrowStep):
     """Remove duplicate rows based on columns.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     columns: Optional[List[str]] = None
 
@@ -519,8 +519,8 @@ class ArrowMapStep(ArrowStep):
     Transforms is a dict of column_name -> expression or value.
     Special key '...row' means include all existing columns.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     transforms: Dict[str, Any]
 
@@ -579,8 +579,8 @@ class ArrowMapStep(ArrowStep):
 class ArrowAggregateStep(ArrowStep):
     """Aggregate table with functions.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     aggregations: Dict[str, Tuple[str, str]]  # output -> (field, func)
 
@@ -621,8 +621,8 @@ class ArrowAggregateStep(ArrowStep):
 class ArrowGroupByStep(ArrowStep):
     """Group by columns with aggregations.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     group_columns: List[str]
     aggregations: List[Tuple[str, str, str]]  # (output_name, source_column, func)
@@ -676,8 +676,8 @@ class ArrowGroupByStep(ArrowStep):
 class ArrowJoinStep(ArrowStep):
     """Join two tables.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     right_source: ArrowSource
     left_keys: List[str]
@@ -733,8 +733,8 @@ class ArrowPythonStep(ArrowStep):
     Converts Arrow table to list of dicts for Python execution,
     then converts result back to Arrow table.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     code: str
 
@@ -783,8 +783,8 @@ class ArrowPipeline:
     Uses Arrow tables throughout, only converting to list of dicts
     when explicitly needed (python blocks, emit).
 
-    @reter: DSLLayer(self)
-    @reter: Monad(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a monad.
     """
     _source: ArrowSource
     _steps: List[ArrowStep] = field(default_factory=list)

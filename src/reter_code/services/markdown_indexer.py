@@ -21,8 +21,8 @@ class MarkdownChunk:
     """
     Represents an indexable chunk from a markdown file.
 
-    @reter: UtilityLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Utility-Layer.
+    @reter-cnl: This is a value-object.
     """
     file: str
     chunk_type: str  # "document", "section", "code_block"
@@ -46,8 +46,8 @@ class MarkdownIndexer:
     """
     Parses markdown files and extracts chunks for embedding.
 
-    @reter: ServiceLayer(self)
-    @reter: Parser(self)
+    @reter-cnl: This is-in-layer Service-Layer.
+    @reter-cnl: This is a parser.
 
     Strategies:
     - Small files (<max_chunk_words): Index as single document

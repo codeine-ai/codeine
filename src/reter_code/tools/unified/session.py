@@ -23,8 +23,8 @@ class ThinkingSession:
     """
     Central orchestrator for unified thinking sessions.
 
-    @reter: ServiceLayer(self)
-    @reter: Manager(self)
+    @reter-cnl: This is-in-layer Service-Layer.
+    @reter-cnl: This is a manager.
 
     Provides:
     - Session lifecycle management

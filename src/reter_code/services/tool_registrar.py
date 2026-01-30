@@ -60,10 +60,10 @@ class ToolRegistrar:
     Manages MCP tool registration.
     Single Responsibility: Register and configure MCP tools.
 
-    @reter: ServiceLayer(self)
-    @reter: MCPToolProvider(self)
-    @reter: dependsOn(self, reter_code.services.ReterOperations)
-    @reter: dependsOn(self, reter_code.services.StatePersistenceService)
+    @reter-cnl: This is-in-layer Service-Layer.
+    @reter-cnl: This is a model-context-protocol-tool-provider.
+    @reter-cnl: This depends-on `reter_code.services.ReterOperations`.
+    @reter-cnl: This depends-on `reter_code.services.StatePersistenceService`.
     """
 
     def __init__(
@@ -218,6 +218,88 @@ class ToolRegistrar:
             except ComponentNotReadyError as e:
                 return e.to_response()
             return self.reter_ops.add_external_directory("default", directory, recursive, exclude_patterns, ctx)
+
+        @app.tool()
+        def validate_cnl(
+            statement: str,
+            context_entity: Optional[str] = None
+        ) -> Dict[str, Any]:
+            """
+            Validate a CNL (Controlled Natural Language) statement without adding it.
+
+            Use this tool to preview and verify CNL annotations before adding them to code.
+            It parses the statement and shows what facts would be created, or any syntax errors.
+
+            The "This" keyword in CNL statements refers to the entity being annotated.
+            Use context_entity to specify what "This" should resolve to.
+
+            Args:
+                statement: CNL statement to validate (e.g., "This is-in-layer Service-Layer.")
+                context_entity: Entity name for "This" resolution (e.g., "mymodule.MyClass")
+
+            Returns:
+                success: Whether the statement parsed successfully
+                errors: List of parsing errors (if any)
+                facts: List of facts that would be created, each with:
+                    - type: Fact type (e.g., "role_assertion", "subsumption")
+                    - subject/role/object: For role assertions
+                    - sub/sup: For subsumptions
+                    - Other attributes depending on fact type
+                resolved_statement: The statement after "This" resolution (if context_entity provided)
+
+            Examples:
+                >>> validate_cnl("This is-in-layer Service-Layer.", "mymodule.MyService")
+                {
+                    "success": True,
+                    "errors": [],
+                    "facts": [{"type": "role_assertion", "subject": "`mymodule.MyService`",
+                               "role": "is-in-layer", "object": "Service-Layer"}],
+                    "resolved_statement": "`mymodule.MyService` is-in-layer Service-Layer."
+                }
+
+                >>> validate_cnl("completely invalid syntax")
+                {
+                    "success": False,
+                    "errors": ["Line 1:0 - mismatched input 'completely' expecting ..."],
+                    "facts": []
+                }
+            """
+            import re
+            import time
+            from reter_core import owl_rete_cpp
+
+            start_time = time.time()
+
+            # Resolve "This" keyword if context_entity provided
+            resolved = statement
+            if context_entity:
+                # Format entity with backticks for CNL
+                cnl_entity = f"`{context_entity}`"
+                # Replace "This" with the entity (word boundary match)
+                resolved = re.sub(r'\bThis\b', cnl_entity, statement)
+
+            # Parse the CNL statement
+            result = owl_rete_cpp.parse_cnl(resolved)
+
+            # Convert facts to serializable format
+            facts_list = []
+            for fact in result.facts:
+                fact_dict = dict(fact.attributes)
+                facts_list.append(fact_dict)
+
+            response = {
+                "success": result.success,
+                "errors": list(result.errors),
+                "facts": facts_list,
+                "fact_count": len(facts_list),
+                "execution_time_ms": (time.time() - start_time) * 1000
+            }
+
+            # Include resolved statement if different from input
+            if context_entity and resolved != statement:
+                response["resolved_statement"] = resolved
+
+            return response
 
     def _register_query_tools(self, app: FastMCP) -> None:
         """Register query execution tools."""

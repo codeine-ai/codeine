@@ -27,9 +27,9 @@ class InstanceManager:
     - Manage per-instance locks for thread safety
     - Support lazy loading of instances from snapshots
 
-    @reter: ServiceLayer(self)
-    @reter: CoreService(self)
-    @reter: dependsOn(self, reter_code.reter_wrapper.ReterWrapper)
+    @reter-cnl: This is-in-layer Service-Layer.
+    @reter-cnl: This is a core-service.
+    @reter-cnl: This depends-on `reter_code.reter_wrapper.ReterWrapper`.
     """
 
     def __init__(self):

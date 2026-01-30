@@ -14,8 +14,8 @@ class DocumentationProvider:
     """
     Provides documentation resources for RETER, Python analysis, and refactoring recipes.
 
-    @reter: ServiceLayer(self)
-    @reter: Provider(self)
+    @reter-cnl: This is-in-layer Service-Layer.
+    @reter-cnl: This is a provider.
 
     This is a stateless service that serves documentation content.
     Uses a resource registry pattern to avoid code duplication.

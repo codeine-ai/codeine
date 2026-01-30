@@ -108,8 +108,8 @@ __all__ = [
 class Context:
     """Execution context for pipelines.
 
-    @reter: DSLLayer(self)
-    @reter: Context(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a context.
     """
     reter: Any  # RETER instance
     params: Dict[str, Any] = field(default_factory=dict)
@@ -143,8 +143,8 @@ class Source(ABC, Generic[T]):
 
     A Source is a functor that produces data when executed in a context.
 
-    @reter: DSLLayer(self)
-    @reter: Source(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a source.
     """
 
     @abstractmethod
@@ -161,8 +161,8 @@ class Source(ABC, Generic[T]):
 class MappedSource(Source[U], Generic[T, U]):
     """A source with a mapped transformation.
 
-    @reter: DSLLayer(self)
-    @reter: Source(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a source.
     """
     inner: Source[T]
     transform: Callable[[T], U]
@@ -185,8 +185,8 @@ class REQLSource(Source[pa.Table]):
 
     Timeout can be specified via ctx.params['timeout_ms'] (default: 300000ms = 5 minutes).
 
-    @reter: DSLLayer(self)
-    @reter: Source(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a source.
     """
     query: str
 
@@ -219,8 +219,8 @@ class REQLSource(Source[pa.Table]):
 class ValueSource(Source[T], Generic[T]):
     """Literal value source.
 
-    @reter: DSLLayer(self)
-    @reter: Source(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a source.
     """
     value: T
 
@@ -246,8 +246,8 @@ def _get_rag_manager(ctx: Context):
 class RAGSearchSource(Source[List[Dict[str, Any]]]):
     """RAG semantic search source.
 
-    @reter: DSLLayer(self)
-    @reter: Source(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a source.
     """
     query: str
     top_k: int = 10
@@ -283,8 +283,8 @@ class RAGSearchSource(Source[List[Dict[str, Any]]]):
 class RAGDuplicatesSource(Source[List[Dict[str, Any]]]):
     """RAG duplicate code detection source.
 
-    @reter: DSLLayer(self)
-    @reter: Source(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a source.
     """
     similarity: float = 0.85
     limit: int = 50
@@ -335,8 +335,8 @@ class RAGDuplicatesSource(Source[List[Dict[str, Any]]]):
 class RAGClustersSource(Source[List[Dict[str, Any]]]):
     """RAG code clustering source using K-means.
 
-    @reter: DSLLayer(self)
-    @reter: Source(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a source.
     """
     n_clusters: int = 50
     min_size: int = 2
@@ -397,8 +397,8 @@ class Step(ABC, Generic[T, U]):
     Steps are the building blocks of pipelines. Each step transforms
     input data and returns a Result, allowing for error propagation.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
 
     @abstractmethod
@@ -428,8 +428,8 @@ class Step(ABC, Generic[T, U]):
 class ComposedStep(Step[T, V], Generic[T, U, V]):
     """Composition of two steps (Kleisli composition).
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     first: Step[T, U]
     second: Step[U, V]
@@ -445,8 +445,8 @@ class ComposedStep(Step[T, V], Generic[T, U, V]):
 class FilterStep(Step[Union[pa.Table, List[T]], Union[pa.Table, List[T]]], Generic[T]):
     """Filter items based on predicate - Arrow-optimized.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     predicate: Callable[[T], bool]
     condition: Optional[Callable[[], bool]] = None  # when/unless condition
@@ -499,8 +499,8 @@ class FilterStep(Step[Union[pa.Table, List[T]], Union[pa.Table, List[T]]], Gener
 class SelectStep(Step[Union[pa.Table, List[Dict]], Union[pa.Table, List[Dict]]]):
     """Select/rename fields from items - Arrow-optimized.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     fields: Dict[str, str]  # output_name -> source_name
 
@@ -552,8 +552,8 @@ class SelectStep(Step[Union[pa.Table, List[Dict]], Union[pa.Table, List[Dict]]])
 class OrderByStep(Step[Union[pa.Table, List[Dict]], Union[pa.Table, List[Dict]]]):
     """Sort items by field - Arrow-optimized.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     field_name: str
     descending: bool = False
@@ -595,8 +595,8 @@ class OrderByStep(Step[Union[pa.Table, List[Dict]], Union[pa.Table, List[Dict]]]
 class LimitStep(Step[Union[pa.Table, List[T]], Union[pa.Table, List[T]]], Generic[T]):
     """Limit number of results - Arrow-optimized.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     count: int
 
@@ -610,8 +610,8 @@ class LimitStep(Step[Union[pa.Table, List[T]], Union[pa.Table, List[T]]], Generi
 class OffsetStep(Step[Union[pa.Table, List[T]], Union[pa.Table, List[T]]], Generic[T]):
     """Skip first N results - Arrow-optimized.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     count: int
 
@@ -625,8 +625,8 @@ class OffsetStep(Step[Union[pa.Table, List[T]], Union[pa.Table, List[T]]], Gener
 class MapStep(Step[Union[pa.Table, List[T]], Union[pa.Table, List[U]]], Generic[T, U]):
     """Transform each item using fmap semantics - Arrow-aware.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     transform: Callable[[T], U]
 
@@ -650,8 +650,8 @@ class MapStep(Step[Union[pa.Table, List[T]], Union[pa.Table, List[U]]], Generic[
 class FlatMapStep(Step[Union[pa.Table, List[T]], Union[pa.Table, List[U]]], Generic[T, U]):
     """Transform and flatten using bind semantics - Arrow-aware.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     transform: Callable[[T], List[U]]
 
@@ -677,8 +677,8 @@ class FlatMapStep(Step[Union[pa.Table, List[T]], Union[pa.Table, List[U]]], Gene
 class GroupByStep(Step[List[Dict], Dict[str, Any]]):
     """Group items by field value or key function.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     field_name: Optional[str] = None
     key_fn: Optional[Callable[[Dict], str]] = None
@@ -727,8 +727,8 @@ class GroupByStep(Step[List[Dict], Dict[str, Any]]):
 class AggregateStep(Step[Union[pa.Table, List[Dict]], Dict[str, Any]]):
     """Aggregate data with specified functions - Arrow-optimized.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     aggregations: Dict[str, Tuple[str, str]]  # output -> (field, func)
 
@@ -789,8 +789,8 @@ class AggregateStep(Step[Union[pa.Table, List[Dict]], Dict[str, Any]]):
 class FlattenStep(Step[List[List[T]], List[T]], Generic[T]):
     """Flatten nested lists (join in monad terms).
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
 
     def execute(self, data: List[List[T]], ctx: Optional["Context"] = None) -> PipelineResult[List[T]]:
@@ -804,8 +804,8 @@ class FlattenStep(Step[List[List[T]], List[T]], Generic[T]):
 class UniqueStep(Step[Union[pa.Table, List[T]], Union[pa.Table, List[T]]], Generic[T]):
     """Remove duplicates based on key - Arrow-optimized.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     key: Optional[Callable[[T], Any]] = None
     columns: Optional[List[str]] = None  # For Arrow: columns to dedupe on
@@ -866,8 +866,8 @@ class UniqueStep(Step[Union[pa.Table, List[T]], Union[pa.Table, List[T]]], Gener
 class TapStep(Step[T, T], Generic[T]):
     """Execute a side effect function and pass through data unchanged.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     fn: Callable[[T], Any]
 
@@ -902,8 +902,8 @@ class TapStep(Step[T, T], Generic[T]):
 class RenderStep(Step[Any, str]):
     """Render data into a formatted string.
 
-    @reter: DSLLayer(self)
-    @reter: Step(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a step.
     """
     format: str
     renderer: Callable[[Any, str], Any]
@@ -949,8 +949,8 @@ class Pipeline(Monad[T], Generic[T]):
         )
         result = pipeline.run(context)  # Result[T, PipelineError]
 
-    @reter: DSLLayer(self)
-    @reter: Monad(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a monad.
     """
     _source: Source[Any]
     _steps: List[Step] = field(default_factory=list)
@@ -1176,8 +1176,8 @@ class BoundPipeline(Generic[T, U]):
     This represents the composition of a pipeline with a function
     that produces another pipeline.
 
-    @reter: DSLLayer(self)
-    @reter: Monad(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a monad.
     """
     def __init__(self, source_pipeline: Pipeline[T], continuation: Callable[[T], Pipeline[U]]):
         self.source_pipeline = source_pipeline
@@ -1247,8 +1247,8 @@ class BoundPipeline(Generic[T, U]):
 class ToolType(Enum):
     """Type of CADSL tool.
 
-    @reter: DSLLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a value-object.
     """
     QUERY = "query"
     DETECTOR = "detector"
@@ -1259,8 +1259,8 @@ class ToolType(Enum):
 class ParamSpec:
     """Specification for a tool parameter.
 
-    @reter: DSLLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a value-object.
     """
     name: str
     type: type
@@ -1306,8 +1306,8 @@ class ParamSpec:
 class ToolSpec:
     """Specification for a CADSL tool.
 
-    @reter: DSLLayer(self)
-    @reter: ValueObject(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a value-object.
     """
     name: str
     type: ToolType
@@ -1327,8 +1327,8 @@ class Query:
 
     Queries do not modify state - they only retrieve and transform data.
 
-    @reter: DSLLayer(self)
-    @reter: Tool(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a tool.
     """
 
     def __init__(self, spec: ToolSpec):
@@ -1346,8 +1346,8 @@ class Detector:
 
     Detectors analyze code and produce findings with severity levels.
 
-    @reter: DSLLayer(self)
-    @reter: Tool(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a tool.
     """
 
     def __init__(self, spec: ToolSpec):
@@ -1370,8 +1370,8 @@ class Diagram:
     """
     A visualization generator (transforms code structure to visual format).
 
-    @reter: DSLLayer(self)
-    @reter: Tool(self)
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a tool.
     """
 
     def __init__(self, spec: ToolSpec):
