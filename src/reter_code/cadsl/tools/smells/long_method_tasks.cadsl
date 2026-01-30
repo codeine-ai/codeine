@@ -1,0 +1,59 @@
+# long_method_tasks - Detect long methods and create review tasks
+#
+# Based on Martin Fowler's "Refactoring" Chapter 3, Smell #2
+# "The key is not method length but the semantic distance between
+# method name and method body."
+#
+# Creates tasks for human review and classification (TP/FP).
+
+detector long_method_tasks(category="smell-review", severity="medium") {
+    """
+    Find methods exceeding line threshold and create review tasks.
+
+    Each task requires manual classification:
+    - TP: Method has multiple responsibilities, needs Extract Method
+    - FP-INTENTIONAL: Single cohesive algorithm (sorting, parsing)
+    - FP-PROTOCOL: Interface requires single entry point (Visitor)
+    - FP-FRAMEWORK: Framework callback structure
+    - FP-GENERATED: Auto-generated code (ANTLR visitors)
+    - FP-TEST-CODE: Test setup/teardown fixtures
+
+    Parameters:
+        min_lines: Minimum lines to flag (default: 20)
+        limit: Maximum tasks to create (default: 100)
+        dry_run: If true, preview without creating tasks (default: true)
+    """
+
+    param min_lines: int = 20;
+    param limit: int = 100;
+    param dry_run: bool = true;
+
+    reql {
+        SELECT ?m ?name ?class_name ?file ?line ?line_count
+        WHERE {
+            ?m type method .
+            ?m has-name ?name .
+            ?m is-in-file ?file .
+            ?m is-at-line ?line .
+            ?m has-line-count ?line_count .
+            OPTIONAL { ?m is-defined-in ?c . ?c has-name ?class_name }
+            FILTER ( ?line_count > {min_lines} )
+            FILTER (!CONTAINS(?file, "test"))
+            FILTER (!CONTAINS(?file, "tests"))
+            FILTER (!CONTAINS(?file, "_test.py"))
+            FILTER (!CONTAINS(?file, "test_"))
+        }
+        ORDER BY DESC(?line_count)
+        LIMIT {limit}
+    }
+    | select { name, class_name, file, line, line_count }
+    | create_task {
+        name: "[long_method] {name} ({line_count} lines) in {file}",
+        category: "smell-review",
+        priority: medium,
+        description: "**Long Method detected** - requires classification.\n\n**Method**: `{name}`\n**Class**: `{class_name}`\n**Location**: {file}:{line}\n**Lines**: {line_count}\n\n---\n\n## Classification (Check FP First!)\n\n**Step 1: Rule out False Positives**\n\n| Check | Question | If Yes → |\n|-------|----------|----------|\n| FP-INTENTIONAL | Is this a single cohesive algorithm (parser, state machine, sort)? | Close as FP |\n| FP-PROTOCOL | Does interface/ABC require this structure? | Close as FP |\n| FP-FRAMEWORK | Is this a framework callback (visitor, handler)? | Close as FP |\n| FP-GENERATED | Is this auto-generated code? | Close as FP |\n| FP-TEST-CODE | Is this test setup/teardown? | Close as FP |\n\n**Step 2: If no FP criteria met → TRUE POSITIVE**\n\nProceed with extraction planning below.\n\n---\n\n## If TP - Refactoring Steps\n\n1. **Identify seams**: Find natural break points (comments, blank lines)\n2. **Extract Method**: Start with innermost/simplest block\n3. **Name well**: Method name should make comment unnecessary\n4. **Run tests**: After each extraction\n\n## Extraction Candidates\n\n- Code after a comment explaining it\n- Loop bodies\n- Conditional branches (if/else bodies)\n- Error handling blocks\n- Initialization sequences\n\n---\n\n## Refactorings\n\n| Refactoring | When to Use |\n|-------------|-------------|\n| Extract Method | Blocks of code that do one thing |\n| Replace Temp with Query | Temp variable used once after assignment |\n| Introduce Parameter Object | Many parameters that travel together |\n| Replace Method with Method Object | Too many temps to extract cleanly |\n| Decompose Conditional | Complex if/else logic |",
+        affects: file,
+        dry_run: {dry_run}
+    }
+    | emit { tasks }
+}

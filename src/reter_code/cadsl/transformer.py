@@ -1097,7 +1097,10 @@ class CADSLTransformer:
         return result
 
     def _transform_render_mermaid_step(self, node: Tree) -> Dict[str, Any]:
-        """Transform render_mermaid step."""
+        """Transform render_mermaid step.
+
+        Uses dispatch table pattern to handle different mermaid parameter types.
+        """
         result = {
             "type": "render_mermaid",
             "mermaid_type": "flowchart",
@@ -1136,61 +1139,68 @@ class CADSLTransformer:
             if isinstance(child, Tree) and child.data == "mermaid_spec":
                 for param in child.children:
                     if isinstance(param, Tree):
-                        if param.data == "mermaid_type_spec":
-                            type_node = param.children[0]
-                            if isinstance(type_node, Tree):
-                                result["mermaid_type"] = type_node.data.replace("mermaid_", "")
-                        elif param.data == "mermaid_nodes":
-                            result["nodes"] = str(param.children[0])
-                        elif param.data == "mermaid_edges":
-                            result["edges_from"] = str(param.children[0])
-                            result["edges_to"] = str(param.children[1])
-                        elif param.data == "mermaid_direction":
-                            dir_node = param.children[0]
-                            if isinstance(dir_node, Tree):
-                                result["direction"] = dir_node.data.replace("dir_", "").upper()
-                        elif param.data == "mermaid_title":
-                            result["title"] = self._unquote(str(param.children[0]))
-                        elif param.data == "mermaid_participants":
-                            result["participants"] = str(param.children[0])
-                        elif param.data == "mermaid_messages":
-                            result["messages_from"] = str(param.children[0])
-                            result["messages_to"] = str(param.children[1])
-                            result["messages_label"] = str(param.children[2])
-                        # Class diagram
-                        elif param.data == "mermaid_classes":
-                            result["classes"] = str(param.children[0])
-                        elif param.data == "mermaid_methods":
-                            result["methods"] = str(param.children[0])
-                        elif param.data == "mermaid_attributes":
-                            result["attributes"] = str(param.children[0])
-                        elif param.data == "mermaid_inheritance":
-                            result["inheritance_from"] = str(param.children[0])
-                            result["inheritance_to"] = str(param.children[1])
-                        elif param.data == "mermaid_composition":
-                            result["composition_from"] = str(param.children[0])
-                            result["composition_to"] = str(param.children[1])
-                        elif param.data == "mermaid_association":
-                            result["association_from"] = str(param.children[0])
-                            result["association_to"] = str(param.children[1])
-                        # Pie chart
-                        elif param.data == "mermaid_labels":
-                            result["labels"] = str(param.children[0])
-                        elif param.data == "mermaid_values":
-                            result["values"] = str(param.children[0])
-                        # State diagram
-                        elif param.data == "mermaid_states":
-                            result["states"] = str(param.children[0])
-                        elif param.data == "mermaid_transitions":
-                            result["transitions_from"] = str(param.children[0])
-                            result["transitions_to"] = str(param.children[1])
-                        # ER diagram
-                        elif param.data == "mermaid_entities":
-                            result["entities"] = str(param.children[0])
-                        elif param.data == "mermaid_relationships":
-                            result["relationships"] = str(param.children[0])
+                        self._apply_mermaid_param(param, result)
 
         return result
+
+    def _apply_mermaid_param(self, param: Tree, result: Dict[str, Any]) -> None:
+        """Apply a single mermaid parameter to the result dict.
+
+        Dispatch table pattern replaces long if-elif chain.
+        """
+        # Single-value parameters: param.data -> result key
+        single_value_params = {
+            "mermaid_nodes": "nodes",
+            "mermaid_participants": "participants",
+            "mermaid_classes": "classes",
+            "mermaid_methods": "methods",
+            "mermaid_attributes": "attributes",
+            "mermaid_labels": "labels",
+            "mermaid_values": "values",
+            "mermaid_states": "states",
+            "mermaid_entities": "entities",
+            "mermaid_relationships": "relationships",
+        }
+
+        # Dual-value parameters: param.data -> (from_key, to_key)
+        dual_value_params = {
+            "mermaid_edges": ("edges_from", "edges_to"),
+            "mermaid_inheritance": ("inheritance_from", "inheritance_to"),
+            "mermaid_composition": ("composition_from", "composition_to"),
+            "mermaid_association": ("association_from", "association_to"),
+            "mermaid_transitions": ("transitions_from", "transitions_to"),
+        }
+
+        param_type = param.data
+
+        # Handle single-value parameters
+        if param_type in single_value_params:
+            result[single_value_params[param_type]] = str(param.children[0])
+
+        # Handle dual-value parameters
+        elif param_type in dual_value_params:
+            from_key, to_key = dual_value_params[param_type]
+            result[from_key] = str(param.children[0])
+            result[to_key] = str(param.children[1])
+
+        # Handle special cases
+        elif param_type == "mermaid_type_spec":
+            type_node = param.children[0]
+            if isinstance(type_node, Tree):
+                result["mermaid_type"] = type_node.data.replace("mermaid_", "")
+
+        elif param_type == "mermaid_direction":
+            dir_node = param.children[0]
+            if isinstance(dir_node, Tree):
+                result["direction"] = dir_node.data.replace("dir_", "").upper()
+
+        elif param_type == "mermaid_title":
+            result["title"] = self._unquote(str(param.children[0]))
+
+        elif param_type == "mermaid_messages":
+            result["messages_from"] = str(param.children[0])
+            result["messages_to"] = str(param.children[1])
+            result["messages_label"] = str(param.children[2])
 
     def _transform_pivot_step(self, node: Tree) -> Dict[str, Any]:
         """Transform pivot step: pivot { rows: x, cols: y, value: z, aggregate: sum }"""
@@ -3588,12 +3598,24 @@ class JoinStep:
             if right_col is None:
                 return pipeline_err("join", f"Right key column not found: {self.right_key}")
 
+            # Map CADSL join types to PyArrow join types
+            # PyArrow uses "left outer" not "left", "right outer" not "right", etc.
+            pyarrow_join_type_map = {
+                "inner": "inner",
+                "left": "left outer",
+                "right": "right outer",
+                "outer": "full outer",
+                "semi": "left semi",
+                "anti": "left anti"
+            }
+            pa_join_type = pyarrow_join_type_map.get(self.join_type, self.join_type)
+
             # Perform join
             joined = left_table.join(
                 right_table,
                 keys=left_col,
                 right_keys=right_col,
-                join_type=self.join_type
+                join_type=pa_join_type
             )
 
             # PyArrow join drops the right key column (since it equals left key).

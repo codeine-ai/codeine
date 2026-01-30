@@ -23,6 +23,8 @@ from .initialization_progress import (
 )
 from ..reter_wrapper import debug_log
 
+from .rag_index_manager import SyncChanges as RAGSyncChanges, LanguageSourceChanges
+
 if TYPE_CHECKING:
     from .default_instance_manager import DefaultInstanceManager
     from .rag_index_manager import RAGIndexManager
@@ -472,11 +474,13 @@ class BackgroundSyncTask:
                 deleted_sources = [f["source_id"] for f in deleted_files]
 
                 try:
-                    self._rag_manager.sync(
+                    rag_changes = RAGSyncChanges(
+                        python=LanguageSourceChanges(changed_sources, deleted_sources),
+                    )
+                    self._rag_manager.sync_with_changes(
                         reter=self._reter,
-                        changed_python_sources=changed_sources,
-                        deleted_python_sources=deleted_sources,
-                        project_root=self._project_root
+                        project_root=self._project_root,
+                        changes=rag_changes,
                     )
                 except Exception as e:
                     debug_log(f"[BackgroundSync] RAG sync error: {e}")

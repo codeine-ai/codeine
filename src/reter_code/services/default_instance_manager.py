@@ -31,6 +31,7 @@ from typing import Dict, List, Set, Optional, Tuple, Any, TYPE_CHECKING
 from ..reter_wrapper import ReterWrapper, debug_log
 from .gitignore_parser import GitignoreParser
 from .source_state_manager import SourceStateManager, SyncChanges, FileInfo
+from .rag_index_manager import SyncChanges as RAGSyncChanges, LanguageSourceChanges
 
 try:
     from watchdog.observers import Observer
@@ -853,19 +854,17 @@ class DefaultInstanceManager:
                 if self._progress_callback is None:
                     print(f"[default] Syncing RAG index...", file=sys.stderr, flush=True)
                 try:
-                    rag_stats = self._rag_manager.sync(
+                    rag_changes = RAGSyncChanges(
+                        python=LanguageSourceChanges(changed_python_sources, deleted_python_sources),
+                        javascript=LanguageSourceChanges(changed_javascript_sources, deleted_javascript_sources),
+                        html=LanguageSourceChanges(changed_html_sources, deleted_html_sources),
+                        csharp=LanguageSourceChanges(changed_csharp_sources, deleted_csharp_sources),
+                        cpp=LanguageSourceChanges(changed_cpp_sources, deleted_cpp_sources),
+                    )
+                    rag_stats = self._rag_manager.sync_with_changes(
                         reter=reter,
-                        changed_python_sources=changed_python_sources,
-                        deleted_python_sources=deleted_python_sources,
                         project_root=self._project_root,
-                        changed_javascript_sources=changed_javascript_sources,
-                        deleted_javascript_sources=deleted_javascript_sources,
-                        changed_html_sources=changed_html_sources,
-                        deleted_html_sources=deleted_html_sources,
-                        changed_csharp_sources=changed_csharp_sources,
-                        deleted_csharp_sources=deleted_csharp_sources,
-                        changed_cpp_sources=changed_cpp_sources,
-                        deleted_cpp_sources=deleted_cpp_sources,
+                        changes=rag_changes,
                     )
                     total_added = (
                         rag_stats.get('python_vectors_added', 0) +
@@ -1395,19 +1394,17 @@ class DefaultInstanceManager:
                 if self._progress_callback is None:
                     print(f"[default] Syncing RAG index...", file=sys.stderr, flush=True)
                 try:
-                    rag_stats = self._rag_manager.sync(
+                    rag_changes = RAGSyncChanges(
+                        python=LanguageSourceChanges(changed_python_sources, deleted_python_sources),
+                        javascript=LanguageSourceChanges(changed_javascript_sources, deleted_javascript_sources),
+                        html=LanguageSourceChanges(changed_html_sources, deleted_html_sources),
+                        csharp=LanguageSourceChanges(changed_csharp_sources, deleted_csharp_sources),
+                        cpp=LanguageSourceChanges(changed_cpp_sources, deleted_cpp_sources),
+                    )
+                    rag_stats = self._rag_manager.sync_with_changes(
                         reter=reter,
-                        changed_python_sources=changed_python_sources,
-                        deleted_python_sources=deleted_python_sources,
                         project_root=self._project_root,
-                        changed_javascript_sources=changed_javascript_sources,
-                        deleted_javascript_sources=deleted_javascript_sources,
-                        changed_html_sources=changed_html_sources,
-                        deleted_html_sources=deleted_html_sources,
-                        changed_csharp_sources=changed_csharp_sources,
-                        deleted_csharp_sources=deleted_csharp_sources,
-                        changed_cpp_sources=changed_cpp_sources,
-                        deleted_cpp_sources=deleted_cpp_sources,
+                        changes=rag_changes,
                     )
                     total_added = (
                         rag_stats.get('python_vectors_added', 0) +

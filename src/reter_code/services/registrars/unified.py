@@ -734,6 +734,7 @@ class UnifiedToolsRegistrar(ToolRegistrarBase):
         """Generate traceability matrix.
 
         Shows tasks grouped by category (Design Docs approach).
+        Delegates to format-specific methods for Mermaid or Markdown output.
         """
         tasks = store.get_items(session_id, item_type="task")
         thoughts = store.get_items(session_id, item_type="thought")
@@ -747,86 +748,104 @@ class UnifiedToolsRegistrar(ToolRegistrarBase):
             tasks_by_category[cat].append(task)
 
         if format == "mermaid":
-            lines = ["flowchart LR"]
-
-            # Define subgraphs for each category
-            for cat, cat_tasks in tasks_by_category.items():
-                safe_cat = cat.replace("-", "_").replace(" ", "_")
-                lines.append(f"    subgraph {safe_cat}[{cat.title()}]")
-                for task in cat_tasks:
-                    task_id = task["item_id"]
-                    safe_id = task_id.replace("-", "_")
-                    lines.append(f"        {safe_id}[{task_id}]")
-                lines.append("    end")
-
-            # Add relations between tasks
-            lines.append("")
-            lines.append("    %% Traceability links")
-
-            for task in tasks:
-                task_id = task["item_id"]
-                safe_task = task_id.replace("-", "_")
-
-                # Task -> Task (depends_on)
-                deps = store.get_items_by_relation(task_id, "depends_on")
-                for dep in deps:
-                    if dep.get("item_type") == "task":
-                        safe_dep = dep["item_id"].replace("-", "_")
-                        lines.append(f"    {safe_dep} -->|blocks| {safe_task}")
-
-                # Task -> Thought (traces)
-                traced = store.get_items_by_relation(task_id, "traces")
-                for t in traced:
-                    if t.get("item_type") == "thought":
-                        safe_t = t["item_id"].replace("-", "_")
-                        lines.append(f"    {safe_t} -.->|traces| {safe_task}")
-
-            return {
-                "success": True,
-                "diagram": "\n".join(lines),
-                "format": "mermaid",
-                "tasks_count": len(tasks),
-                "categories": list(tasks_by_category.keys())
-            }
-
+            return self._traceability_to_mermaid(store, tasks, tasks_by_category)
         elif format == "markdown":
-            lines = ["# Traceability Matrix", ""]
-
-            # Tasks by category
-            lines.append("## Tasks by Category")
-            lines.append("| Category | Task | Status | Dependencies |")
-            lines.append("|----------|------|--------|--------------|")
-
-            for cat, cat_tasks in tasks_by_category.items():
-                for task in cat_tasks:
-                    task_id = task["item_id"]
-                    status = task.get("status", "pending")
-                    deps = store.get_items_by_relation(task_id, "depends_on")
-                    dep_ids = [d["item_id"] for d in deps if d.get("item_type") == "task"]
-                    lines.append(f"| {cat} | {task_id} | {status} | {', '.join(dep_ids) or '-'} |")
-
-            # Thought to Task traceability
-            lines.append("")
-            lines.append("## Thoughts → Tasks")
-            lines.append("| Thought | Related Tasks |")
-            lines.append("|---------|---------------|")
-
-            for thought in thoughts[:20]:  # Limit to recent thoughts
-                thought_id = thought["item_id"]
-                traced = store.get_items_by_relation(thought_id, "traces")
-                task_ids = [t["item_id"] for t in traced if t.get("item_type") == "task"]
-                if task_ids:
-                    lines.append(f"| {thought_id} | {', '.join(task_ids)} |")
-
-            return {
-                "success": True,
-                "diagram": "\n".join(lines),
-                "format": "markdown",
-                "tasks_count": len(tasks),
-                "categories": list(tasks_by_category.keys())
-            }
+            return self._traceability_to_markdown(store, tasks, thoughts, tasks_by_category)
 
         return {"success": False, "error": f"Format {format} not supported for traceability"}
+
+    def _traceability_to_mermaid(self, store, tasks, tasks_by_category):
+        """Generate Mermaid flowchart for traceability.
+
+        Creates a flowchart with:
+        - Subgraphs for each task category
+        - Dependency links between tasks
+        - Trace links from thoughts to tasks
+        """
+        lines = ["flowchart LR"]
+
+        # Define subgraphs for each category
+        for cat, cat_tasks in tasks_by_category.items():
+            safe_cat = cat.replace("-", "_").replace(" ", "_")
+            lines.append(f"    subgraph {safe_cat}[{cat.title()}]")
+            for task in cat_tasks:
+                task_id = task["item_id"]
+                safe_id = task_id.replace("-", "_")
+                lines.append(f"        {safe_id}[{task_id}]")
+            lines.append("    end")
+
+        # Add relations between tasks
+        lines.append("")
+        lines.append("    %% Traceability links")
+
+        for task in tasks:
+            task_id = task["item_id"]
+            safe_task = task_id.replace("-", "_")
+
+            # Task -> Task (depends_on)
+            deps = store.get_items_by_relation(task_id, "depends_on")
+            for dep in deps:
+                if dep.get("item_type") == "task":
+                    safe_dep = dep["item_id"].replace("-", "_")
+                    lines.append(f"    {safe_dep} -->|blocks| {safe_task}")
+
+            # Task -> Thought (traces)
+            traced = store.get_items_by_relation(task_id, "traces")
+            for t in traced:
+                if t.get("item_type") == "thought":
+                    safe_t = t["item_id"].replace("-", "_")
+                    lines.append(f"    {safe_t} -.->|traces| {safe_task}")
+
+        return {
+            "success": True,
+            "diagram": "\n".join(lines),
+            "format": "mermaid",
+            "tasks_count": len(tasks),
+            "categories": list(tasks_by_category.keys())
+        }
+
+    def _traceability_to_markdown(self, store, tasks, thoughts, tasks_by_category):
+        """Generate Markdown table for traceability.
+
+        Creates a document with:
+        - Tasks by Category table (category, task, status, dependencies)
+        - Thoughts to Tasks mapping table
+        """
+        lines = ["# Traceability Matrix", ""]
+
+        # Tasks by category
+        lines.append("## Tasks by Category")
+        lines.append("| Category | Task | Status | Dependencies |")
+        lines.append("|----------|------|--------|--------------|")
+
+        for cat, cat_tasks in tasks_by_category.items():
+            for task in cat_tasks:
+                task_id = task["item_id"]
+                status = task.get("status", "pending")
+                deps = store.get_items_by_relation(task_id, "depends_on")
+                dep_ids = [d["item_id"] for d in deps if d.get("item_type") == "task"]
+                lines.append(f"| {cat} | {task_id} | {status} | {', '.join(dep_ids) or '-'} |")
+
+        # Thought to Task traceability
+        lines.append("")
+        lines.append("## Thoughts → Tasks")
+        lines.append("| Thought | Related Tasks |")
+        lines.append("|---------|---------------|")
+
+        for thought in thoughts[:20]:  # Limit to recent thoughts
+            thought_id = thought["item_id"]
+            traced = store.get_items_by_relation(thought_id, "traces")
+            task_ids = [t["item_id"] for t in traced if t.get("item_type") == "task"]
+            if task_ids:
+                lines.append(f"| {thought_id} | {', '.join(task_ids)} |")
+
+        return {
+            "success": True,
+            "diagram": "\n".join(lines),
+            "format": "markdown",
+            "tasks_count": len(tasks),
+            "categories": list(tasks_by_category.keys())
+        }
 
     def _generate_requirements_diagram(self, store, session_id, root_id, format):
         """Generate requirements hierarchy diagram."""

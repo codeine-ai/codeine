@@ -27,10 +27,7 @@ from .tools_service import ToolsRegistrar
 from .registrars.system_tools import SystemToolsRegistrar
 from .nlq_helpers import query_instance_schema
 from .response_truncation import truncate_response
-from .hybrid_query_engine import (
-    build_rag_query_params,
-    build_similar_tools_section,
-)
+from .hybrid_query_engine import build_similar_tools_section
 from .agent_sdk_client import (
     is_agent_sdk_available,
     generate_cadsl_query,
@@ -362,6 +359,131 @@ class ToolRegistrar:
         if is_full_mode or "generate_cadsl" in DEFAULT_TOOLS:
             self._register_generate_cadsl_tool(app)
 
+    def _execute_single_cadsl_pipeline(
+        self,
+        query: str,
+        execution_state: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Execute a single CADSL query pipeline.
+
+        Extracted from _execute_cadsl_query to reduce method length.
+        Handles parsing, transforming, and executing CADSL.
+
+        Args:
+            query: The CADSL query string
+            execution_state: Mutable dict with 'attempts' and 'tools_used' tracking
+
+        Returns:
+            Result dict with success, results, count, etc.
+        """
+        from ..cadsl.parser import parse_cadsl
+        from ..cadsl.transformer import CADSLTransformer
+        from ..cadsl.loader import build_pipeline_factory
+        from ..dsl.core import Context as PipelineContext
+        from ..dsl.catpy import Err, Ok
+
+        # Update execution state
+        execution_state["attempts"] += execution_state.get("attempt_delta", 1)
+        execution_state["tools_used"].extend(execution_state.get("tools_delta", []))
+
+        # Auto-fix bare reql blocks (Rule 10 violation)
+        fixed_query = self._fix_bare_reql_block(query)
+
+        # Parse CADSL
+        parse_result = parse_cadsl(fixed_query)
+        if not parse_result.success:
+            return self._cadsl_error_response(
+                fixed_query, execution_state,
+                f"Parse error: {parse_result.errors}"
+            )
+
+        # Transform to tool spec
+        transformer = CADSLTransformer()
+        tool_specs = transformer.transform(parse_result.tree)
+
+        if not tool_specs:
+            return self._cadsl_error_response(
+                fixed_query, execution_state,
+                "No tool spec generated from CADSL"
+            )
+
+        # Get fresh instances
+        reter = self.instance_manager.get_or_create_instance("default")
+        rag_manager = self.default_manager.get_rag_manager() if self.default_manager else None
+
+        # Build pipeline context with parameters
+        tool_spec = tool_specs[0]
+        params = {"rag_manager": rag_manager}
+        for param in tool_spec.params:
+            if param.default is not None:
+                params[param.name] = param.default
+        debug_log.debug(f"CADSL pipeline params: {params}")
+
+        pipeline_ctx = PipelineContext(reter=reter, params=params)
+
+        # Build and execute pipeline
+        pipeline_factory = build_pipeline_factory(tool_spec)
+        pipeline = pipeline_factory(pipeline_ctx)
+        pipeline_result = pipeline.execute(pipeline_ctx)
+
+        # Handle Result monad
+        if isinstance(pipeline_result, Err):
+            return self._cadsl_error_response(
+                fixed_query, execution_state,
+                str(pipeline_result.value)
+            )
+
+        if isinstance(pipeline_result, Ok):
+            pipeline_result = pipeline_result.value
+
+        # Normalize and return result
+        return self._normalize_cadsl_result(fixed_query, execution_state, pipeline_result)
+
+    def _cadsl_error_response(
+        self,
+        query: str,
+        execution_state: Dict[str, Any],
+        error: str
+    ) -> Dict[str, Any]:
+        """Build a standardized CADSL error response."""
+        return {
+            "success": False,
+            "results": [],
+            "count": 0,
+            "cadsl_query": query,
+            "query_type": "cadsl",
+            "attempts": execution_state["attempts"],
+            "tools_used": execution_state["tools_used"],
+            "error": error
+        }
+
+    def _normalize_cadsl_result(
+        self,
+        query: str,
+        execution_state: Dict[str, Any],
+        pipeline_result: Any
+    ) -> Dict[str, Any]:
+        """Normalize pipeline result to standard response format."""
+        if isinstance(pipeline_result, dict) and "success" in pipeline_result:
+            pipeline_result["cadsl_query"] = query
+            pipeline_result["query_type"] = "cadsl"
+            pipeline_result["attempts"] = execution_state["attempts"]
+            pipeline_result["tools_used"] = execution_state["tools_used"]
+            return pipeline_result
+
+        results = pipeline_result if isinstance(pipeline_result, list) else [pipeline_result]
+        return {
+            "success": True,
+            "results": results,
+            "count": len(results),
+            "cadsl_query": query,
+            "query_type": "cadsl",
+            "attempts": execution_state["attempts"],
+            "tools_used": execution_state["tools_used"],
+            "error": None
+        }
+
     async def _execute_cadsl_query(
         self,
         question: str,
@@ -369,11 +491,14 @@ class ToolRegistrar:
         max_retries: int,
         similar_tools: Optional[list] = None
     ) -> Dict[str, Any]:
-        """Execute a CADSL query using Agent SDK for generation with retry on empty/error."""
-        from ..cadsl.parser import parse_cadsl
-        from ..cadsl.transformer import CADSLTransformer
-        from ..cadsl.loader import build_pipeline_factory
+        """
+        Execute a CADSL query using Agent SDK for generation with retry on empty/error.
 
+        Orchestrates the query generation and execution flow:
+        1. Generate CADSL from natural language using Agent SDK
+        2. Execute the generated query via _execute_single_cadsl_pipeline
+        3. Retry with agent feedback if results are empty/error
+        """
         debug_log.debug(f"\n{'='*60}\nCADSL EXECUTION (Agent SDK)\n{'='*60}")
 
         if not is_agent_sdk_available():
@@ -385,128 +510,22 @@ class ToolRegistrar:
                 "error": "Claude Agent SDK not available. Install with: pip install claude-agent-sdk"
             }
 
-        # Build similar tools context if provided
-        similar_tools_context = None
-        if similar_tools:
-            similar_tools_context = build_similar_tools_section(similar_tools)
+        # Setup context
+        similar_tools_context = build_similar_tools_section(similar_tools) if similar_tools else None
 
-        # Get reter instance and rag_manager for query tools
         try:
             reter = self.instance_manager.get_or_create_instance("default")
         except Exception:
             reter = None
 
         rag_manager = self.default_manager.get_rag_manager() if self.default_manager else None
-
-        # Get project root for file path context in Agent SDK
         project_root = None
         if hasattr(self.instance_manager, '_project_root') and self.instance_manager._project_root:
             project_root = str(self.instance_manager._project_root)
 
-        # Track total attempts across retries
-        total_attempts = 0
-        all_tools_used = []
-        max_empty_retries = 2  # Max times to retry on empty results
-
-        async def execute_single_cadsl(query: str, attempt_info: dict) -> Dict[str, Any]:
-            """Execute a single CADSL query and return results."""
-            nonlocal total_attempts, all_tools_used
-            total_attempts += attempt_info.get("attempts", 1)
-            all_tools_used.extend(attempt_info.get("tools_used", []))
-
-            # Auto-fix bare reql blocks (Rule 10 violation)
-            fixed_query = self._fix_bare_reql_block(query)
-
-            # Parse CADSL
-            parse_result = parse_cadsl(fixed_query)
-            if not parse_result.success:
-                return {
-                    "success": False,
-                    "results": [],
-                    "count": 0,
-                    "cadsl_query": fixed_query,
-                    "query_type": "cadsl",
-                    "attempts": total_attempts,
-                    "tools_used": all_tools_used,
-                    "error": f"Parse error: {parse_result.errors}"
-                }
-
-            transformer = CADSLTransformer()
-            tool_specs = transformer.transform(parse_result.tree)
-
-            if not tool_specs:
-                return {
-                    "success": False,
-                    "results": [],
-                    "count": 0,
-                    "cadsl_query": fixed_query,
-                    "query_type": "cadsl",
-                    "attempts": total_attempts,
-                    "tools_used": all_tools_used,
-                    "error": "No tool spec generated from CADSL"
-                }
-
-            # Build and execute pipeline
-            nonlocal reter, rag_manager
-            reter = self.instance_manager.get_or_create_instance("default")
-            rag_manager = self.default_manager.get_rag_manager() if self.default_manager else None
-
-            tool_spec = tool_specs[0]
-
-            # Extract default parameter values from tool spec
-            params = {"rag_manager": rag_manager}
-            for param in tool_spec.params:
-                if param.default is not None:
-                    params[param.name] = param.default
-            debug_log.debug(f"CADSL pipeline params: {params}")
-
-            from ..dsl.core import Context as PipelineContext
-            pipeline_ctx = PipelineContext(reter=reter, params=params)
-
-            pipeline_factory = build_pipeline_factory(tool_spec)
-            pipeline = pipeline_factory(pipeline_ctx)
-
-            pipeline_result = pipeline.execute(pipeline_ctx)
-
-            # Check for Result monad errors (Err type)
-            from ..dsl.catpy import Err
-            if isinstance(pipeline_result, Err):
-                error = pipeline_result.value
-                return {
-                    "success": False,
-                    "results": [],
-                    "count": 0,
-                    "cadsl_query": fixed_query,
-                    "query_type": "cadsl",
-                    "attempts": total_attempts,
-                    "tools_used": all_tools_used,
-                    "error": str(error)  # PipelineError has __str__
-                }
-
-            # Unwrap Ok result if needed
-            from ..dsl.catpy import Ok
-            if isinstance(pipeline_result, Ok):
-                pipeline_result = pipeline_result.value
-
-            # Normalize result
-            if isinstance(pipeline_result, dict) and "success" in pipeline_result:
-                pipeline_result["cadsl_query"] = fixed_query
-                pipeline_result["query_type"] = "cadsl"
-                pipeline_result["attempts"] = total_attempts
-                pipeline_result["tools_used"] = all_tools_used
-                return pipeline_result
-            else:
-                results = pipeline_result if isinstance(pipeline_result, list) else [pipeline_result]
-                return {
-                    "success": True,
-                    "results": results,
-                    "count": len(results),
-                    "cadsl_query": fixed_query,
-                    "query_type": "cadsl",
-                    "attempts": total_attempts,
-                    "tools_used": all_tools_used,
-                    "error": None
-                }
+        # Execution state for tracking across retries
+        execution_state = {"attempts": 0, "tools_used": []}
+        max_empty_retries = 2
 
         try:
             # Generate initial CADSL using Agent SDK
@@ -536,60 +555,15 @@ class ToolRegistrar:
             debug_log.debug(f"GENERATED CADSL QUERY:\n{generated_query}")
 
             # Execute the query
-            exec_result = await execute_single_cadsl(generated_query, {
-                "attempts": result.attempts,
-                "tools_used": result.tools_used
-            })
+            execution_state["attempt_delta"] = result.attempts
+            execution_state["tools_delta"] = result.tools_used
+            exec_result = self._execute_single_cadsl_pipeline(generated_query, execution_state)
 
-            # Check if we need to retry (empty results or error)
-            empty_retry_count = 0
-            current_query = generated_query
-
-            while empty_retry_count < max_empty_retries:
-                result_count = exec_result.get("count", 0)
-                has_error = not exec_result.get("success", False)
-                error_msg = exec_result.get("error")
-
-                # If we have results and no error, we're done
-                if result_count > 0 and not has_error:
-                    debug_log.debug(f"CADSL query returned {result_count} results, no retry needed")
-                    return exec_result
-
-                # Ask agent if it wants to retry
-                debug_log.debug(f"CADSL query returned {result_count} results, error={error_msg}. Asking agent to retry...")
-
-                retry_result = await retry_cadsl_query(
-                    question=question,
-                    previous_query=current_query,
-                    result_count=result_count,
-                    error_message=error_msg if has_error else None,
-                    reter_instance=reter,
-                    rag_manager=rag_manager
-                )
-
-                # Check if agent confirmed empty is correct
-                if retry_result.error == "CONFIRM_EMPTY":
-                    debug_log.debug("Agent confirmed empty results are correct")
-                    exec_result["agent_confirmed_empty"] = True
-                    return exec_result
-
-                # Check if agent provided a new query
-                if retry_result.success and retry_result.query:
-                    debug_log.debug(f"Agent provided retry query: {retry_result.query[:100]}...")
-                    current_query = retry_result.query
-                    exec_result = await execute_single_cadsl(current_query, {
-                        "attempts": retry_result.attempts,
-                        "tools_used": retry_result.tools_used
-                    })
-                    empty_retry_count += 1
-                else:
-                    # Agent didn't provide a new query, return current result
-                    debug_log.debug("Agent did not provide retry query, returning current result")
-                    return exec_result
-
-            # Max retries reached
-            debug_log.debug(f"Max empty retries ({max_empty_retries}) reached")
-            return exec_result
+            # Retry loop for empty results
+            return await self._retry_cadsl_on_empty(
+                question, generated_query, exec_result,
+                execution_state, reter, rag_manager, max_empty_retries
+            )
 
         except Exception as e:
             debug_log.debug(f"CADSL ERROR: {e}")
@@ -598,10 +572,73 @@ class ToolRegistrar:
                 "results": [],
                 "count": 0,
                 "query_type": "cadsl",
-                "attempts": total_attempts,
-                "tools_used": all_tools_used,
+                "attempts": execution_state["attempts"],
+                "tools_used": execution_state["tools_used"],
                 "error": str(e)
             }
+
+    async def _retry_cadsl_on_empty(
+        self,
+        question: str,
+        current_query: str,
+        exec_result: Dict[str, Any],
+        execution_state: Dict[str, Any],
+        reter: Any,
+        rag_manager: Any,
+        max_empty_retries: int
+    ) -> Dict[str, Any]:
+        """
+        Handle retry logic when CADSL query returns empty or error results.
+
+        Asks the agent if it wants to provide a revised query or confirm
+        that empty results are correct.
+        """
+        empty_retry_count = 0
+
+        while empty_retry_count < max_empty_retries:
+            result_count = exec_result.get("count", 0)
+            has_error = not exec_result.get("success", False)
+            error_msg = exec_result.get("error")
+
+            # If we have results and no error, we're done
+            if result_count > 0 and not has_error:
+                debug_log.debug(f"CADSL query returned {result_count} results, no retry needed")
+                return exec_result
+
+            # Ask agent if it wants to retry
+            debug_log.debug(f"CADSL query returned {result_count} results, error={error_msg}. Asking agent to retry...")
+
+            retry_result = await retry_cadsl_query(
+                question=question,
+                previous_query=current_query,
+                result_count=result_count,
+                error_message=error_msg if has_error else None,
+                reter_instance=reter,
+                rag_manager=rag_manager
+            )
+
+            # Check if agent confirmed empty is correct
+            if retry_result.error == "CONFIRM_EMPTY":
+                debug_log.debug("Agent confirmed empty results are correct")
+                exec_result["agent_confirmed_empty"] = True
+                return exec_result
+
+            # Check if agent provided a new query
+            if retry_result.success and retry_result.query:
+                debug_log.debug(f"Agent provided retry query: {retry_result.query[:100]}...")
+                current_query = retry_result.query
+                execution_state["attempt_delta"] = retry_result.attempts
+                execution_state["tools_delta"] = retry_result.tools_used
+                exec_result = self._execute_single_cadsl_pipeline(current_query, execution_state)
+                empty_retry_count += 1
+            else:
+                # Agent didn't provide a new query, return current result
+                debug_log.debug("Agent did not provide retry query, returning current result")
+                return exec_result
+
+        # Max retries reached
+        debug_log.debug(f"Max empty retries ({max_empty_retries}) reached")
+        return exec_result
 
     def _fix_bare_reql_block(self, cadsl_query: str) -> str:
         """
@@ -640,103 +677,6 @@ class ToolRegistrar:
             return fixed
 
         return cadsl_query
-
-    def _execute_rag_query(self, question: str) -> Dict[str, Any]:
-        """Execute a RAG query - semantic search, duplicate detection, or clustering."""
-        rag_manager = self.default_manager.get_rag_manager() if self.default_manager else None
-
-        if rag_manager is None:
-            return {
-                "success": False,
-                "results": [],
-                "count": 0,
-                "query_type": "rag",
-                "error": "RAG is not configured. Set RETER_PROJECT_ROOT to enable."
-            }
-
-        if not rag_manager.is_enabled:
-            return {
-                "success": False,
-                "results": [],
-                "count": 0,
-                "query_type": "rag",
-                "error": "RAG is disabled via configuration."
-            }
-
-        try:
-            params = build_rag_query_params(question)
-            analysis_type = params.get("analysis_type", "search")
-            debug_log.debug(f"RAG QUERY PARAMS: {params} (type: {analysis_type})")
-
-            if analysis_type == "duplicates":
-                # Execute duplicate detection
-                result = rag_manager.find_duplicate_candidates(
-                    similarity_threshold=params.get("similarity_threshold", 0.85),
-                    max_results=params.get("max_results", 50),
-                    exclude_same_file=params.get("exclude_same_file", True),
-                    exclude_same_class=params.get("exclude_same_class", True),
-                    entity_types=params.get("entity_types"),
-                )
-                return {
-                    "success": True,
-                    "results": result.get("pairs", []),
-                    "count": result.get("count", 0),
-                    "query_type": "rag",
-                    "analysis_type": "duplicates",
-                    "rag_params": params,
-                    "stats": result.get("stats", {}),
-                    "error": None
-                }
-
-            elif analysis_type == "clusters":
-                # Execute cluster detection
-                result = rag_manager.find_similar_clusters(
-                    n_clusters=params.get("n_clusters", 50),
-                    min_cluster_size=params.get("min_size", 2),  # param name is min_cluster_size
-                    exclude_same_file=params.get("exclude_same_file", True),
-                    exclude_same_class=params.get("exclude_same_class", True),
-                    entity_types=params.get("entity_types"),
-                )
-                return {
-                    "success": True,
-                    "results": result.get("clusters", []),
-                    "count": result.get("total_clusters", 0),  # return key is total_clusters
-                    "query_type": "rag",
-                    "analysis_type": "clusters",
-                    "rag_params": params,
-                    "stats": result.get("stats", {}),
-                    "error": None
-                }
-
-            else:
-                # Default: semantic search
-                results, stats = rag_manager.search(
-                    query=params.get("query", question),
-                    top_k=params.get("top_k", 20),
-                    entity_types=params.get("entity_types"),
-                    search_scope=params.get("search_scope", "code"),
-                    include_content=params.get("include_content", False),
-                )
-
-                return {
-                    "success": True,
-                    "results": [r.to_dict() for r in results],
-                    "count": len(results),
-                    "query_type": "rag",
-                    "analysis_type": "search",
-                    "rag_params": params,
-                    "stats": stats,
-                    "error": None
-                }
-
-        except Exception as e:
-            return {
-                "success": False,
-                "results": [],
-                "count": 0,
-                "query_type": "rag",
-                "error": str(e)
-            }
 
     def _register_nlq_tool(self, app: FastMCP) -> None:
         """Register the natural language query tool."""
