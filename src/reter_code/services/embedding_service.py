@@ -73,6 +73,11 @@ class EmbeddingService:
     @reter-cnl: This is-in-layer Infrastructure-Layer.
     @reter-cnl: This is a machine-learning-component.
     @reter-cnl: This has-provider "sentence-transformers".
+    @reter-cnl: This is-in-process Main-Process.
+    @reter-cnl: This is stateful.
+    @reter-cnl: This holds-expensive-resource "embedding-model".
+    @reter-cnl: This has-startup-order 2.
+    @reter-cnl: This has-singleton-scope.
     """
 
     # Model configurations

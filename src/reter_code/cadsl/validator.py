@@ -134,6 +134,8 @@ class CADSLValidator:
 
     @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
     @reter-cnl: This is a validator.
+    @reter-cnl: This is-in-process Main-Process.
+    @reter-cnl: This is stateful.
     """
 
     def __init__(self, strict: bool = False):

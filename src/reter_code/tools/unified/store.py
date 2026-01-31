@@ -230,6 +230,8 @@ class UnifiedStore:
 
     @reter-cnl: This is-in-layer Service-Layer.
     @reter-cnl: This is a repository.
+    @reter-cnl: This is-in-process Main-Process.
+    @reter-cnl: This is stateful.
 
     Manages sessions, items, relations, and artifacts in a single database.
     """

@@ -164,6 +164,10 @@ class ReterCodeServer:
     @reter-cnl: This depends-on `reter_code.services.InstanceManager`.
     @reter-cnl: This depends-on `reter_code.services.ToolRegistrar`.
     @reter-cnl: This depends-on `reter_code.services.ResourceRegistrar`.
+    @reter-cnl: This is-in-process Model-Context-Protocol-Server-Process.
+    @reter-cnl: This is a process-entry-point.
+    @reter-cnl: This is stateless.
+    @reter-cnl: This is a ipc-proxy.
     """
 
     def __init__(self):

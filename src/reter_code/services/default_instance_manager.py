@@ -65,6 +65,8 @@ class _FileChangeHandler(FileSystemEventHandler):
 
     @reter-cnl: This is-in-layer Service-Layer.
     @reter-cnl: This is a handler.
+    @reter-cnl: This is-in-process Main-Process.
+    @reter-cnl: This is stateful.
 
     Only triggers on supported code file extensions and respects
     gitignore/exclude patterns.
@@ -148,6 +150,8 @@ class DefaultInstanceManager:
 
     @reter-cnl: This is-in-layer Service-Layer.
     @reter-cnl: This is a manager.
+    @reter-cnl: This is-in-process Main-Process.
+    @reter-cnl: This is stateful.
 
     The default instance:
     - Always appears in list_all_instances()

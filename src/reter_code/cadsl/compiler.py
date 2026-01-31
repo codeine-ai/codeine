@@ -74,6 +74,8 @@ class ExpressionCompiler:
     @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
     @reter-cnl: This is a compiler.
     @reter-cnl: This is-part-of `reter_code.cadsl`.
+    @reter-cnl: This is-in-process Main-Process.
+    @reter-cnl: This is stateless.
     """
 
     def __init__(self):

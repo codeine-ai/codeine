@@ -16,6 +16,8 @@ class ResourceRegistrar:
 
     @reter-cnl: This is-in-layer Service-Layer.
     @reter-cnl: This is a registrar.
+    @reter-cnl: This is-in-process MCP-Server-Process.
+    @reter-cnl: This is stateless.
 
     Single Responsibility: Register and serve documentation resources.
     """

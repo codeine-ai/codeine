@@ -25,6 +25,8 @@ class ThinkingSession:
 
     @reter-cnl: This is-in-layer Service-Layer.
     @reter-cnl: This is a manager.
+    @reter-cnl: This is-in-process Main-Process.
+    @reter-cnl: This is stateful.
 
     Provides:
     - Session lifecycle management

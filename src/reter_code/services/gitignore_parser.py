@@ -153,6 +153,8 @@ class GitignoreParser:
 
     @reter-cnl: This is-in-layer Service-Layer.
     @reter-cnl: This is a parser.
+    @reter-cnl: This is-in-process Main-Process.
+    @reter-cnl: This is stateful.
 
     Usage:
         parser = GitignoreParser(project_root)

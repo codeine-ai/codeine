@@ -88,6 +88,8 @@ class CADSLParser:
     @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
     @reter-cnl: This is a parser.
     @reter-cnl: This is a singleton.
+    @reter-cnl: This is-in-process Main-Process.
+    @reter-cnl: This is stateful.
     """
 
     _instance: Optional["CADSLParser"] = None

@@ -1,0 +1,239 @@
+# Sync Annotations Tool
+# Finds classes with missing or outdated annotations and creates update tasks
+#
+# Annotation Version Schema:
+#   v1: is-in-layer only (basic architecture)
+#   v2: v1 + functional component (is a <component>)
+#   v3: v2 + runtime annotations (is-in-process, stateful/stateless)
+#
+# Usage:
+#   mcp__reter__execute_cadsl(script="...", params={"target_version": 3, "dry_run": True})
+
+# Main tool: Find unannotated classes (v0) and create tasks
+query sync_annotations_v0(
+    category = "annotation",
+    capabilities = ["task_creation", "code_analysis"]
+) {
+    """
+    Find classes with NO annotations (v0) and create tasks.
+
+    Parameters:
+        dry_run: If true, returns task data without creating tasks. Default: true
+        limit: Maximum number of tasks to generate. Default: 100
+    """
+
+    param dry_run: bool = true;
+    param limit: int = 100;
+
+    reql {
+        SELECT ?class ?name ?file ?line WHERE {
+            ?class type class .
+            ?class has-name ?name .
+            ?class is-in-file ?file .
+            ?class is-at-line ?line .
+            # No layer annotation = v0
+            FILTER NOT EXISTS { ?class is-in-layer ?any }
+            # Exclude test files
+            FILTER (!CONTAINS(?file, "test"))
+            FILTER (!CONTAINS(?file, "tests"))
+            FILTER (!CONTAINS(?file, "_test.py"))
+            FILTER (!CONTAINS(?file, "test_"))
+        }
+        ORDER BY ?file ?line
+        LIMIT {limit}
+    }
+    | select { name, file, line }
+    | map {
+        class_name: name,
+        file: file,
+        line: line,
+        current_version: 0,
+        target_version: 3,
+        task_type: "Add"
+    }
+    | create_task {
+        name: "{task_type} @reter-cnl annotations for {class_name} (v0→v3)",
+        category: "annotation",
+        priority: high,
+        description: "Add annotations to bring class to version 3.\n\nClass: {class_name}\nFile: {file}:{line}\nCurrent Version: v0 (no annotations)\nTarget Version: v3\n\n---\n\nRequired Annotations:\n\nv1 - Architecture Layer:\n  @reter-cnl: This is-in-layer <Layer-Name>.\n  Layers: Presentation-Layer, Service-Layer, Domain-Specific-Language-Layer,\n          Infrastructure-Layer, Core-Layer, Test-Layer, Utility-Layer\n\nv2 - Functional Component:\n  @reter-cnl: This is a <component>.\n  Components: service, manager, handler, repository, parser, transformer,\n              factory, executor, adapter, singleton, etc.\n\nv3 - Runtime/Process:\n  @reter-cnl: This is-in-process Main-Process.\n  @reter-cnl: This is stateful.  (or: This is stateless.)\n  Optional: holds-expensive-resource, has-singleton-scope, has-startup-order\n\n---\n\nValidate before adding:\n  mcp__reter__validate_cnl(statement, context_entity)",
+        affects: file,
+        dry_run: {dry_run}
+    }
+    | emit { tasks }
+}
+
+
+# Find classes with v1 annotations (layer only) that need upgrade to v2+
+query sync_annotations_v1(
+    category = "annotation",
+    capabilities = ["task_creation", "code_analysis"]
+) {
+    """
+    Find classes at v1 (has layer, missing component) and create upgrade tasks.
+
+    Parameters:
+        dry_run: If true, returns task data without creating tasks. Default: true
+        limit: Maximum number of tasks to generate. Default: 100
+    """
+
+    param dry_run: bool = true;
+    param limit: int = 100;
+
+    reql {
+        SELECT DISTINCT ?class ?name ?file ?line ?layer WHERE {
+            ?class type class .
+            ?class has-name ?name .
+            ?class is-in-file ?file .
+            ?class is-at-line ?line .
+            # Has layer annotation (v1+)
+            ?class is-in-layer ?layer .
+            # Missing component annotation
+            FILTER NOT EXISTS {
+                ?class type ?component .
+                FILTER(?component IN (
+                    service, manager, handler, repository, parser, transformer,
+                    factory, builder, validator, executor, compiler, adapter,
+                    facade, singleton, observer, strategy, decorator,
+                    value-object, entity, aggregate-root, domain-event,
+                    query-engine, reasoning-engine, machine-learning-component,
+                    retrieval-augmented-generation-component, persistence-component,
+                    model-context-protocol-server, model-context-protocol-tool-provider,
+                    core-service, registrar, loader, extractor, provider
+                ))
+            }
+            # Exclude test files
+            FILTER (!CONTAINS(?file, "test"))
+        }
+        ORDER BY ?file ?line
+        LIMIT {limit}
+    }
+    | select { name, file, line, layer }
+    | map {
+        class_name: name,
+        file: file,
+        line: line,
+        layer: layer,
+        current_version: 1,
+        target_version: 3,
+        task_type: "Upgrade"
+    }
+    | create_task {
+        name: "{task_type} @reter-cnl for {class_name} (v1→v3)",
+        category: "annotation",
+        priority: medium,
+        description: "Upgrade annotations from v1 to v3.\n\nClass: {class_name}\nFile: {file}:{line}\nCurrent Version: v1 (has layer: {layer})\nTarget Version: v3\n\n---\n\nMissing Annotations:\n\nv2 - Functional Component:\n  @reter-cnl: This is a <component>.\n  Components: service, manager, handler, repository, parser, transformer,\n              factory, executor, adapter, singleton, etc.\n\nv3 - Runtime/Process:\n  @reter-cnl: This is-in-process Main-Process.\n  @reter-cnl: This is stateful.  (or: This is stateless.)\n  Optional: holds-expensive-resource, has-singleton-scope, has-startup-order\n\n---\n\nValidate before adding:\n  mcp__reter__validate_cnl(statement, context_entity)",
+        affects: file,
+        dry_run: {dry_run}
+    }
+    | emit { tasks }
+}
+
+
+# Find classes with v2 annotations that need upgrade to v3
+query sync_annotations_v2(
+    category = "annotation",
+    capabilities = ["task_creation", "code_analysis"]
+) {
+    """
+    Find classes at v2 (has layer + component, missing runtime) and create upgrade tasks.
+
+    Parameters:
+        dry_run: If true, returns task data without creating tasks. Default: true
+        limit: Maximum number of tasks to generate. Default: 100
+    """
+
+    param dry_run: bool = true;
+    param limit: int = 100;
+
+    reql {
+        SELECT DISTINCT ?class ?name ?file ?line ?layer WHERE {
+            ?class type class .
+            ?class has-name ?name .
+            ?class is-in-file ?file .
+            ?class is-at-line ?line .
+            # Has layer annotation
+            ?class is-in-layer ?layer .
+            # Has component annotation (v2)
+            ?class type ?component .
+            FILTER(?component IN (
+                service, manager, handler, repository, parser, transformer,
+                factory, builder, validator, executor, compiler, adapter,
+                facade, singleton, observer, strategy, decorator,
+                value-object, entity, aggregate-root, domain-event,
+                query-engine, reasoning-engine, machine-learning-component,
+                retrieval-augmented-generation-component, persistence-component,
+                model-context-protocol-server, model-context-protocol-tool-provider,
+                core-service, registrar, loader, extractor, provider
+            ))
+            # Missing runtime annotations (v3)
+            FILTER NOT EXISTS { ?class is-in-process ?any }
+            FILTER NOT EXISTS { ?class type stateful }
+            FILTER NOT EXISTS { ?class type stateless }
+            # Exclude test files
+            FILTER (!CONTAINS(?file, "test"))
+        }
+        ORDER BY ?file ?line
+        LIMIT {limit}
+    }
+    | select { name, file, line, layer }
+    | map {
+        class_name: name,
+        file: file,
+        line: line,
+        layer: layer,
+        current_version: 2,
+        target_version: 3,
+        task_type: "Upgrade"
+    }
+    | create_task {
+        name: "{task_type} @reter-cnl for {class_name} (v2→v3)",
+        category: "annotation",
+        priority: low,
+        description: "Upgrade annotations from v2 to v3.\n\nClass: {class_name}\nFile: {file}:{line}\nCurrent Version: v2 (has layer: {layer}, has component)\nTarget Version: v3\n\n---\n\nMissing Annotations (v3 - Runtime/Process):\n\n  @reter-cnl: This is-in-process Main-Process.\n  @reter-cnl: This is stateful.  (or: This is stateless.)\n  Optional: holds-expensive-resource, has-singleton-scope, has-startup-order\n\n---\n\nValidate before adding:\n  mcp__reter__validate_cnl(statement, context_entity)",
+        affects: file,
+        dry_run: {dry_run}
+    }
+    | emit { tasks }
+}
+
+
+# Summary query - shows annotation coverage without creating tasks
+query annotation_coverage(
+    category = "annotation",
+    capabilities = ["code_analysis"]
+) {
+    """
+    Show annotation coverage summary.
+
+    Returns counts of classes at each annotation version level.
+    """
+
+    param include_tests: bool = false;
+
+    reql {
+        SELECT ?class ?name ?file ?layer ?component ?process ?state WHERE {
+            ?class type class .
+            ?class has-name ?name .
+            ?class is-in-file ?file .
+
+            OPTIONAL { ?class is-in-layer ?layer }
+            OPTIONAL {
+                ?class type ?comp_type .
+                FILTER(?comp_type IN (
+                    service, manager, handler, repository, parser, transformer,
+                    factory, builder, executor, compiler, adapter, singleton,
+                    query-engine, reasoning-engine, core-service, registrar
+                ))
+                BIND(?comp_type AS ?component)
+            }
+            OPTIONAL { ?class is-in-process ?process }
+            OPTIONAL {
+                { ?class type stateful . BIND("stateful" AS ?state) }
+                UNION
+                { ?class type stateless . BIND("stateless" AS ?state) }
+            }
+        }
+    }
+    | select { name, file, layer, component, process, state }
+    | emit { results }
+}

@@ -21,6 +21,8 @@ class OperationsHandler:
 
     @reter-cnl: This is-in-layer Service-Layer.
     @reter-cnl: This is a handler.
+    @reter-cnl: This is-in-process Main-Process.
+    @reter-cnl: This is stateless.
 
     Operations are processed in order:
     1. RETER knowledge operations

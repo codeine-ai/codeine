@@ -108,6 +108,8 @@ class SourceStateManager:
 
     @reter-cnl: This is-in-layer Service-Layer.
     @reter-cnl: This is a manager.
+    @reter-cnl: This is-in-process Main-Process.
+    @reter-cnl: This is stateful.
 
     This is the single source of truth for what's loaded in RETER and RAG.
     """

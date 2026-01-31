@@ -66,6 +66,8 @@ class FAISSWrapper:
 
     @reter-cnl: This is-in-layer Infrastructure-Layer.
     @reter-cnl: This is a wrapper.
+    @reter-cnl: This is-in-process Main-Process.
+    @reter-cnl: This is stateful.
 
     Handles index creation, vector operations, and persistence.
     Uses IndexIDMap to support vector deletion (required for incremental updates).

@@ -1102,6 +1102,8 @@ class Pipeline(Monad[T], Generic[T]):
 
     @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
     @reter-cnl: This is a monad.
+    @reter-cnl: This is-in-process Main-Process.
+    @reter-cnl: This is stateless.
     """
     _source: Source[Any]
     _steps: List[Step] = field(default_factory=list)

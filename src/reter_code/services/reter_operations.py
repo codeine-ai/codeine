@@ -28,6 +28,8 @@ class ReterOperations:
 
     @reter-cnl: This is-in-layer Service-Layer.
     @reter-cnl: This is a service.
+    @reter-cnl: This is-in-process Main-Process.
+    @reter-cnl: This is stateless.
 
     This service handles:
     - Adding knowledge incrementally (ontology, Python code)

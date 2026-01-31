@@ -58,6 +58,8 @@ class Registry:
 
     @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
     @reter-cnl: This is a registrar.
+    @reter-cnl: This is-in-process Main-Process.
+    @reter-cnl: This is stateful.
     """
 
     # Class-level storage

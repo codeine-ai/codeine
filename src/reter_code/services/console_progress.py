@@ -59,6 +59,8 @@ class ConsoleProgress:
 
     @reter-cnl: This is-in-layer Presentation-Layer.
     @reter-cnl: This is a view.
+    @reter-cnl: This is-in-process Main-Process.
+    @reter-cnl: This is stateful.
     """
 
     def __init__(self):

@@ -58,6 +58,8 @@ class ContentExtractor:
 
     @reter-cnl: This is-in-layer Service-Layer.
     @reter-cnl: This is a extractor.
+    @reter-cnl: This is-in-process Main-Process.
+    @reter-cnl: This is stateless.
 
     Works with RETER query results that provide file paths and line numbers.
     Maintains a file cache to avoid repeated disk reads during batch operations.

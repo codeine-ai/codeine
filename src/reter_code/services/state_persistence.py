@@ -41,6 +41,8 @@ class StatePersistenceService:
     @reter-cnl: This is-in-layer Service-Layer.
     @reter-cnl: This is a persistence-component.
     @reter-cnl: This depends-on `reter_code.services.InstanceManager`.
+    @reter-cnl: This is-in-process Main-Process.
+    @reter-cnl: This is stateful.
     """
 
     def __init__(self, instance_manager: InstanceManager):

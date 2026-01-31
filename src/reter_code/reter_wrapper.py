@@ -5,358 +5,73 @@ Provides a clean Python interface to RETER's C++ reasoning engine
 using the AI lexer variant for natural language DL syntax.
 """
 
-from pathlib import Path
-from typing import List, Optional, Callable, TypeVar, Any, Tuple, Dict, Set
-import logging
 import time
-import hashlib
-import traceback
-import sys
+from pathlib import Path
+from typing import List, Optional, Any, Tuple, Dict, Set
 import functools
-import os
 
 from reter import Reter
 
 from .logging_config import configure_logger_for_debug_trace
 
+# Import exceptions from separate module (re-export for backward compatibility)
+from .reter_exceptions import (
+    ReterError,
+    ReterFileError,
+    ReterFileNotFoundError,
+    ReterSaveError,
+    ReterLoadError,
+    ReterQueryError,
+    ReterOntologyError,
+    DefaultInstanceNotInitialised,
+)
+
+# Import utilities from separate module (re-export for backward compatibility)
+from .reter_utils import (
+    set_initialization_in_progress,
+    set_initialization_complete,
+    is_initialization_complete,
+    check_initialization,
+    DEBUG_MAX_VALUE_LEN,
+    RETER_REQL_TIMEOUT_MS,
+    debug_log,
+    _shorten_value,
+    _format_args,
+    safe_cpp_call,
+    generate_source_id,
+)
+
+# Import loader mixins from separate module
+from .reter_loaders import ReterLoaderMixin
+
 # Configure module logger to also write to debug_trace.log
 logger = configure_logger_for_debug_trace(__name__)
 
-
-# =============================================================================
-# RETER Exception Hierarchy
-# =============================================================================
-class ReterError(Exception):
-    """
-    Base exception for all RETER operations.
-
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a exception.
-    """
-    pass
-
-
-class ReterFileError(ReterError):
-    """
-    Exception for file-related RETER operations (save/load).
-
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a exception.
-    """
-    pass
-
-
-class ReterFileNotFoundError(ReterFileError):
-    """
-    Raised when a RETER snapshot file is not found.
-
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a exception.
-    """
-    pass
-
-
-class ReterSaveError(ReterFileError):
-    """
-    Raised when saving RETER network fails.
-
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a exception.
-    """
-    pass
-
-
-class ReterLoadError(ReterFileError):
-    """
-    Raised when loading RETER network fails.
-
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a exception.
-    """
-    pass
-
-
-class ReterQueryError(ReterError):
-    """
-    Exception for query-related RETER operations.
-
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a exception.
-    """
-    pass
-
-
-class ReterOntologyError(ReterError):
-    """
-    Exception for ontology/knowledge loading errors.
-
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a exception.
-    """
-    pass
-
-
-class DefaultInstanceNotInitialised(ReterError):
-    """
-    Raised when attempting to access RETER before initialization is complete.
-
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a exception.
-
-    This exception is thrown by ReterWrapper and RAGIndexManager when:
-    - Server is starting up and background initialization hasn't completed
-    - Embedding model is still loading
-    - Default instance Python files are still being indexed
-
-    MCP tools should catch this exception and return an appropriate error
-    message to the client indicating they should wait and retry.
-    """
-    pass
-
-
-# =============================================================================
-# Initialization State Management
-# =============================================================================
-# Two-flag system to control access during initialization:
-# - _initialization_in_progress: True while background init thread is running
-#   (allows internal access for loading Python files, running REQL, etc.)
-# - _initialization_complete: True after init finishes (allows normal operation)
-#
-# Access is BLOCKED only when BOTH flags are False (before init starts)
-# This ensures MCP tools cannot access RETER while allowing init code to work.
-
-_initialization_in_progress = False
-_initialization_complete = False
-
-
-def set_initialization_in_progress(value: bool) -> None:
-    """Set whether initialization is currently in progress."""
-    global _initialization_in_progress
-    _initialization_in_progress = value
-    debug_log(f"[InitState] _initialization_in_progress = {value}")
-
-
-def set_initialization_complete(value: bool) -> None:
-    """Set whether initialization is complete."""
-    global _initialization_complete
-    _initialization_complete = value
-    debug_log(f"[InitState] _initialization_complete = {value}")
-
-
-def is_initialization_complete() -> bool:
-    """Check if initialization is complete."""
-    return _initialization_complete
-
-
-def check_initialization() -> None:
-    """
-    Check if access to RETER is allowed.
-
-    Raises:
-        DefaultInstanceNotInitialised: If neither init is in progress nor complete
-
-    Access is ALLOWED when:
-    - _initialization_complete is True (normal operation after init)
-    - _initialization_in_progress is True (internal init code running)
-
-    Access is BLOCKED when:
-    - Both flags are False (server starting, init not yet begun)
-    """
-    if not _initialization_complete and not _initialization_in_progress:
-        raise DefaultInstanceNotInitialised(
-            "Server is still initializing. The embedding model and code index "
-            "are being loaded in the background. Please wait a few seconds and retry."
-        )
-
-
-# Max length for parameter/return value logging
-DEBUG_MAX_VALUE_LEN = int(os.getenv("RETER_DEBUG_MAX_VALUE_LEN", "200"))
-
-# REQL query timeout in milliseconds (default: 5 minutes = 300000ms)
-# Set RETER_REQL_TIMEOUT environment variable to override (in seconds)
-RETER_REQL_TIMEOUT_MS = int(os.getenv("RETER_REQL_TIMEOUT", "300")) * 1000
-
-
-def debug_log(msg: str):
-    """Write debug message via standard logger (configured to write to debug_trace.log)."""
-    logger.debug(msg)
-
-
-def _shorten_value(value: Any, max_len: int = None) -> str:
-    """
-    Shorten a value for debug logging.
-
-    Args:
-        value: Any value to represent as string
-        max_len: Maximum length (uses DEBUG_MAX_VALUE_LEN if not specified)
-
-    Returns:
-        Shortened string representation
-    """
-    if max_len is None:
-        max_len = DEBUG_MAX_VALUE_LEN
-
-    try:
-        # Handle None
-        if value is None:
-            return "None"
-
-        # Handle common types with type info
-        if isinstance(value, bool):
-            return str(value)
-
-        if isinstance(value, (int, float)):
-            return str(value)
-
-        if isinstance(value, str):
-            if len(value) <= max_len:
-                return repr(value)
-            return repr(value[:max_len]) + f"...({len(value)} chars)"
-
-        if isinstance(value, bytes):
-            if len(value) <= max_len:
-                return f"bytes({len(value)})"
-            return f"bytes({len(value)})"
-
-        if isinstance(value, (list, tuple)):
-            type_name = type(value).__name__
-            if len(value) == 0:
-                return f"{type_name}(empty)"
-            if len(value) <= 3:
-                items = ", ".join(_shorten_value(v, max_len // 4) for v in value)
-                result = f"{type_name}[{items}]"
-                if len(result) <= max_len:
-                    return result
-            return f"{type_name}({len(value)} items)"
-
-        if isinstance(value, dict):
-            if len(value) == 0:
-                return "dict(empty)"
-            if len(value) <= 3:
-                items = ", ".join(
-                    f"{_shorten_value(k, 20)}: {_shorten_value(v, max_len // 4)}"
-                    for k, v in list(value.items())[:3]
-                )
-                result = f"dict{{{items}}}"
-                if len(result) <= max_len:
-                    return result
-            return f"dict({len(value)} keys)"
-
-        # Handle objects with __class__
-        type_name = type(value).__name__
-        str_repr = str(value)
-        if len(str_repr) <= max_len:
-            return f"{type_name}({str_repr})"
-        return f"{type_name}({str_repr[:max_len]}...)"
-
-    except Exception as e:
-        return f"<error formatting: {e}>"
-
-
-def _format_args(args: tuple, kwargs: dict) -> str:
-    """Format function arguments for debug logging."""
-    parts = []
-
-    # Format positional args
-    for i, arg in enumerate(args):
-        parts.append(f"arg{i}={_shorten_value(arg)}")
-
-    # Format keyword args
-    for key, value in kwargs.items():
-        parts.append(f"{key}={_shorten_value(value)}")
-
-    return ", ".join(parts) if parts else "(no args)"
-
-
-T = TypeVar('T')
-
-
-def safe_cpp_call(func: Callable[..., T], *args, **kwargs) -> T:
-    """
-    Safely call a C++ function with comprehensive exception handling.
-
-    Catches:
-    - Standard Python exceptions
-    - SystemError (C extension errors)
-    - MemoryError
-    - Any other exceptions from C++ bindings
-
-    Args:
-        func: The C++ function to call
-        *args: Positional arguments
-        **kwargs: Keyword arguments
-
-    Returns:
-        The result of the function call
-
-    Raises:
-        RuntimeError: If C++ call fails with details about the error
-    """
-    func_name = func.__name__ if hasattr(func, '__name__') else str(func)
-    args_str = _format_args(args, kwargs)
-    debug_log(f"safe_cpp_call ENTER: {func_name}({args_str})")
-    start_time = time.perf_counter()
-    try:
-        result = func(*args, **kwargs)
-        elapsed_ms = (time.perf_counter() - start_time) * 1000
-        result_str = _shorten_value(result)
-        debug_log(f"safe_cpp_call EXIT: {func_name} [{elapsed_ms:.1f}ms] -> {result_str}")
-        return result
-    except SystemError as e:
-        elapsed_ms = (time.perf_counter() - start_time) * 1000
-        # SystemError typically indicates C extension problems
-        error_msg = f"C++ SystemError in {func_name}: {e}"
-        debug_log(f"safe_cpp_call EXIT: {func_name} [{elapsed_ms:.1f}ms] FAILED - SystemError: {e}")
-        debug_log(f"  Args were: {args_str}")
-        debug_log(f"  Traceback: {traceback.format_exc()}")
-        print(f"ERROR: {error_msg}", file=sys.stderr)
-        traceback.print_exc()
-        raise RuntimeError(error_msg) from e
-    except MemoryError as e:
-        elapsed_ms = (time.perf_counter() - start_time) * 1000
-        error_msg = f"Memory error in C++ call {func_name}: {e}"
-        debug_log(f"safe_cpp_call EXIT: {func_name} [{elapsed_ms:.1f}ms] FAILED - MemoryError: {e}")
-        debug_log(f"  Args were: {args_str}")
-        print(f"ERROR: {error_msg}", file=sys.stderr)
-        raise RuntimeError(error_msg) from e
-    except OSError as e:
-        elapsed_ms = (time.perf_counter() - start_time) * 1000
-        # OSError can occur with file operations in C++
-        error_msg = f"OS error in C++ call {func_name}: {e}"
-        debug_log(f"safe_cpp_call EXIT: {func_name} [{elapsed_ms:.1f}ms] FAILED - OSError: {e}")
-        debug_log(f"  Args were: {args_str}")
-        print(f"ERROR: {error_msg}", file=sys.stderr)
-        raise RuntimeError(error_msg) from e
-    except Exception as e:
-        elapsed_ms = (time.perf_counter() - start_time) * 1000
-        # Catch any other exceptions
-        error_msg = f"Error in C++ call {func_name}: {type(e).__name__}: {e}"
-        debug_log(f"safe_cpp_call EXIT: {func_name} [{elapsed_ms:.1f}ms] FAILED - {type(e).__name__}: {e}")
-        debug_log(f"  Args were: {args_str}")
-        debug_log(f"  Traceback: {traceback.format_exc()}")
-        print(f"ERROR: {error_msg}", file=sys.stderr)
-        traceback.print_exc()
-        raise
-
-
-def generate_source_id(file_content: str, rel_path: str) -> str:
-    """
-    Generate source ID based on MD5 hash of file content and relative path.
-
-    Format: {md5_hash}|{rel_path}
-
-    Args:
-        file_content: Content of the Python file
-        rel_path: Relative path of the file
-
-    Returns:
-        Source ID string in format "md5hash|relative/path.py"
-    """
-    md5_hash = hashlib.md5(file_content.encode('utf-8')).hexdigest()
-    return f"{md5_hash}|{rel_path}"
-
-
-class ReterWrapper:
+# Re-export for backward compatibility
+__all__ = [
+    # Exceptions
+    "ReterError",
+    "ReterFileError",
+    "ReterFileNotFoundError",
+    "ReterSaveError",
+    "ReterLoadError",
+    "ReterQueryError",
+    "ReterOntologyError",
+    "DefaultInstanceNotInitialised",
+    # Utilities
+    "set_initialization_in_progress",
+    "set_initialization_complete",
+    "is_initialization_complete",
+    "check_initialization",
+    "debug_log",
+    "safe_cpp_call",
+    "generate_source_id",
+    # Main class
+    "ReterWrapper",
+]
+
+
+class ReterWrapper(ReterLoaderMixin):
     """
     Wrapper for RETER - Incremental Semantic Reasoning Engine
 
@@ -375,6 +90,12 @@ class ReterWrapper:
     @reter-cnl: This is-in-layer Infrastructure-Layer.
     @reter-cnl: This is a reasoning-engine.
     @reter-cnl: This depends-on `reter.Reter`.
+    @reter-cnl: This is-in-process Main-Process.
+    @reter-cnl: This is stateful.
+    @reter-cnl: This holds-expensive-resource "rete-network".
+    @reter-cnl: This has-startup-order 1.
+    @reter-cnl: This is not-serializable.
+    @reter-cnl: This has-singleton-scope.
     """
 
     def __init__(self, load_ontology: bool = True) -> None:
@@ -928,6 +649,9 @@ class ReterWrapper:
             # Step 3: Add facts (rule auto-fires!)
             add_ontology("Person(Alice)\\nage(Alice, 25)", source="data")
             # → RETER infers: Adult(Alice)
+
+        @reter-cnl: This is-exposed-via-ipc.
+        @reter-cnl: This communicates-sync.
         """
         check_initialization()
         start_time = time.time()
@@ -991,6 +715,10 @@ class ReterWrapper:
             DefaultInstanceNotInitialised: If server initialization not complete
             RuntimeError: If query execution times out
             Exception: If query execution fails
+
+        @reter-cnl: This is-exposed-via-ipc.
+        @reter-cnl: This has-ipc-timeout 300000.
+        @reter-cnl: This communicates-sync.
         """
         check_initialization()
         # Use default timeout if not specified
@@ -998,809 +726,6 @@ class ReterWrapper:
             timeout_ms = RETER_REQL_TIMEOUT_MS
         # Returns PyArrow table directly - wrap with safe call for C++ protection
         return safe_cpp_call(self.reasoner.reql, query, timeout_ms)
-
-    def load_python_file(
-        self,
-        filepath: str,
-        base_path: Optional[str] = None,
-        package_roots: Optional[Set[str]] = None
-    ) -> Tuple[int, str, float, List[str]]:
-        """
-        Load Python source file and add semantic facts to RETER
-
-        Args:
-            filepath: Path to Python file to load
-            base_path: Optional base path for calculating relative path (defaults to filepath's parent)
-            package_roots: Optional set of Python package root directories (containing __init__.py).
-                          If provided, enables proper Python module name calculation.
-
-        Returns:
-            Tuple[int, str, float, list]: (wme_count, source_id, time_ms, errors)
-
-        Raises:
-            Exception: If loading fails
-
-        Extracts and adds facts about:
-        - Classes, methods, functions
-        - Inheritance relationships
-        - Function calls
-        - Imports and dependencies
-        - Decorators
-        - Parameters and return types
-
-        Source ID is generated as MD5 hash of content | relative path.
-        INCREMENTAL: Adds to existing knowledge, doesn't replace.
-        """
-        check_initialization()
-        start_time = time.time()
-
-        # Read file content
-        filepath_obj = Path(filepath)
-        with open(filepath_obj, 'r', encoding='utf-8') as f:
-            code = f.read()
-
-        # Calculate relative path
-        if base_path:
-            try:
-                rel_path = filepath_obj.relative_to(Path(base_path))
-            except ValueError:
-                rel_path = filepath_obj
-        else:
-            rel_path = filepath_obj.name
-
-        # Generate MD5-based source ID
-        source_id = generate_source_id(code, str(rel_path))
-
-        # Use relative path with forward slashes for inFile (e.g., "path/to/file.py")
-        in_file = str(rel_path).replace('\\', '/')
-
-        # Calculate Python module name from relative path
-        # With package_roots: respects __init__.py to calculate proper import paths
-        # Without: falls back to simple path-to-dots conversion
-        module_name = self._path_to_module_name(in_file, package_roots)
-
-        # Load Python code with in_file, module_name, and source_id - wrap with safe call for C++ protection
-        wme_count, errors = safe_cpp_call(self.reasoner.load_python_code, code, in_file, module_name, source_id)
-
-        self._session_stats["total_wmes"] += wme_count
-        time_ms = (time.time() - start_time) * 1000
-        self._dirty = True  # Mark instance as modified
-
-        # Return errors in the response
-        return wme_count, source_id, time_ms, errors
-
-    def load_python_code(
-        self,
-        code: str,
-        source: str = "module",
-        progress_callback: Optional[Callable[[int, int, str], None]] = None,
-        package_roots: Optional[Set[str]] = None
-    ) -> Tuple[int, str, float, List[str]]:
-        """
-        Load Python code string and add semantic facts to RETER
-
-        Args:
-            code: Python source code as string
-            source: Source ID for tracking (can be module name, path, or path@timestamp)
-            progress_callback: Optional callback function(items_processed, total_items, message)
-            package_roots: Optional set of Python package root directories (containing __init__.py).
-                          If provided, enables proper Python module name calculation.
-
-        Returns:
-            Tuple[int, str, float, list]: (wme_count, source, time_ms, errors)
-
-        Raises:
-            Exception: If loading fails
-
-        Same as load_python_file() but takes code as string.
-        Useful for loading code snippets or dynamically generated code.
-
-        INCREMENTAL: Adds to existing knowledge.
-        """
-        check_initialization()
-        start_time = time.time()
-
-        # Extract file path from source (strip timestamp, MD5)
-        # Source formats: "module", "path/file.py", "path/file.py@timestamp", "md5|path/file.py"
-        in_file = source
-
-        # Strip MD5 prefix if present (format: "md5hash|path")
-        if '|' in in_file:
-            in_file = in_file.split('|', 1)[1]
-
-        # Strip timestamp suffix if present (format: "path@timestamp")
-        if '@' in in_file:
-            in_file = in_file.split('@', 1)[0]
-
-        # Normalize path separators to forward slashes (C++ visitor expects this)
-        in_file = in_file.replace('\\', '/')
-
-        # Calculate Python module name from file path
-        # With package_roots: respects __init__.py to calculate proper import paths
-        # Without: falls back to simple path-to-dots conversion
-        module_name = self._path_to_module_name(in_file, package_roots)
-
-        # load_python_code signature: (code, in_file, module_name, source_id)
-        wme_count, errors = safe_cpp_call(self.reasoner.load_python_code, code, in_file, module_name, source)
-
-        self._session_stats["total_wmes"] += wme_count
-        time_ms = (time.time() - start_time) * 1000
-        self._dirty = True  # Mark instance as modified
-
-        # Return errors in the response
-        return wme_count, source, time_ms, errors
-
-    def load_python_directory(self, directory: str, recursive: bool = True, exclude_patterns: Optional[List[str]] = None, progress_callback: Optional[Callable[[int, int, str], None]] = None) -> Tuple[int, Dict[str, List[str]], float]:
-        """
-        Load all Python files from a directory with optional exclusion patterns
-
-        Args:
-            directory: Path to directory containing Python files
-            recursive: If True, recursively scan subdirectories
-            exclude_patterns: List of patterns to exclude (e.g., ["test_*.py", "tests/**/*.py"])
-            progress_callback: Optional callback function(items_processed, total_items, message)
-
-        Returns:
-            Tuple[int, dict, float]: (total_wmes, all_errors, time_ms)
-            where all_errors is a dict mapping filepath -> list of errors
-
-        Raises:
-            Exception: If loading fails
-
-        INCREMENTAL: Adds to existing knowledge.
-        """
-        return self._load_directory_generic(
-            directory=directory,
-            extensions=["*.py"],
-            default_excludes=["__pycache__"],
-            load_file_func=self.load_python_file,
-            recursive=recursive,
-            exclude_patterns=exclude_patterns,
-            progress_callback=progress_callback
-        )
-
-    def load_javascript_file(self, filepath: str, base_path: Optional[str] = None) -> Tuple[int, str, float, List[str]]:
-        """
-        Load JavaScript source file and add semantic facts to RETER
-
-        Args:
-            filepath: Path to JavaScript file to load
-            base_path: Optional base path for calculating relative path (defaults to filepath's parent)
-
-        Returns:
-            Tuple[int, str, float, list]: (wme_count, source_id, time_ms, errors)
-
-        Raises:
-            Exception: If loading fails
-
-        Extracts and adds facts about:
-        - Classes, methods, functions
-        - Inheritance relationships
-        - Function calls
-        - Imports and exports
-        - Arrow functions
-        - Parameters
-
-        Source ID is generated as MD5 hash of content | relative path.
-        INCREMENTAL: Adds to existing knowledge, doesn't replace.
-        """
-        check_initialization()
-        start_time = time.time()
-
-        # Read file content
-        filepath_obj = Path(filepath)
-        with open(filepath_obj, 'r', encoding='utf-8') as f:
-            code = f.read()
-
-        # Calculate relative path
-        if base_path:
-            try:
-                rel_path = filepath_obj.relative_to(Path(base_path))
-            except ValueError:
-                rel_path = filepath_obj
-        else:
-            rel_path = filepath_obj.name
-
-        # Generate MD5-based source ID
-        source_id = generate_source_id(code, str(rel_path))
-
-        # Use relative path with forward slashes for inFile (e.g., "path/to/file.js")
-        in_file = str(rel_path).replace('\\', '/')
-
-        # Load JavaScript code - use the C++ bindings
-        from reter import owl_rete_cpp
-        facts, errors = owl_rete_cpp.parse_javascript_code(code, in_file)
-
-        # Add facts to the network with source tracking
-        wme_count = 0
-        for fact in facts:
-            self.reasoner.network.add_fact_with_source(
-                owl_rete_cpp.Fact(fact),
-                source_id
-            )
-            wme_count += 1
-
-        time_ms = (time.time() - start_time) * 1000
-        self._dirty = True  # Mark instance as modified
-
-        # Convert errors to list of dicts for consistency
-        error_list = []
-        for err in errors:
-            error_list.append({
-                "line": err.get("line", 0),
-                "column": err.get("column", 0),
-                "message": err.get("message", "Unknown error")
-            })
-
-        return wme_count, source_id, time_ms, error_list
-
-    def load_javascript_code(self, code: str, source: str = "module", progress_callback: Optional[Callable[[int, int, str], None]] = None) -> Tuple[int, str, float, List[str]]:
-        """
-        Load JavaScript code string and add semantic facts to RETER
-
-        Args:
-            code: JavaScript source code as string
-            source: Source ID for tracking (can be module name, path, or path@timestamp)
-            progress_callback: Optional callback function(items_processed, total_items, message)
-
-        Returns:
-            Tuple[int, str, float, list]: (wme_count, source, time_ms, errors)
-
-        Raises:
-            Exception: If loading fails
-
-        Same as load_javascript_file() but takes code as string.
-        Useful for loading code snippets or dynamically generated code.
-
-        INCREMENTAL: Adds to existing knowledge.
-        """
-        check_initialization()
-        start_time = time.time()
-
-        # Extract file path from source (strip timestamp, MD5)
-        in_file = source
-
-        # Strip MD5 prefix if present (format: "md5hash|path")
-        if '|' in in_file:
-            in_file = in_file.split('|', 1)[1]
-
-        # Strip timestamp suffix if present (format: "path@timestamp")
-        if '@' in in_file:
-            in_file = in_file.split('@', 1)[0]
-
-        # Normalize path separators to forward slashes
-        in_file = in_file.replace('\\', '/')
-
-        # Load JavaScript code - use the C++ bindings (C++ derives module name from in_file)
-        from reter import owl_rete_cpp
-        facts, errors = owl_rete_cpp.parse_javascript_code(code, in_file)
-
-        # Add facts to the network with source tracking
-        wme_count = 0
-        for fact in facts:
-            self.reasoner.network.add_fact_with_source(
-                owl_rete_cpp.Fact(fact),
-                source
-            )
-            wme_count += 1
-
-        time_ms = (time.time() - start_time) * 1000
-        self._dirty = True  # Mark instance as modified
-
-        # Convert errors to list of dicts for consistency
-        error_list = []
-        for err in errors:
-            error_list.append({
-                "line": err.get("line", 0),
-                "column": err.get("column", 0),
-                "message": err.get("message", "Unknown error")
-            })
-
-        return wme_count, source, time_ms, error_list
-
-    def load_javascript_directory(self, directory: str, recursive: bool = True, exclude_patterns: Optional[List[str]] = None, progress_callback: Optional[Callable[[int, int, str], None]] = None) -> Tuple[int, Dict[str, List[str]], float]:
-        """
-        Load all JavaScript files from a directory with optional exclusion patterns
-
-        Args:
-            directory: Path to directory containing JavaScript files
-            recursive: If True, recursively scan subdirectories
-            exclude_patterns: List of patterns to exclude (e.g., ["test_*.js", "node_modules/**/*.js"])
-            progress_callback: Optional callback function(items_processed, total_items, message)
-
-        Returns:
-            Tuple[int, dict, float]: (total_wmes, all_errors, time_ms)
-            where all_errors is a dict mapping filepath -> list of errors
-
-        Raises:
-            Exception: If loading fails
-
-        INCREMENTAL: Adds to existing knowledge.
-        """
-        return self._load_directory_generic(
-            directory=directory,
-            extensions=["*.js", "*.mjs", "*.jsx"],
-            default_excludes=["node_modules"],
-            load_file_func=self.load_javascript_file,
-            recursive=recursive,
-            exclude_patterns=exclude_patterns,
-            progress_callback=progress_callback
-        )
-
-    def load_html_file(self, filepath: str, base_path: Optional[str] = None) -> Tuple[int, str, float, List[str]]:
-        """
-        Load HTML file and add semantic facts to RETER
-
-        Args:
-            filepath: Path to HTML file to load
-            base_path: Optional base path for calculating relative path (defaults to filepath's parent)
-
-        Returns:
-            Tuple[int, str, float, list]: (wme_count, source_id, time_ms, errors)
-
-        Raises:
-            Exception: If loading fails
-
-        Extracts and adds facts about:
-        - Document structure (title, language, charset)
-        - Elements (forms, inputs, links, etc.)
-        - Scripts (inline and external references)
-        - Event handlers (onclick, onsubmit, etc.)
-        - Framework usage (Vue, Angular, HTMX, Alpine)
-        - Embedded JavaScript (parsed and extracted)
-
-        Source ID is generated as MD5 hash of content | relative path.
-        INCREMENTAL: Adds to existing knowledge, doesn't replace.
-        """
-        check_initialization()
-        start_time = time.time()
-
-        # Read file content
-        filepath_obj = Path(filepath)
-        with open(filepath_obj, 'r', encoding='utf-8') as f:
-            code = f.read()
-
-        # Calculate relative path
-        if base_path:
-            try:
-                rel_path = filepath_obj.relative_to(Path(base_path))
-            except ValueError:
-                rel_path = filepath_obj
-        else:
-            rel_path = filepath_obj.name
-
-        # Generate MD5-based source ID
-        source_id = generate_source_id(code, str(rel_path))
-
-        # Use relative path with forward slashes for inDocument (e.g., "path/to/file.html")
-        in_file = str(rel_path).replace('\\', '/')
-
-        # Load HTML code - use load_html_from_string directly like Python extractor
-        from reter import owl_rete_cpp
-
-        # First parse to get errors
-        _, errors = owl_rete_cpp.parse_html_code(code, in_file)
-
-        # Then load directly into network with source tracking
-        wme_count = owl_rete_cpp.load_html_from_string(self.reasoner.network, code, in_file, source_id)
-
-        time_ms = (time.time() - start_time) * 1000
-        self._dirty = True  # Mark instance as modified
-
-        # Convert errors to list of dicts for consistency
-        error_list = []
-        for err in errors:
-            error_list.append({
-                "line": err.get("line", 0),
-                "column": err.get("column", 0),
-                "message": err.get("message", "Unknown error")
-            })
-
-        return wme_count, source_id, time_ms, error_list
-
-    def load_html_code(self, code: str, source: str = "document", progress_callback: Optional[Callable[[int, int, str], None]] = None) -> Tuple[int, str, float, List[str]]:
-        """
-        Load HTML code string and add semantic facts to RETER
-
-        Args:
-            code: HTML source code as string
-            source: Source ID for tracking (can be document name, path, or path@timestamp)
-            progress_callback: Optional callback function(items_processed, total_items, message)
-
-        Returns:
-            Tuple[int, str, float, list]: (wme_count, source, time_ms, errors)
-
-        Raises:
-            Exception: If loading fails
-
-        Same as load_html_file() but takes code as string.
-        Useful for loading HTML snippets or dynamically generated content.
-
-        INCREMENTAL: Adds to existing knowledge.
-        """
-        check_initialization()
-        start_time = time.time()
-
-        # Extract file path from source (strip timestamp, MD5)
-        in_file = source
-
-        # Strip MD5 prefix if present (format: "md5hash|path")
-        if '|' in in_file:
-            in_file = in_file.split('|', 1)[1]
-
-        # Strip timestamp suffix if present (format: "path@timestamp")
-        if '@' in in_file:
-            in_file = in_file.split('@', 1)[0]
-
-        # Normalize path separators to forward slashes
-        in_file = in_file.replace('\\', '/')
-
-        # Load HTML code - use load_html_from_string directly (C++ derives module name from in_file)
-        from reter import owl_rete_cpp
-
-        # First parse to get errors
-        _, errors = owl_rete_cpp.parse_html_code(code, in_file)
-
-        # Then load directly into network with source tracking
-        wme_count = owl_rete_cpp.load_html_from_string(self.reasoner.network, code, in_file, source)
-
-        time_ms = (time.time() - start_time) * 1000
-        self._dirty = True  # Mark instance as modified
-
-        # Convert errors to list of dicts for consistency
-        error_list = []
-        for err in errors:
-            error_list.append({
-                "line": err.get("line", 0),
-                "column": err.get("column", 0),
-                "message": err.get("message", "Unknown error")
-            })
-
-        return wme_count, source, time_ms, error_list
-
-    def load_html_directory(self, directory: str, recursive: bool = True, exclude_patterns: Optional[List[str]] = None, progress_callback: Optional[Callable[[int, int, str], None]] = None) -> Tuple[int, Dict[str, List[str]], float]:
-        """
-        Load all HTML files from a directory with optional exclusion patterns
-
-        Args:
-            directory: Path to directory containing HTML files
-            recursive: If True, recursively scan subdirectories
-            exclude_patterns: List of patterns to exclude (e.g., ["test_*.html", "node_modules/**/*.html"])
-            progress_callback: Optional callback function(items_processed, total_items, message)
-
-        Returns:
-            Tuple[int, dict, float]: (total_wmes, all_errors, time_ms)
-            where all_errors is a dict mapping filepath -> list of errors
-
-        Raises:
-            Exception: If loading fails
-
-        INCREMENTAL: Adds to existing knowledge.
-        """
-        return self._load_directory_generic(
-            directory=directory,
-            extensions=["*.html", "*.htm"],
-            default_excludes=["node_modules"],
-            load_file_func=self.load_html_file,
-            recursive=recursive,
-            exclude_patterns=exclude_patterns,
-            progress_callback=progress_callback
-        )
-
-    def load_csharp_file(self, filepath: str, base_path: Optional[str] = None) -> Tuple[int, str, float, List[str]]:
-        """
-        Load C# source file and add semantic facts to RETER
-
-        Args:
-            filepath: Path to C# file to load
-            base_path: Optional base path for calculating relative path (defaults to filepath's parent)
-
-        Returns:
-            Tuple[int, str, float, list]: (wme_count, source_id, time_ms, errors)
-
-        Raises:
-            Exception: If loading fails
-
-        Extracts and adds facts about:
-        - Classes, interfaces, structs, enums
-        - Methods, properties, fields, events
-        - Inheritance relationships
-        - Method calls
-        - Using directives (imports)
-        - Attributes (decorators)
-        - Parameters and return types
-        - Try/catch/finally blocks
-        - Throw and return statements
-
-        Source ID is generated as MD5 hash of content | relative path.
-        INCREMENTAL: Adds to existing knowledge, doesn't replace.
-        """
-        check_initialization()
-        start_time = time.time()
-
-        # Read file content
-        filepath_obj = Path(filepath)
-        with open(filepath_obj, 'r', encoding='utf-8') as f:
-            code = f.read()
-
-        # Calculate relative path
-        if base_path:
-            try:
-                rel_path = filepath_obj.relative_to(Path(base_path))
-            except ValueError:
-                rel_path = filepath_obj
-        else:
-            rel_path = filepath_obj.name
-
-        # Generate MD5-based source ID
-        source_id = generate_source_id(code, str(rel_path))
-
-        # Use relative path with forward slashes for inFile (e.g., "path/to/file.cs")
-        in_file = str(rel_path).replace('\\', '/')
-
-        # Load C# code - use the C++ bindings
-        from reter import owl_rete_cpp
-
-        # Use load_csharp_from_string with in_file and source_id
-        wme_count = owl_rete_cpp.load_csharp_from_string(
-            self.reasoner.network,
-            code,
-            in_file,
-            source_id
-        )
-
-        time_ms = (time.time() - start_time) * 1000
-        self._dirty = True  # Mark instance as modified
-
-        # C# parser doesn't return errors in the same format as Python/JS
-        # Return empty list for now
-        error_list: List[str] = []
-
-        return wme_count, source_id, time_ms, error_list
-
-    def load_csharp_code(self, code: str, source: str = "namespace", progress_callback: Optional[Callable[[int, int, str], None]] = None) -> Tuple[int, str, float, List[str]]:
-        """
-        Load C# code string and add semantic facts to RETER
-
-        Args:
-            code: C# source code as string
-            source: Source ID for tracking (can be namespace name, path, or path@timestamp)
-            progress_callback: Optional callback function(items_processed, total_items, message)
-
-        Returns:
-            Tuple[int, str, float, list]: (wme_count, source, time_ms, errors)
-
-        Raises:
-            Exception: If loading fails
-
-        Same as load_csharp_file() but takes code as string.
-        Useful for loading code snippets or dynamically generated code.
-
-        INCREMENTAL: Adds to existing knowledge.
-        """
-        check_initialization()
-        start_time = time.time()
-
-        # Extract file path from source (strip timestamp, MD5)
-        in_file = source
-
-        # Strip MD5 prefix if present (format: "md5hash|path")
-        if '|' in in_file:
-            in_file = in_file.split('|', 1)[1]
-
-        # Strip timestamp suffix if present (format: "path@timestamp")
-        if '@' in in_file:
-            in_file = in_file.split('@', 1)[0]
-
-        # Normalize path separators to forward slashes
-        in_file = in_file.replace('\\', '/')
-
-        # Load C# code - use the C++ bindings (C++ derives namespace name from in_file)
-        from reter import owl_rete_cpp
-
-        # Use load_csharp_from_string which now supports source_id
-        wme_count = owl_rete_cpp.load_csharp_from_string(
-            self.reasoner.network,
-            code,
-            in_file,
-            source
-        )
-
-        time_ms = (time.time() - start_time) * 1000
-        self._dirty = True  # Mark instance as modified
-
-        # C# parser doesn't return errors in the same format as Python/JS
-        # Return empty list for now
-        error_list: List[str] = []
-
-        return wme_count, source, time_ms, error_list
-
-    def load_csharp_directory(self, directory: str, recursive: bool = True, exclude_patterns: Optional[List[str]] = None, progress_callback: Optional[Callable[[int, int, str], None]] = None) -> Tuple[int, Dict[str, List[str]], float]:
-        """
-        Load all C# files from a directory with optional exclusion patterns
-
-        Args:
-            directory: Path to directory containing C# files
-            recursive: If True, recursively scan subdirectories
-            exclude_patterns: List of patterns to exclude (e.g., ["*.Designer.cs", "obj/**/*.cs"])
-            progress_callback: Optional callback function(items_processed, total_items, message)
-
-        Returns:
-            Tuple[int, dict, float]: (total_wmes, all_errors, time_ms)
-            where all_errors is a dict mapping filepath -> list of errors
-
-        Raises:
-            Exception: If loading fails
-
-        INCREMENTAL: Adds to existing knowledge.
-        """
-        return self._load_directory_generic(
-            directory=directory,
-            extensions=["*.cs"],
-            default_excludes=["bin", "obj"],
-            load_file_func=self.load_csharp_file,
-            recursive=recursive,
-            exclude_patterns=exclude_patterns,
-            progress_callback=progress_callback
-        )
-
-    def load_cpp_file(self, filepath: str, base_path: Optional[str] = None) -> Tuple[int, str, float, List[str]]:
-        """
-        Load C++ source file and add semantic facts to RETER
-
-        Args:
-            filepath: Path to C++ file to load
-            base_path: Optional base path for calculating relative path (defaults to filepath's parent)
-
-        Returns:
-            Tuple[int, str, float, list]: (wme_count, source_id, time_ms, errors)
-
-        Raises:
-            Exception: If loading fails
-
-        Extracts and adds facts about:
-        - Classes, structs, namespaces
-        - Methods, functions, constructors, destructors
-        - Inheritance relationships
-        - Function calls
-        - Using directives (imports)
-        - Templates
-        - Parameters and return types
-        - Try/catch/throw blocks
-        - Enums and enumerators
-        - Literals (for magic number detection)
-
-        Source ID is generated as MD5 hash of content | relative path.
-        INCREMENTAL: Adds to existing knowledge, doesn't replace.
-        """
-        check_initialization()
-        start_time = time.time()
-
-        # Read file content
-        filepath_obj = Path(filepath)
-        with open(filepath_obj, 'r', encoding='utf-8') as f:
-            code = f.read()
-
-        # Calculate relative path
-        if base_path:
-            try:
-                rel_path = filepath_obj.relative_to(Path(base_path))
-            except ValueError:
-                rel_path = filepath_obj
-        else:
-            rel_path = filepath_obj.name
-
-        # Generate MD5-based source ID
-        source_id = generate_source_id(code, str(rel_path))
-
-        # Use relative path with forward slashes for inFile (e.g., "path/to/file.cpp")
-        in_file = str(rel_path).replace('\\', '/')
-
-        # Load C++ code - use the C++ bindings
-        from reter import owl_rete_cpp
-
-        # Use load_cpp_from_string with in_file and source_id
-        wme_count = owl_rete_cpp.load_cpp_from_string(
-            self.reasoner.network,
-            code,
-            in_file,
-            source_id
-        )
-
-        time_ms = (time.time() - start_time) * 1000
-        self._dirty = True  # Mark instance as modified
-
-        # C++ parser doesn't return errors in the same format as Python/JS
-        # Return empty list for now
-        error_list: List[str] = []
-
-        return wme_count, source_id, time_ms, error_list
-
-    def load_cpp_code(self, code: str, source: str = "namespace", progress_callback: Optional[Callable[[int, int, str], None]] = None) -> Tuple[int, str, float, List[str]]:
-        """
-        Load C++ code string and add semantic facts to RETER
-
-        Args:
-            code: C++ source code as string
-            source: Source ID for tracking (can be namespace name, path, or path@timestamp)
-            progress_callback: Optional callback function(items_processed, total_items, message)
-
-        Returns:
-            Tuple[int, str, float, list]: (wme_count, source, time_ms, errors)
-
-        Raises:
-            Exception: If loading fails
-
-        Same as load_cpp_file() but takes code as string.
-        Useful for loading code snippets or dynamically generated code.
-
-        INCREMENTAL: Adds to existing knowledge.
-        """
-        check_initialization()
-        start_time = time.time()
-
-        # Extract file path from source (strip timestamp, MD5)
-        in_file = source
-
-        # Strip MD5 prefix if present (format: "md5hash|path")
-        if '|' in in_file:
-            in_file = in_file.split('|', 1)[1]
-
-        # Strip timestamp suffix if present (format: "path@timestamp")
-        if '@' in in_file:
-            in_file = in_file.split('@', 1)[0]
-
-        # Normalize path separators (use forward slashes)
-        in_file = in_file.replace('\\', '/')
-
-        # Load C++ code - use the C++ bindings
-        from reter import owl_rete_cpp
-
-        # Use load_cpp_from_string which supports source_id
-        wme_count = owl_rete_cpp.load_cpp_from_string(
-            self.reasoner.network,
-            code,
-            in_file,
-            source
-        )
-
-        time_ms = (time.time() - start_time) * 1000
-        self._dirty = True  # Mark instance as modified
-
-        # C++ parser doesn't return errors in the same format as Python/JS
-        # Return empty list for now
-        error_list: List[str] = []
-
-        return wme_count, source, time_ms, error_list
-
-    def load_cpp_directory(self, directory: str, recursive: bool = True, exclude_patterns: Optional[List[str]] = None, progress_callback: Optional[Callable[[int, int, str], None]] = None) -> Tuple[int, Dict[str, List[str]], float]:
-        """
-        Load all C++ files from a directory with optional exclusion patterns
-
-        Args:
-            directory: Path to directory containing C++ files
-            recursive: If True, recursively scan subdirectories
-            exclude_patterns: List of patterns to exclude (e.g., ["test_*.cpp", "build/**/*.cpp"])
-            progress_callback: Optional callback function(items_processed, total_items, message)
-
-        Returns:
-            Tuple[int, dict, float]: (total_wmes, all_errors, time_ms)
-            where all_errors is a dict mapping filepath -> list of errors
-
-        Raises:
-            Exception: If loading fails
-
-        INCREMENTAL: Adds to existing knowledge.
-        """
-        return self._load_directory_generic(
-            directory=directory,
-            extensions=["*.cpp", "*.cc", "*.cxx", "*.c++", "*.hpp", "*.hh", "*.hxx", "*.h++", "*.h"],
-            default_excludes=["CMakeFiles", "build", "cmake-build-"],
-            load_file_func=self.load_cpp_file,
-            recursive=recursive,
-            exclude_patterns=exclude_patterns,
-            progress_callback=progress_callback
-        )
 
     def get_all_sources(self) -> Tuple[List[str], float]:
         """
@@ -1818,6 +743,9 @@ class ReterWrapper:
         Raises:
             DefaultInstanceNotInitialised: If server initialization not complete
             Exception: If retrieval fails
+
+        @reter-cnl: This is-exposed-via-ipc.
+        @reter-cnl: This communicates-sync.
         """
         check_initialization()
         start_time = time.time()
@@ -1865,6 +793,9 @@ class ReterWrapper:
         Raises:
             DefaultInstanceNotInitialised: If server initialization not complete
             Exception: If removal fails
+
+        @reter-cnl: This is-exposed-via-ipc.
+        @reter-cnl: This communicates-sync.
         """
         check_initialization()
         start_time = time.time()
@@ -1892,6 +823,9 @@ class ReterWrapper:
         Raises:
             DefaultInstanceNotInitialised: If server initialization not complete
             ReterSaveError: If save operation fails
+
+        @reter-cnl: This is-exposed-via-ipc.
+        @reter-cnl: This communicates-sync.
         """
         check_initialization()
         start_time = time.time()

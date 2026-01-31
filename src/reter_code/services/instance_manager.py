@@ -30,6 +30,10 @@ class InstanceManager:
     @reter-cnl: This is-in-layer Service-Layer.
     @reter-cnl: This is a core-service.
     @reter-cnl: This depends-on `reter_code.reter_wrapper.ReterWrapper`.
+    @reter-cnl: This is-in-process Main-Process.
+    @reter-cnl: This is stateful.
+    @reter-cnl: This owns-resource `ReterWrapper`.
+    @reter-cnl: This has-singleton-scope.
     """
 
     def __init__(self):

@@ -50,6 +50,8 @@ class RecommenderToolsRegistrar(ToolRegistrarBase):
 
     @reter-cnl: This is-in-layer Service-Layer.
     @reter-cnl: This is a registrar.
+    @reter-cnl: This is-in-process MCP-Server-Process.
+    @reter-cnl: This is stateless.
     """
 
     def __init__(self, instance_manager, persistence_service, default_manager=None, tools_filter=None):

@@ -88,6 +88,8 @@ class ToolRegistrarBase:
 
     @reter-cnl: This is-in-layer Service-Layer.
     @reter-cnl: This is a registrar.
+    @reter-cnl: This is-in-process MCP-Server-Process.
+    @reter-cnl: This is stateless.
     """
 
     def __init__(self, instance_manager, persistence_service, tools_filter: Optional[Set[str]] = None):

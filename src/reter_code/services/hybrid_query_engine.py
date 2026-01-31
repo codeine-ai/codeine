@@ -72,6 +72,8 @@ class CADSLToolIndex:
     @reter-cnl: This is-in-layer Service-Layer.
     @reter-cnl: This is a query-engine.
     @reter-cnl: This depends-on `reter_code.services.EmbeddingService`.
+    @reter-cnl: This is-in-process Main-Process.
+    @reter-cnl: This is stateful.
     """
 
     def __init__(self, tools_dir: Optional[Path] = None):

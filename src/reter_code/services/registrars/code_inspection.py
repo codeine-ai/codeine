@@ -61,6 +61,8 @@ class CodeInspectionToolsRegistrar(ToolRegistrarBase):
 
     @reter-cnl: This is-in-layer Service-Layer.
     @reter-cnl: This is a registrar.
+    @reter-cnl: This is-in-process MCP-Server-Process.
+    @reter-cnl: This is stateless.
 
     Uses CADSL tools from cadsl/tools/inspection.
     UML diagrams are available via the 'diagram' tool.

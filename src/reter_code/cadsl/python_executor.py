@@ -158,6 +158,8 @@ class ASTValidator(ast.NodeVisitor):
 
     @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
     @reter-cnl: This is a validator.
+    @reter-cnl: This is-in-process Main-Process.
+    @reter-cnl: This is stateful.
     """
 
     def __init__(self, security_level: SecurityLevel = SecurityLevel.STANDARD):
@@ -521,6 +523,8 @@ class PythonExecutor:
 
     @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
     @reter-cnl: This is a executor.
+    @reter-cnl: This is-in-process Main-Process.
+    @reter-cnl: This is stateless.
     """
 
     def __init__(self, security_context: Optional[SecurityContext] = None):
@@ -730,6 +734,8 @@ class SecurePythonStep:
 
     @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
     @reter-cnl: This is a executor.
+    @reter-cnl: This is-in-process Main-Process.
+    @reter-cnl: This is stateful.
     """
 
     def __init__(self, code: str, security_context: Optional[SecurityContext] = None):

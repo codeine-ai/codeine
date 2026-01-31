@@ -48,6 +48,8 @@ class MarkdownIndexer:
 
     @reter-cnl: This is-in-layer Service-Layer.
     @reter-cnl: This is a parser.
+    @reter-cnl: This is-in-process Main-Process.
+    @reter-cnl: This is stateless.
 
     Strategies:
     - Small files (<max_chunk_words): Index as single document

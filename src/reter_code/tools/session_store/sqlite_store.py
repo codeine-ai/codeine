@@ -24,6 +24,8 @@ class SQLiteSessionStore:
 
     @reter-cnl: This is-in-layer Service-Layer.
     @reter-cnl: This is a repository.
+    @reter-cnl: This is-in-process Main-Process.
+    @reter-cnl: This is stateful.
 
     Features:
     - Connection pooling with thread-local connections

@@ -61,6 +61,8 @@ class ToolRegistrar:
     @reter-cnl: This is a model-context-protocol-tool-provider.
     @reter-cnl: This depends-on `reter_code.services.ReterOperations`.
     @reter-cnl: This depends-on `reter_code.services.StatePersistenceService`.
+    @reter-cnl: This is-in-process MCP-Server-Process.
+    @reter-cnl: This is stateless.
     """
 
     def __init__(

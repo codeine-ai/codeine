@@ -16,6 +16,8 @@ class DocumentationProvider:
 
     @reter-cnl: This is-in-layer Service-Layer.
     @reter-cnl: This is a provider.
+    @reter-cnl: This is-in-process MCP-Server-Process.
+    @reter-cnl: This is stateless.
 
     This is a stateless service that serves documentation content.
     Uses a resource registry pattern to avoid code duplication.

@@ -1,0 +1,86 @@
+# Sync Annotations v1 → v3
+# Find classes with layer annotation but missing functional component
+# Creates upgrade tasks to add component + runtime annotations
+
+query sync_annotations_v1(
+    category = "annotation",
+    capabilities = ["task_creation", "code_analysis"]
+) {
+    """
+    Find classes at v1 (has layer, missing component) and create upgrade tasks.
+
+    Parameters:
+        dry_run: If true, returns task data without creating tasks. Default: true
+        limit: Maximum number of tasks to generate. Default: 500
+    """
+
+    param dry_run: bool = true;
+    param limit: int = 500;
+
+    reql {
+        SELECT DISTINCT ?class ?name ?file ?line ?layer WHERE {
+            ?class type class .
+            ?class has-name ?name .
+            ?class is-in-file ?file .
+            ?class is-at-line ?line .
+            ?class is-in-layer ?layer .
+            # Exclude classes that have functional component annotations
+            FILTER NOT EXISTS { ?class type service }
+            FILTER NOT EXISTS { ?class type manager }
+            FILTER NOT EXISTS { ?class type handler }
+            FILTER NOT EXISTS { ?class type repository }
+            FILTER NOT EXISTS { ?class type parser }
+            FILTER NOT EXISTS { ?class type transformer }
+            FILTER NOT EXISTS { ?class type factory }
+            FILTER NOT EXISTS { ?class type builder }
+            FILTER NOT EXISTS { ?class type validator }
+            FILTER NOT EXISTS { ?class type executor }
+            FILTER NOT EXISTS { ?class type compiler }
+            FILTER NOT EXISTS { ?class type adapter }
+            FILTER NOT EXISTS { ?class type facade }
+            FILTER NOT EXISTS { ?class type singleton }
+            FILTER NOT EXISTS { ?class type observer }
+            FILTER NOT EXISTS { ?class type strategy }
+            FILTER NOT EXISTS { ?class type decorator }
+            FILTER NOT EXISTS { ?class type value-object }
+            FILTER NOT EXISTS { ?class type entity }
+            FILTER NOT EXISTS { ?class type aggregate-root }
+            FILTER NOT EXISTS { ?class type domain-event }
+            FILTER NOT EXISTS { ?class type query-engine }
+            FILTER NOT EXISTS { ?class type reasoning-engine }
+            FILTER NOT EXISTS { ?class type machine-learning-component }
+            FILTER NOT EXISTS { ?class type retrieval-augmented-generation-component }
+            FILTER NOT EXISTS { ?class type persistence-component }
+            FILTER NOT EXISTS { ?class type model-context-protocol-server }
+            FILTER NOT EXISTS { ?class type model-context-protocol-tool-provider }
+            FILTER NOT EXISTS { ?class type core-service }
+            FILTER NOT EXISTS { ?class type registrar }
+            FILTER NOT EXISTS { ?class type loader }
+            FILTER NOT EXISTS { ?class type extractor }
+            FILTER NOT EXISTS { ?class type provider }
+            # Exclude test files
+            FILTER (!CONTAINS(?file, "test"))
+        }
+        ORDER BY ?file ?line
+        LIMIT {limit}
+    }
+    | select { name, file, line, layer }
+    | map {
+        class_name: name,
+        file: file,
+        line: line,
+        layer: layer,
+        current_version: 1,
+        target_version: 3,
+        task_type: "Upgrade"
+    }
+    | create_task {
+        name: "{task_type} @reter-cnl for {class_name} (v1→v3)",
+        category: "annotation",
+        priority: medium,
+        description: "Upgrade annotations from v1 to v3.\n\nClass: {class_name}\nFile: {file}:{line}\nCurrent Version: v1 (has layer: {layer})\nTarget Version: v3\n\n---\n\nMissing Annotations:\n\nv2 - Functional Component:\n  @reter-cnl: This is a <component>.\n  Components: service, manager, handler, repository, parser, transformer,\n              factory, executor, adapter, singleton, etc.\n\nv3 - Runtime/Process:\n  @reter-cnl: This is-in-process Main-Process.\n  @reter-cnl: This is stateful.  (or: This is stateless.)\n  Optional: holds-expensive-resource, has-singleton-scope, has-startup-order\n\n---\n\nValidate before adding:\n  mcp__reter__validate_cnl(statement, context_entity)",
+        affects: file,
+        dry_run: {dry_run}
+    }
+    | emit { tasks }
+}
