@@ -57,6 +57,7 @@ source: reql_source
       | rag_source
       | value_source
       | merge_source
+      | file_scan_source
 
 reql_source: "reql" REQL_BLOCK
 
@@ -106,6 +107,28 @@ rag_param_value: SIGNED_FLOAT  -> rag_float_val
                | list_value    -> rag_list_val
 
 value_source: "value" "{" expr "}"
+
+// File scan source - scans RETER sources for files matching patterns
+// file_scan { glob: "**/*.py", exclude: ["**/test/**"], contains: "TODO" }
+file_scan_source: "file_scan" "{" file_scan_spec "}"
+
+file_scan_spec: file_scan_param ("," file_scan_param)*
+
+file_scan_param: "glob" ":" STRING                    -> fs_glob
+               | "exclude" ":" fs_string_list         -> fs_exclude
+               | "contains" ":" STRING                -> fs_contains
+               | "contains" ":" param_ref             -> fs_contains_param
+               | "not_contains" ":" STRING            -> fs_not_contains
+               | "not_contains" ":" param_ref         -> fs_not_contains_param
+               | "case_sensitive" ":" bool_val        -> fs_case_sensitive
+               | "include_matches" ":" bool_val       -> fs_include_matches
+               | "context_lines" ":" INT              -> fs_context_lines
+               | "context_lines" ":" param_ref        -> fs_context_lines_param
+               | "max_matches_per_file" ":" INT       -> fs_max_matches
+               | "max_matches_per_file" ":" param_ref -> fs_max_matches_param
+               | "include_stats" ":" bool_val         -> fs_include_stats
+
+fs_string_list: "[" (STRING ("," STRING)*)? "]"
 
 // ============================================================
 // PIPELINE STEPS

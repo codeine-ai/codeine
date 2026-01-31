@@ -351,6 +351,98 @@ class CADSLTransformer:
                 if isinstance(child, Tree) and child.data == "source_list":
                     spec.merge_sources = self._extract_source_list(child)
 
+        elif node.data == "file_scan_source":
+            spec.source_type = "file_scan"
+            # Extract file_scan parameters
+            for child in node.children:
+                if isinstance(child, Tree) and child.data == "file_scan_spec":
+                    spec.rag_params = self._transform_file_scan_spec(child)
+
+    def _transform_file_scan_spec(self, node: Tree) -> Dict[str, Any]:
+        """Transform file_scan specification into parameters dict."""
+        params = {}
+
+        for child in node.children:
+            if isinstance(child, Tree):
+                data = child.data
+
+                if data == "fs_glob":
+                    params["glob"] = self._extract_fs_string(child)
+                elif data == "fs_exclude":
+                    params["exclude"] = self._extract_fs_string_list(child)
+                elif data == "fs_contains":
+                    params["contains"] = self._extract_fs_string(child)
+                elif data == "fs_contains_param":
+                    params["contains"] = self._extract_fs_param_ref(child)
+                elif data == "fs_not_contains":
+                    params["not_contains"] = self._extract_fs_string(child)
+                elif data == "fs_not_contains_param":
+                    params["not_contains"] = self._extract_fs_param_ref(child)
+                elif data == "fs_case_sensitive":
+                    params["case_sensitive"] = self._extract_fs_bool(child)
+                elif data == "fs_include_matches":
+                    params["include_matches"] = self._extract_fs_bool(child)
+                elif data == "fs_context_lines":
+                    params["context_lines"] = self._extract_fs_int(child)
+                elif data == "fs_context_lines_param":
+                    params["context_lines"] = self._extract_fs_param_ref(child)
+                elif data == "fs_max_matches":
+                    params["max_matches_per_file"] = self._extract_fs_int(child)
+                elif data == "fs_max_matches_param":
+                    params["max_matches_per_file"] = self._extract_fs_param_ref(child)
+                elif data == "fs_include_stats":
+                    params["include_stats"] = self._extract_fs_bool(child)
+
+        return params
+
+    def _extract_fs_string(self, node: Tree) -> str:
+        """Extract a string value from a file_scan param node."""
+        for child in node.children:
+            if isinstance(child, Token) and child.type == "STRING":
+                s = str(child)
+                return s[1:-1] if s.startswith('"') or s.startswith("'") else s
+        return ""
+
+    def _extract_fs_int(self, node: Tree) -> int:
+        """Extract an integer value from a file_scan param node."""
+        for child in node.children:
+            if isinstance(child, Token) and child.type == "INT":
+                return int(str(child))
+        return 0
+
+    def _extract_fs_bool(self, node: Tree) -> bool:
+        """Extract a boolean value from a file_scan param node."""
+        for child in node.children:
+            if isinstance(child, Tree):
+                if child.data == "bool_true":
+                    return True
+                elif child.data == "bool_false":
+                    return False
+        return False
+
+    def _extract_fs_param_ref(self, node: Tree) -> str:
+        """Extract a parameter reference from a file_scan param node."""
+        for child in node.children:
+            if isinstance(child, Tree) and child.data == "param_ref":
+                for item in child.children:
+                    if isinstance(item, Token) and item.type == "NAME":
+                        return "{" + str(item) + "}"
+        return ""
+
+    def _extract_fs_string_list(self, node: Tree) -> List[str]:
+        """Extract list of strings from fs_exclude node."""
+        strings = []
+        for child in node.children:
+            if isinstance(child, Tree) and child.data == "fs_string_list":
+                for item in child.children:
+                    if isinstance(item, Token) and item.type == "STRING":
+                        s = str(item)
+                        strings.append(s[1:-1] if s.startswith('"') or s.startswith("'") else s)
+            elif isinstance(child, Token) and child.type == "STRING":
+                s = str(child)
+                strings.append(s[1:-1] if s.startswith('"') or s.startswith("'") else s)
+        return strings
+
     def _extract_source_list(self, node: Tree) -> List[Dict[str, Any]]:
         """Extract list of sources from source_list node.
 

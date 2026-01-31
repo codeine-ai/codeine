@@ -208,6 +208,7 @@ def build_pipeline_factory(spec: CADSLToolSpec,
     from reter_code.dsl.core import (
         Pipeline, REQLSource, ValueSource,
         RAGSearchSource, RAGDuplicatesSource, RAGClustersSource,
+        FileScanSource,
         FilterStep, SelectStep, MapStep, FlatMapStep,
         OrderByStep, LimitStep, OffsetStep,
         GroupByStep, AggregateStep, FlattenStep, UniqueStep,
@@ -250,6 +251,19 @@ def build_pipeline_factory(spec: CADSLToolSpec,
         elif spec.source_type == "merge":
             from .transformer import MergeSource
             source = MergeSource(spec.merge_sources)
+        elif spec.source_type == "file_scan":
+            params = _resolve_rag_params(spec.rag_params, ctx)
+            source = FileScanSource(
+                glob=params.get("glob", "*"),
+                exclude=params.get("exclude"),
+                contains=params.get("contains"),
+                not_contains=params.get("not_contains"),
+                case_sensitive=params.get("case_sensitive", True),
+                include_matches=params.get("include_matches", False),
+                context_lines=params.get("context_lines", 0),
+                max_matches_per_file=params.get("max_matches_per_file"),
+                include_stats=params.get("include_stats", True),
+            )
         else:
             source = ValueSource([])
 

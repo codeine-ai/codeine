@@ -382,6 +382,157 @@ class RAGClustersSource(Source[List[Dict[str, Any]]]):
             return pipeline_err("rag", f"Clustering failed: {e}", e)
 
 
+@dataclass
+class FileScanSource(Source[List[Dict[str, Any]]]):
+    """
+    Scan RETER sources for files matching patterns, with optional content search.
+
+    Iterates over RETER's tracked sources (already loaded files) rather than
+    scanning the filesystem directly. This ensures consistency with the knowledge
+    graph and enables seamless JOINs via the 'file' field.
+
+    Source format: "hash|relative_path" (e.g., "abc123|src/module.py")
+    Output 'file' field: normalized path with forward slashes (matches REQL is-in-file)
+
+    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
+    @reter-cnl: This is a source.
+    """
+    glob: str = "*"
+    exclude: Optional[List[str]] = None
+    contains: Optional[str] = None
+    not_contains: Optional[str] = None
+    case_sensitive: bool = True
+    include_matches: bool = False
+    context_lines: int = 0
+    max_matches_per_file: Optional[int] = None
+    include_stats: bool = True
+
+    def execute(self, ctx: Context) -> PipelineResult[List[Dict[str, Any]]]:
+        """Scan RETER sources for matching files."""
+        import re
+        import fnmatch
+        from pathlib import Path
+        from datetime import datetime
+
+        try:
+            # Get RETER instance
+            reter = ctx.reter
+            if reter is None:
+                return pipeline_err("file_scan", "RETER instance not available in context")
+
+            # Get all sources from RETER
+            sources_result = reter.get_all_sources()
+            if isinstance(sources_result, tuple) and len(sources_result) == 2:
+                sources = sources_result[0]
+            else:
+                sources = sources_result if isinstance(sources_result, list) else []
+
+            if not isinstance(sources, list):
+                return pipeline_err("file_scan", f"Unexpected sources format: {type(sources)}")
+
+            # Compile regex patterns
+            flags = 0 if self.case_sensitive else re.IGNORECASE
+            contains_re = re.compile(self.contains, flags) if self.contains else None
+            not_contains_re = re.compile(self.not_contains, flags) if self.not_contains else None
+
+            # Get base directory from RETER or use current directory
+            base_dir = getattr(reter, 'base_directory', None)
+            if base_dir is None:
+                base_dir = Path.cwd()
+            else:
+                base_dir = Path(base_dir)
+
+            results = []
+
+            for source_id in sources:
+                # Parse source ID: "hash|relative_path"
+                if '|' in source_id:
+                    rel_path = source_id.split('|', 1)[1]
+                else:
+                    rel_path = source_id
+
+                # Normalize path to forward slashes (matches REQL is-in-file format)
+                normalized_path = rel_path.replace('\\', '/')
+
+                # Apply glob filter
+                if not fnmatch.fnmatch(normalized_path, self.glob):
+                    continue
+
+                # Apply exclusion filters
+                if self.exclude:
+                    excluded = False
+                    for pattern in self.exclude:
+                        if fnmatch.fnmatch(normalized_path, pattern):
+                            excluded = True
+                            break
+                    if excluded:
+                        continue
+
+                # Try to read the file for content filtering and stats
+                abs_path = base_dir / rel_path.replace('/', '\\')
+                if not abs_path.exists():
+                    # Try with original path
+                    abs_path = base_dir / rel_path
+                    if not abs_path.exists():
+                        continue
+
+                try:
+                    content = abs_path.read_text(encoding='utf-8', errors='ignore')
+                    lines = content.splitlines()
+
+                    # Apply not_contains filter
+                    if not_contains_re and not_contains_re.search(content):
+                        continue
+
+                    # Apply contains filter
+                    if contains_re and not contains_re.search(content):
+                        continue
+
+                    # Build result
+                    result = {
+                        "file": normalized_path,  # Matches REQL is-in-file format
+                    }
+
+                    # Add stats if requested
+                    if self.include_stats:
+                        stat = abs_path.stat()
+                        result["line_count"] = len(lines)
+                        result["file_size"] = stat.st_size
+                        result["last_modified"] = datetime.fromtimestamp(stat.st_mtime).isoformat()
+
+                    # Find matches if requested
+                    if self.include_matches and contains_re:
+                        matches = []
+                        for i, line in enumerate(lines):
+                            if contains_re.search(line):
+                                match = {
+                                    "line_number": i + 1,
+                                    "content": line,
+                                }
+                                if self.context_lines > 0:
+                                    match["context_before"] = lines[max(0, i - self.context_lines):i]
+                                    match["context_after"] = lines[i + 1:i + 1 + self.context_lines]
+                                matches.append(match)
+                                if self.max_matches_per_file and len(matches) >= self.max_matches_per_file:
+                                    break
+                        result["match_count"] = len(matches)
+                        result["matches"] = matches
+                    elif contains_re:
+                        # Count matches without storing them
+                        result["match_count"] = len(contains_re.findall(content))
+
+                    results.append(result)
+
+                except (IOError, UnicodeDecodeError, PermissionError):
+                    # Skip files that can't be read
+                    continue
+
+            return pipeline_ok(results)
+
+        except Exception as e:
+            return pipeline_err("file_scan", f"File scan failed: {e}", e)
+
+
 # Backward compatibility alias
 RAGSource = RAGSearchSource
 
