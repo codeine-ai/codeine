@@ -22,8 +22,8 @@ from lark import Tree, Token
 class Severity(Enum):
     """Severity level for validation issues.
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a value-object.
     """
     ERROR = "error"      # Must be fixed, blocks compilation
     WARNING = "warning"  # Should be fixed, but allows compilation
@@ -34,8 +34,8 @@ class Severity(Enum):
 class ValidationIssue:
     """Represents a validation issue found in CADSL code.
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a value-object.
     """
     severity: Severity
     message: str
@@ -61,8 +61,8 @@ class ValidationIssue:
 class ValidationResult:
     """Result of validating a CADSL parse tree.
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a value-object.
     """
     valid: bool
     issues: List[ValidationIssue] = field(default_factory=list)
@@ -132,10 +132,10 @@ class CADSLValidator:
             for issue in result.issues:
                 print(issue)
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a validator.
-    @reter-cnl: This is-in-process Main-Process.
-    @reter-cnl: This is stateful.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a validator.
+    ::: This is-in-process Main-Process.
+    ::: This is stateful.
     """
 
     def __init__(self, strict: bool = False):

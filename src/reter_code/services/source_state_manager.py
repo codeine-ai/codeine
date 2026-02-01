@@ -45,8 +45,8 @@ class FileInfo:
     """
     Information about a single tracked file.
 
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Utility-Layer.
+    ::: This is a value-object.
     """
     rel_path: str
     abs_path: str
@@ -86,8 +86,8 @@ class SyncChanges:
     """
     Changes detected during sync.
 
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Utility-Layer.
+    ::: This is a value-object.
     """
     to_add: List[FileInfo] = field(default_factory=list)
     to_modify: List[Tuple[FileInfo, FileInfo]] = field(default_factory=list)  # (new_info, old_info)
@@ -106,10 +106,10 @@ class SourceStateManager:
     """
     Manages the unified source state JSON file.
 
-    @reter-cnl: This is-in-layer Service-Layer.
-    @reter-cnl: This is a manager.
-    @reter-cnl: This is-in-process Main-Process.
-    @reter-cnl: This is stateful.
+    ::: This is-in-layer Service-Layer.
+    ::: This is a manager.
+    ::: This is-in-process Main-Process.
+    ::: This is stateful.
 
     This is the single source of truth for what's loaded in RETER and RAG.
     """

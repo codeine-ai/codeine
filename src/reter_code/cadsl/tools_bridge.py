@@ -44,8 +44,8 @@ class RegistryToolSpec:
     - .meta (dict with category, severity, etc.)
     - .description
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a adapter.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a adapter.
     """
     name: str
     type: str  # "query", "detector", "diagram"
@@ -77,8 +77,8 @@ class CADSLToolModule:
     Tools are loaded fresh from disk on each execution (no caching),
     so changes to .cadsl files take effect immediately.
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a module.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a module.
     """
 
     def __init__(self, name: str, tools_path: Path):

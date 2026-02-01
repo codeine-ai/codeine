@@ -20,10 +20,10 @@ class RAGToolsRegistrar(ToolRegistrarBase):
     """
     Registers RAG tools with FastMCP.
 
-    @reter-cnl: This is-in-layer Service-Layer.
-    @reter-cnl: This is a registrar.
-    @reter-cnl: This is-in-process MCP-Server-Process.
-    @reter-cnl: This is stateless.
+    ::: This is-in-layer Service-Layer.
+    ::: This is a registrar.
+    ::: This is-in-process MCP-Server-Process.
+    ::: This is stateless.
     """
 
     def __init__(self, instance_manager, persistence_service, default_manager=None, tools_filter=None):

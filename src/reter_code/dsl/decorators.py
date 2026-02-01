@@ -354,8 +354,8 @@ class ToolBuilder:
             .build()
         )
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a builder.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a builder.
     """
 
     def __init__(self, name: str, type_: ToolType):

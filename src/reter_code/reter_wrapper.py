@@ -87,15 +87,15 @@ class ReterWrapper(ReterLoaderMixin):
     - Selective forgetting by source ID
     - Persistent semantic memory for AI agents
 
-    @reter-cnl: This is-in-layer Infrastructure-Layer.
-    @reter-cnl: This is a reasoning-engine.
-    @reter-cnl: This depends-on `reter.Reter`.
-    @reter-cnl: This is-in-process Main-Process.
-    @reter-cnl: This is stateful.
-    @reter-cnl: This holds-expensive-resource "rete-network".
-    @reter-cnl: This has-startup-order 1.
-    @reter-cnl: This is not-serializable.
-    @reter-cnl: This has-singleton-scope.
+    ::: This is-in-layer Infrastructure-Layer.
+    ::: This is a reasoning-engine.
+    ::: This depends-on `reter.Reter`.
+    ::: This is-in-process Main-Process.
+    ::: This is stateful.
+    ::: This holds-expensive-resource "rete-network".
+    ::: This has-startup-order 1.
+    ::: This is not-serializable.
+    ::: This has-singleton-scope.
     """
 
     def __init__(self, load_ontology: bool = True) -> None:
@@ -650,8 +650,8 @@ class ReterWrapper(ReterLoaderMixin):
             add_ontology("Person(Alice)\\nage(Alice, 25)", source="data")
             # → RETER infers: Adult(Alice)
 
-        @reter-cnl: This is-exposed-via-ipc.
-        @reter-cnl: This communicates-sync.
+        ::: This is-exposed-via-ipc.
+        ::: This communicates-sync.
         """
         check_initialization()
         start_time = time.time()
@@ -716,9 +716,9 @@ class ReterWrapper(ReterLoaderMixin):
             RuntimeError: If query execution times out
             Exception: If query execution fails
 
-        @reter-cnl: This is-exposed-via-ipc.
-        @reter-cnl: This has-ipc-timeout 300000.
-        @reter-cnl: This communicates-sync.
+        ::: This is-exposed-via-ipc.
+        ::: This has-ipc-timeout 300000.
+        ::: This communicates-sync.
         """
         check_initialization()
         # Use default timeout if not specified
@@ -744,8 +744,8 @@ class ReterWrapper(ReterLoaderMixin):
             DefaultInstanceNotInitialised: If server initialization not complete
             Exception: If retrieval fails
 
-        @reter-cnl: This is-exposed-via-ipc.
-        @reter-cnl: This communicates-sync.
+        ::: This is-exposed-via-ipc.
+        ::: This communicates-sync.
         """
         check_initialization()
         start_time = time.time()
@@ -794,8 +794,8 @@ class ReterWrapper(ReterLoaderMixin):
             DefaultInstanceNotInitialised: If server initialization not complete
             Exception: If removal fails
 
-        @reter-cnl: This is-exposed-via-ipc.
-        @reter-cnl: This communicates-sync.
+        ::: This is-exposed-via-ipc.
+        ::: This communicates-sync.
         """
         check_initialization()
         start_time = time.time()
@@ -824,8 +824,8 @@ class ReterWrapper(ReterLoaderMixin):
             DefaultInstanceNotInitialised: If server initialization not complete
             ReterSaveError: If save operation fails
 
-        @reter-cnl: This is-exposed-via-ipc.
-        @reter-cnl: This communicates-sync.
+        ::: This is-exposed-via-ipc.
+        ::: This communicates-sync.
         """
         check_initialization()
         start_time = time.time()

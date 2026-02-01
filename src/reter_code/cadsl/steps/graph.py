@@ -20,8 +20,8 @@ class GraphCyclesStep:
 
     Uses DFS to detect cycles and returns a list of cycles found.
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a step.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a step.
     """
 
     def __init__(self, from_field, to_field):
@@ -92,8 +92,8 @@ class GraphClosureStep:
 
     Returns all reachable nodes from each source node.
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a step.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a step.
     """
 
     def __init__(self, from_field, to_field, max_depth=10):
@@ -158,8 +158,8 @@ class GraphTraverseStep:
 
     Syntax: graph_traverse { from: field, to: field, algorithm: bfs, max_depth: 10 }
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a step.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a step.
     """
 
     def __init__(self, from_field, to_field, algorithm="bfs", max_depth=10, root=None):
@@ -278,8 +278,8 @@ class ParallelStep:
 
     Results from all steps are collected into a list.
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a step.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a step.
     """
 
     def __init__(self, step_specs):

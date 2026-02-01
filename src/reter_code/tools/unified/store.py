@@ -228,10 +228,10 @@ class UnifiedStore:
     """
     Unified SQLite store for the thinking system.
 
-    @reter-cnl: This is-in-layer Service-Layer.
-    @reter-cnl: This is a repository.
-    @reter-cnl: This is-in-process Main-Process.
-    @reter-cnl: This is stateful.
+    ::: This is-in-layer Service-Layer.
+    ::: This is a repository.
+    ::: This is-in-process Main-Process.
+    ::: This is stateful.
 
     Manages sessions, items, relations, and artifacts in a single database.
     """

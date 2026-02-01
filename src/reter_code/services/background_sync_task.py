@@ -28,10 +28,10 @@ class BackgroundSyncTask:
     """
     Handles background file synchronization.
 
-    @reter-cnl: This is-in-layer Service-Layer.
-    @reter-cnl: This is a task.
-    @reter-cnl: This is-in-process Main-Process.
-    @reter-cnl: This is stateful.
+    ::: This is-in-layer Service-Layer.
+    ::: This is a task.
+    ::: This is-in-process Main-Process.
+    ::: This is stateful.
 
     Triggered when file changes are detected (via file watcher or manual check).
     """

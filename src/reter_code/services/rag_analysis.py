@@ -22,8 +22,8 @@ class RAGAnalysisMixin:
     """
     Mixin providing analysis methods for RAGIndexManager.
 
-    @reter-cnl: This is-in-layer Service-Layer.
-    @reter-cnl: This is-part-of-component RAG-Index.
+    ::: This is-in-layer Service-Layer.
+    ::: This is-part-of-component RAG-Index.
 
     These methods require:
     - self._initialized: bool

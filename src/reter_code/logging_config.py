@@ -70,8 +70,8 @@ def _create_file_handler(log_filename: str) -> Optional[logging.FileHandler]:
 class FlushingStreamHandler(logging.StreamHandler):
     """StreamHandler that flushes after every emit.
 
-    @reter-cnl: This is-in-layer Infrastructure-Layer.
-    @reter-cnl: This is a handler.
+    ::: This is-in-layer Infrastructure-Layer.
+    ::: This is a handler.
     """
     def emit(self, record):
         super().emit(record)

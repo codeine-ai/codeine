@@ -21,8 +21,8 @@ class GitignorePattern:
     """
     Represents a single gitignore pattern.
 
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Utility-Layer.
+    ::: This is a value-object.
     """
 
     def __init__(self, pattern: str, base_dir: Path, negation: bool = False):
@@ -151,10 +151,10 @@ class GitignoreParser:
     """
     Parses and caches .gitignore patterns for a project.
 
-    @reter-cnl: This is-in-layer Service-Layer.
-    @reter-cnl: This is a parser.
-    @reter-cnl: This is-in-process Main-Process.
-    @reter-cnl: This is stateful.
+    ::: This is-in-layer Service-Layer.
+    ::: This is a parser.
+    ::: This is-in-process Main-Process.
+    ::: This is stateful.
 
     Usage:
         parser = GitignoreParser(project_root)

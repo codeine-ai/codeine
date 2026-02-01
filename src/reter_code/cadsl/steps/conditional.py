@@ -17,8 +17,8 @@ class WhenStep:
 
     Syntax: when { condition } step
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a step.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a step.
     """
 
     def __init__(self, condition, inner_step_spec):
@@ -80,8 +80,8 @@ class UnlessStep:
 
     Syntax: unless { condition } step
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a step.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a step.
     """
 
     def __init__(self, condition, inner_step_spec):
@@ -118,8 +118,8 @@ class BranchStep:
 
     Syntax: branch { condition } then step [else step]
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a step.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a step.
     """
 
     def __init__(self, condition, then_step_spec, else_step_spec=None):
@@ -162,8 +162,8 @@ class CatchStep:
     Note: This step wraps the pipeline execution, catching any errors
     and returning the default value instead.
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a step.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a step.
     """
 
     def __init__(self, default_fn):

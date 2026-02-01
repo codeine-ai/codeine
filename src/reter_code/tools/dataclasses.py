@@ -13,8 +13,8 @@ class ThoughtInput:
     """
     Input parameters for creating a thought in the thinking session.
 
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Utility-Layer.
+    ::: This is a value-object.
 
     Groups all parameters needed to create a thought item,
     reducing parameter passing overhead and improving type safety.
@@ -43,8 +43,8 @@ class LogicData:
     """
     Logic operation results for a thought.
 
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Utility-Layer.
+    ::: This is a value-object.
 
     Groups data from logical reasoning operations performed during thinking.
     """
@@ -59,8 +59,8 @@ class ReasoningMeta:
     """
     Reasoning metadata for a thought.
 
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Utility-Layer.
+    ::: This is a value-object.
 
     Groups confidence and justification data for a thought.
     """
@@ -74,8 +74,8 @@ class BranchingInfo:
     """
     Branching and revision information for a thought.
 
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Utility-Layer.
+    ::: This is a value-object.
 
     Groups all branching-related parameters for thought chains.
     """
@@ -91,8 +91,8 @@ class ThoughtStoreData:
     """
     Complete data for storing a thought in LogicalThinkingStore.
 
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Utility-Layer.
+    ::: This is a value-object.
 
     Consolidates 19 individual parameters into a structured object with
     logical groupings:

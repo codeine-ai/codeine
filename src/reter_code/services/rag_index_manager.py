@@ -62,16 +62,16 @@ class RAGIndexManager(RAGAnalysisMixin, RAGCollectorMixin):
         embedding_dim: Dimension of embeddings
         is_initialized: Whether the index is loaded and ready
 
-    @reter-cnl: This is-in-layer Service-Layer.
-    @reter-cnl: This is a retrieval-augmented-generation-component.
-    @reter-cnl: This depends-on `reter_code.services.EmbeddingService`.
-    @reter-cnl: This depends-on `reter_code.services.FAISSWrapper`.
-    @reter-cnl: This depends-on `reter_code.services.ContentExtractor`.
-    @reter-cnl: This is-in-process Main-Process.
-    @reter-cnl: This is stateful.
-    @reter-cnl: This holds-expensive-resource "faiss-index".
-    @reter-cnl: This has-startup-order 3.
-    @reter-cnl: This has-singleton-scope.
+    ::: This is-in-layer Service-Layer.
+    ::: This is a retrieval-augmented-generation-component.
+    ::: This depends-on `reter_code.services.EmbeddingService`.
+    ::: This depends-on `reter_code.services.FAISSWrapper`.
+    ::: This depends-on `reter_code.services.ContentExtractor`.
+    ::: This is-in-process Main-Process.
+    ::: This is stateful.
+    ::: This holds-expensive-resource "faiss-index".
+    ::: This has-startup-order 3.
+    ::: This has-singleton-scope.
     """
 
     def __init__(

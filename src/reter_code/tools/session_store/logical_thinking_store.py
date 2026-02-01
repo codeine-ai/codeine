@@ -20,8 +20,8 @@ class LogicalThinkingStore:
     """
     SQLite-based store for logical thinking sessions and thoughts.
 
-    @reter-cnl: This is-in-layer Service-Layer.
-    @reter-cnl: This is a repository.
+    ::: This is-in-layer Service-Layer.
+    ::: This is a repository.
 
     Features:
     - Session persistence per RETER instance

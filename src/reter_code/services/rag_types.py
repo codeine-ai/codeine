@@ -13,8 +13,8 @@ class LanguageSourceChanges:
     """
     Source changes for a single language type.
 
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Utility-Layer.
+    ::: This is a value-object.
 
     Groups changed and deleted source IDs for one language.
     """
@@ -27,8 +27,8 @@ class SyncChanges:
     """
     All source changes for RAG index synchronization.
 
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Utility-Layer.
+    ::: This is a value-object.
 
     Consolidates 12 individual parameters (6 languages × 2 change types)
     into a structured object organized by language.
@@ -100,8 +100,8 @@ class RAGSearchResult:
     """
     Result from a RAG semantic search.
 
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Utility-Layer.
+    ::: This is a value-object.
     """
 
     def __init__(

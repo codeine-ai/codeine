@@ -18,8 +18,8 @@ class CollectStep:
 
     Operations: set, list, first, last, count, sum, avg, min, max
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a step.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a step.
     """
 
     def __init__(self, by: str, fields: dict):
@@ -91,8 +91,8 @@ class NestStep:
 
     Syntax: nest { parent: field, child: field, root: expr, max_depth: 10 }
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a step.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a step.
     """
 
     def __init__(self, parent: str, child: str, root=None, max_depth=10, children_key="children"):

@@ -22,10 +22,10 @@ class SQLiteSessionStore:
     """
     Base class for SQLite-based session storage.
 
-    @reter-cnl: This is-in-layer Service-Layer.
-    @reter-cnl: This is a repository.
-    @reter-cnl: This is-in-process Main-Process.
-    @reter-cnl: This is stateful.
+    ::: This is-in-layer Service-Layer.
+    ::: This is a repository.
+    ::: This is-in-process Main-Process.
+    ::: This is stateful.
 
     Features:
     - Connection pooling with thread-local connections

@@ -78,7 +78,7 @@ query sync_annotations_v1(
         name: "{task_type} @reter-cnl for {class_name} (v1→v3)",
         category: "annotation",
         priority: medium,
-        description: "Upgrade annotations from v1 to v3.\n\nClass: {class_name}\nFile: {file}:{line}\nCurrent Version: v1 (has layer: {layer})\nTarget Version: v3\n\n---\n\nMissing Annotations:\n\nv2 - Functional Component:\n  @reter-cnl: This is a <component>.\n  Components: service, manager, handler, repository, parser, transformer,\n              factory, executor, adapter, singleton, etc.\n\nv3 - Runtime/Process:\n  @reter-cnl: This is-in-process Main-Process.\n  @reter-cnl: This is stateful.  (or: This is stateless.)\n  Optional: holds-expensive-resource, has-singleton-scope, has-startup-order\n\n---\n\nValidate before adding:\n  mcp__reter__validate_cnl(statement, context_entity)",
+        description: "Upgrade annotations from v1 to v3.\n\nClass: {class_name}\nFile: {file}:{line}\nCurrent Version: v1 (has layer: {layer})\nTarget Version: v3\n\n---\n\nMissing Annotations:\n\nv2 - Functional Component:\n  ::: This is a <component>.\n  Components: service, manager, handler, repository, parser, transformer,\n              factory, executor, adapter, singleton, etc.\n\nv3 - Runtime/Process:\n  ::: This is-in-process Main-Process.\n  ::: This is stateful.  (or: This is stateless.)\n  Optional: holds-expensive-resource, has-singleton-scope, has-startup-order\n\n---\n\nValidate before adding:\n  mcp__reter__validate_cnl(statement, context_entity)",
         affects: file,
         dry_run: {dry_run}
     }

@@ -30,10 +30,10 @@ class ReterPythonLoaderMixin:
         - self._load_directory_generic: directory loading helper
         - self._path_to_module_name: static method for module name calculation
 
-    @reter-cnl: This is-in-layer Infrastructure-Layer.
-    @reter-cnl: This is a loader.
-    @reter-cnl: This is-in-process Main-Process.
-    @reter-cnl: This is stateless.
+    ::: This is-in-layer Infrastructure-Layer.
+    ::: This is a loader.
+    ::: This is-in-process Main-Process.
+    ::: This is stateless.
     """
 
     def load_python_file(
@@ -212,10 +212,10 @@ class ReterJavaScriptLoaderMixin:
         - self._dirty: bool flag
         - self._load_directory_generic: directory loading helper
 
-    @reter-cnl: This is-in-layer Infrastructure-Layer.
-    @reter-cnl: This is a loader.
-    @reter-cnl: This is-in-process Main-Process.
-    @reter-cnl: This is stateless.
+    ::: This is-in-layer Infrastructure-Layer.
+    ::: This is a loader.
+    ::: This is-in-process Main-Process.
+    ::: This is stateless.
     """
 
     def load_javascript_file(
@@ -411,10 +411,10 @@ class ReterHTMLLoaderMixin:
         - self._dirty: bool flag
         - self._load_directory_generic: directory loading helper
 
-    @reter-cnl: This is-in-layer Infrastructure-Layer.
-    @reter-cnl: This is a loader.
-    @reter-cnl: This is-in-process Main-Process.
-    @reter-cnl: This is stateless.
+    ::: This is-in-layer Infrastructure-Layer.
+    ::: This is a loader.
+    ::: This is-in-process Main-Process.
+    ::: This is stateless.
     """
 
     def load_html_file(
@@ -602,10 +602,10 @@ class ReterCSharpLoaderMixin:
         - self._dirty: bool flag
         - self._load_directory_generic: directory loading helper
 
-    @reter-cnl: This is-in-layer Infrastructure-Layer.
-    @reter-cnl: This is a loader.
-    @reter-cnl: This is-in-process Main-Process.
-    @reter-cnl: This is stateless.
+    ::: This is-in-layer Infrastructure-Layer.
+    ::: This is a loader.
+    ::: This is-in-process Main-Process.
+    ::: This is stateless.
     """
 
     def load_csharp_file(
@@ -790,10 +790,10 @@ class ReterCPPLoaderMixin:
         - self._dirty: bool flag
         - self._load_directory_generic: directory loading helper
 
-    @reter-cnl: This is-in-layer Infrastructure-Layer.
-    @reter-cnl: This is a loader.
-    @reter-cnl: This is-in-process Main-Process.
-    @reter-cnl: This is stateless.
+    ::: This is-in-layer Infrastructure-Layer.
+    ::: This is a loader.
+    ::: This is-in-process Main-Process.
+    ::: This is stateless.
     """
 
     def load_cpp_file(
@@ -982,10 +982,10 @@ class ReterLoaderMixin(
 
     This single mixin can be used instead of inheriting from all individual mixins.
 
-    @reter-cnl: This is-in-layer Infrastructure-Layer.
-    @reter-cnl: This is a loader.
-    @reter-cnl: This is-in-process Main-Process.
-    @reter-cnl: This is stateless.
+    ::: This is-in-layer Infrastructure-Layer.
+    ::: This is a loader.
+    ::: This is-in-process Main-Process.
+    ::: This is stateless.
     """
     pass
 

@@ -39,10 +39,10 @@ class ConfigLoader:
     """
     Loads configuration from reter_code.json file.
 
-    @reter-cnl: This is-in-layer Service-Layer.
-    @reter-cnl: This is a loader.
-    @reter-cnl: This is-in-process Main-Process.
-    @reter-cnl: This is stateless.
+    ::: This is-in-layer Service-Layer.
+    ::: This is a loader.
+    ::: This is-in-process Main-Process.
+    ::: This is stateless.
 
     Priority: Environment variables > reter_code.json > defaults
     """

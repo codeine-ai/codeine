@@ -32,8 +32,8 @@ class SecurityLevel(Enum):
     """
     Security levels for Python block execution.
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a value-object.
     """
     RESTRICTED = "restricted"  # No imports, minimal builtins
     STANDARD = "standard"      # Safe imports, common builtins
@@ -49,8 +49,8 @@ class Capability:
     """
     Represents a permission capability.
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a value-object.
     """
     prefix: str
     pattern: str  # e.g., "fs:read:*", "net:http:api.example.com"
@@ -68,8 +68,8 @@ class SecurityContext:
     """
     Security context for Python execution.
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a value-object.
     """
     level: SecurityLevel = SecurityLevel.STANDARD
     capabilities: List[str] = field(default_factory=list)
@@ -156,10 +156,10 @@ class ASTValidator(ast.NodeVisitor):
     - Dangerous function calls (eval, exec, etc.)
     - Dangerous attribute access (__class__, __globals__, etc.)
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a validator.
-    @reter-cnl: This is-in-process Main-Process.
-    @reter-cnl: This is stateful.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a validator.
+    ::: This is-in-process Main-Process.
+    ::: This is stateful.
     """
 
     def __init__(self, security_level: SecurityLevel = SecurityLevel.STANDARD):
@@ -493,8 +493,8 @@ class ExecutionResult:
     """
     Result of Python code execution.
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a value-object.
     """
     success: bool
     result: Any = None
@@ -521,10 +521,10 @@ class PythonExecutor:
         else:
             raise RuntimeError(result.error)
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a executor.
-    @reter-cnl: This is-in-process Main-Process.
-    @reter-cnl: This is stateless.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a executor.
+    ::: This is-in-process Main-Process.
+    ::: This is stateless.
     """
 
     def __init__(self, security_context: Optional[SecurityContext] = None):
@@ -732,10 +732,10 @@ class SecurePythonStep:
     This replaces the simpler PythonStep in transformer.py with
     full security controls.
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a executor.
-    @reter-cnl: This is-in-process Main-Process.
-    @reter-cnl: This is stateful.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a executor.
+    ::: This is-in-process Main-Process.
+    ::: This is stateful.
     """
 
     def __init__(self, code: str, security_context: Optional[SecurityContext] = None):

@@ -27,13 +27,13 @@ class InstanceManager:
     - Manage per-instance locks for thread safety
     - Support lazy loading of instances from snapshots
 
-    @reter-cnl: This is-in-layer Service-Layer.
-    @reter-cnl: This is a core-service.
-    @reter-cnl: This depends-on `reter_code.reter_wrapper.ReterWrapper`.
-    @reter-cnl: This is-in-process Main-Process.
-    @reter-cnl: This is stateful.
-    @reter-cnl: This owns-resource `ReterWrapper`.
-    @reter-cnl: This has-singleton-scope.
+    ::: This is-in-layer Service-Layer.
+    ::: This is a core-service.
+    ::: This depends-on `reter_code.reter_wrapper.ReterWrapper`.
+    ::: This is-in-process Main-Process.
+    ::: This is stateful.
+    ::: This owns-resource `ReterWrapper`.
+    ::: This has-singleton-scope.
     """
 
     def __init__(self):

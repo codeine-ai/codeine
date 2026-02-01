@@ -19,10 +19,10 @@ class OperationsHandler:
     """
     Handles operations dict from thinking() calls.
 
-    @reter-cnl: This is-in-layer Service-Layer.
-    @reter-cnl: This is a handler.
-    @reter-cnl: This is-in-process Main-Process.
-    @reter-cnl: This is stateless.
+    ::: This is-in-layer Service-Layer.
+    ::: This is a handler.
+    ::: This is-in-process Main-Process.
+    ::: This is stateless.
 
     Operations are processed in order:
     1. RETER knowledge operations

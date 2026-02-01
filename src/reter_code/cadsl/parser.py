@@ -27,8 +27,8 @@ class ParseError:
     """
     Represents a parsing error with location information.
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a value-object.
     """
     message: str
     line: int
@@ -51,8 +51,8 @@ class ParseResult:
     """
     Result of parsing CADSL source code.
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a value-object.
     """
     success: bool
     tree: Optional[Tree] = None
@@ -85,11 +85,11 @@ class CADSLParser:
             for error in result.errors:
                 print(error)
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a parser.
-    @reter-cnl: This is a singleton.
-    @reter-cnl: This is-in-process Main-Process.
-    @reter-cnl: This is stateful.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a parser.
+    ::: This is a singleton.
+    ::: This is-in-process Main-Process.
+    ::: This is stateful.
     """
 
     _instance: Optional["CADSLParser"] = None

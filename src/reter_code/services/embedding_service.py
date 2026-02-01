@@ -70,14 +70,14 @@ class EmbeddingService:
         provider: Provider type ("local", "voyage", "openai")
         embedding_dim: Dimension of embeddings produced
 
-    @reter-cnl: This is-in-layer Infrastructure-Layer.
-    @reter-cnl: This is a machine-learning-component.
-    @reter-cnl: This has-provider "sentence-transformers".
-    @reter-cnl: This is-in-process Main-Process.
-    @reter-cnl: This is stateful.
-    @reter-cnl: This holds-expensive-resource "embedding-model".
-    @reter-cnl: This has-startup-order 2.
-    @reter-cnl: This has-singleton-scope.
+    ::: This is-in-layer Infrastructure-Layer.
+    ::: This is a machine-learning-component.
+    ::: This has-provider "sentence-transformers".
+    ::: This is-in-process Main-Process.
+    ::: This is stateful.
+    ::: This holds-expensive-resource "embedding-model".
+    ::: This has-startup-order 2.
+    ::: This has-singleton-scope.
     """
 
     # Model configurations
@@ -587,8 +587,8 @@ class LightweightEmbeddingService(EmbeddingService):
     """
     Lightweight embedding service for testing without heavy dependencies.
 
-    @reter-cnl: This is-in-layer Service-Layer.
-    @reter-cnl: This is a service.
+    ::: This is-in-layer Service-Layer.
+    ::: This is a service.
 
     Uses hash-based embeddings that maintain some semantic properties
     (same text = same embedding) but are NOT suitable for production.

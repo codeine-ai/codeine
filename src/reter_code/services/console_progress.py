@@ -29,8 +29,8 @@ class StderrSuppressor:
     """
     Context manager to suppress stderr output during progress display.
 
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a utility.
+    ::: This is-in-layer Utility-Layer.
+    ::: This is a utility.
     """
 
     def __init__(self):
@@ -57,10 +57,10 @@ class ConsoleProgress:
     """
     Rich-based console progress display for sync operations.
 
-    @reter-cnl: This is-in-layer Presentation-Layer.
-    @reter-cnl: This is a view.
-    @reter-cnl: This is-in-process Main-Process.
-    @reter-cnl: This is stateful.
+    ::: This is-in-layer Presentation-Layer.
+    ::: This is a view.
+    ::: This is-in-process Main-Process.
+    ::: This is stateful.
     """
 
     def __init__(self):

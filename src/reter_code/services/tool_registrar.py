@@ -57,12 +57,12 @@ class ToolRegistrar:
     Manages MCP tool registration.
     Single Responsibility: Register and configure MCP tools.
 
-    @reter-cnl: This is-in-layer Service-Layer.
-    @reter-cnl: This is a model-context-protocol-tool-provider.
-    @reter-cnl: This depends-on `reter_code.services.ReterOperations`.
-    @reter-cnl: This depends-on `reter_code.services.StatePersistenceService`.
-    @reter-cnl: This is-in-process MCP-Server-Process.
-    @reter-cnl: This is stateless.
+    ::: This is-in-layer Service-Layer.
+    ::: This is a model-context-protocol-tool-provider.
+    ::: This depends-on `reter_code.services.ReterOperations`.
+    ::: This depends-on `reter_code.services.StatePersistenceService`.
+    ::: This is-in-process MCP-Server-Process.
+    ::: This is stateless.
     """
 
     def __init__(

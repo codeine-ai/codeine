@@ -159,15 +159,15 @@ class ReterCodeServer:
     - ReterOperations: Handles RETER operations
     - StatePersistenceService: Manages state persistence
 
-    @reter-cnl: This is-in-layer Presentation-Layer.
-    @reter-cnl: This is a model-context-protocol-server.
-    @reter-cnl: This depends-on `reter_code.services.InstanceManager`.
-    @reter-cnl: This depends-on `reter_code.services.ToolRegistrar`.
-    @reter-cnl: This depends-on `reter_code.services.ResourceRegistrar`.
-    @reter-cnl: This is-in-process Model-Context-Protocol-Server-Process.
-    @reter-cnl: This is a process-entry-point.
-    @reter-cnl: This is stateless.
-    @reter-cnl: This is a ipc-proxy.
+    ::: This is-in-layer Presentation-Layer.
+    ::: This is a model-context-protocol-server.
+    ::: This depends-on `reter_code.services.InstanceManager`.
+    ::: This depends-on `reter_code.services.ToolRegistrar`.
+    ::: This depends-on `reter_code.services.ResourceRegistrar`.
+    ::: This is-in-process Model-Context-Protocol-Server-Process.
+    ::: This is a process-entry-point.
+    ::: This is stateless.
+    ::: This is a ipc-proxy.
     """
 
     def __init__(self):

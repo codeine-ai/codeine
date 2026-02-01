@@ -39,8 +39,8 @@ class QueryType(Enum):
     """
     Types of queries the generator can handle.
 
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Utility-Layer.
+    ::: This is a value-object.
     """
     REQL = "reql"
     CADSL = "cadsl"
@@ -51,8 +51,8 @@ class QueryGenerationResult:
     """
     Result of query generation.
 
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Utility-Layer.
+    ::: This is a value-object.
     """
     success: bool
     query: Optional[str]

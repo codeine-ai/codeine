@@ -17,8 +17,8 @@ from enum import Enum
 class ToolSpec:
     """Forward reference placeholder.
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a value-object.
     """
     name: str
     type: Any
@@ -28,8 +28,8 @@ class ToolSpec:
 class ToolType(Enum):
     """Tool type enum (forward reference).
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a value-object.
     """
     QUERY = "query"
     DETECTOR = "detector"
@@ -56,10 +56,10 @@ class Registry:
         queries = Registry.get_by_type(ToolType.QUERY)
         code_smells = Registry.get_by_category("code_smell")
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a registrar.
-    @reter-cnl: This is-in-process Main-Process.
-    @reter-cnl: This is stateful.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a registrar.
+    ::: This is-in-process Main-Process.
+    ::: This is stateful.
     """
 
     # Class-level storage
@@ -257,8 +257,8 @@ class Namespace:
         # Load all tools from namespace
         refactoring.load()
 
-    @reter-cnl: This is-in-layer Domain-Specific-Language-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Domain-Specific-Language-Layer.
+    ::: This is a value-object.
     """
     name: str
     _tools: Dict[str, Any] = field(default_factory=dict)

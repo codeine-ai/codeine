@@ -40,10 +40,10 @@ class BackgroundInitializer:
     """
     Handles background initialization of the default RETER instance.
 
-    @reter-cnl: This is-in-layer Service-Layer.
-    @reter-cnl: This is a manager.
-    @reter-cnl: This is-in-process Main-Process.
-    @reter-cnl: This is stateful.
+    ::: This is-in-layer Service-Layer.
+    ::: This is a manager.
+    ::: This is-in-process Main-Process.
+    ::: This is stateful.
 
     Runs in a separate thread to avoid blocking MCP server startup.
 

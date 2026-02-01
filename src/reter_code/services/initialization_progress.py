@@ -16,8 +16,8 @@ class InitStatus(Enum):
     """
     Status of initial server startup.
 
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Utility-Layer.
+    ::: This is a value-object.
     """
     PENDING = "pending"           # Not started
     INITIALIZING = "initializing" # In progress
@@ -29,8 +29,8 @@ class InitPhase(Enum):
     """
     Current phase of initialization.
 
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Utility-Layer.
+    ::: This is a value-object.
     """
     PENDING = "pending"
     LOADING_PYTHON = "loading_python"
@@ -42,8 +42,8 @@ class SyncStatus(Enum):
     """
     Status of file sync operations.
 
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Utility-Layer.
+    ::: This is a value-object.
     """
     IDLE = "idle"           # No sync in progress
     SYNCING = "syncing"     # Sync in progress
@@ -55,8 +55,8 @@ class SyncPhase(Enum):
     """
     Current phase of file synchronization.
 
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Utility-Layer.
+    ::: This is a value-object.
     """
     IDLE = "idle"
     SCANNING = "scanning"
@@ -72,8 +72,8 @@ class InstanceProgress:
     """
     Shared state for initialization and sync progress.
 
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Utility-Layer.
+    ::: This is a value-object.
 
     The instance goes through two types of blocking operations:
     1. Initial startup (loading all files for the first time)
@@ -249,8 +249,8 @@ class InstanceNotReadyError(Exception):
     """
     Raised when a tool is called while the instance is busy.
 
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a exception.
+    ::: This is-in-layer Utility-Layer.
+    ::: This is a exception.
 
     Covers both:
     - Initial startup (initialization in progress)
@@ -402,8 +402,8 @@ class ComponentReadiness:
     """
     Component readiness tracking.
 
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a value-object.
+    ::: This is-in-layer Utility-Layer.
+    ::: This is a value-object.
 
     Components initialize sequentially:
     1. sql_ready - SQLite/UnifiedStore initialized
@@ -538,8 +538,8 @@ class ComponentNotReadyError(Exception):
     """
     Raised when a specific component is not ready.
 
-    @reter-cnl: This is-in-layer Utility-Layer.
-    @reter-cnl: This is a exception.
+    ::: This is-in-layer Utility-Layer.
+    ::: This is a exception.
 
     Allows tools to check for specific component readiness and return
     appropriate error messages indicating which component is still initializing.
