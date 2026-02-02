@@ -1053,9 +1053,8 @@ async def generate_query_with_tools(
     ctx,  # Kept for backwards compatibility but not used
     max_iterations: int = 5,
     similar_tools: Optional[List[SimilarTool]] = None,
-    reter_instance=None,
+    reter_client=None,
     schema_info: str = "",
-    rag_manager=None,
     project_root: Optional[str] = None
 ) -> str:
     """
@@ -1067,7 +1066,7 @@ async def generate_query_with_tools(
         ctx: Unused (kept for backwards compatibility)
         max_iterations: Maximum iterations for Agent SDK
         similar_tools: Similar CADSL tools from case-based reasoning
-        reter_instance: Optional Reter instance for query validation
+        reter_client: ReterClient instance connected to RETER server
         schema_info: Schema information for REQL queries
         project_root: Project root path for file verification tools
 
@@ -1089,10 +1088,9 @@ async def generate_query_with_tools(
         result = await generate_reql_query(
             question=question,
             schema_info=schema_info,
-            reter_instance=reter_instance,
+            reter_client=reter_client,
             max_iterations=max_iterations,
             similar_tools_context=similar_tools_context,
-            rag_manager=rag_manager,
             project_root=project_root
         )
     else:  # CADSL
@@ -1101,8 +1099,7 @@ async def generate_query_with_tools(
             schema_info=schema_info,
             max_iterations=max_iterations,
             similar_tools_context=similar_tools_context,
-            reter_instance=reter_instance,
-            rag_manager=rag_manager,
+            reter_client=reter_client,
             project_root=project_root
         )
 

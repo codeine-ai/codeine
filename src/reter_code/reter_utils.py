@@ -15,7 +15,7 @@ import time
 import traceback
 from typing import Any, Callable, TypeVar
 
-from .logging_config import configure_logger_for_debug_trace
+from .logging_config import configure_logger_for_debug_trace, is_stderr_suppressed
 from .reter_exceptions import DefaultInstanceNotInitialised
 
 # Configure module logger to also write to debug_trace.log
@@ -217,15 +217,17 @@ def safe_cpp_call(func: Callable[..., T], *args, **kwargs) -> T:
         debug_log(f"safe_cpp_call EXIT: {func_name} [{elapsed_ms:.1f}ms] FAILED - SystemError: {e}")
         debug_log(f"  Args were: {args_str}")
         debug_log(f"  Traceback: {traceback.format_exc()}")
-        print(f"ERROR: {error_msg}", file=sys.stderr)
-        traceback.print_exc()
+        if not is_stderr_suppressed():
+            print(f"ERROR: {error_msg}", file=sys.stderr)
+            traceback.print_exc()
         raise RuntimeError(error_msg) from e
     except MemoryError as e:
         elapsed_ms = (time.perf_counter() - start_time) * 1000
         error_msg = f"Memory error in C++ call {func_name}: {e}"
         debug_log(f"safe_cpp_call EXIT: {func_name} [{elapsed_ms:.1f}ms] FAILED - MemoryError: {e}")
         debug_log(f"  Args were: {args_str}")
-        print(f"ERROR: {error_msg}", file=sys.stderr)
+        if not is_stderr_suppressed():
+            print(f"ERROR: {error_msg}", file=sys.stderr)
         raise RuntimeError(error_msg) from e
     except OSError as e:
         elapsed_ms = (time.perf_counter() - start_time) * 1000
@@ -233,7 +235,8 @@ def safe_cpp_call(func: Callable[..., T], *args, **kwargs) -> T:
         error_msg = f"OS error in C++ call {func_name}: {e}"
         debug_log(f"safe_cpp_call EXIT: {func_name} [{elapsed_ms:.1f}ms] FAILED - OSError: {e}")
         debug_log(f"  Args were: {args_str}")
-        print(f"ERROR: {error_msg}", file=sys.stderr)
+        if not is_stderr_suppressed():
+            print(f"ERROR: {error_msg}", file=sys.stderr)
         raise RuntimeError(error_msg) from e
     except Exception as e:
         elapsed_ms = (time.perf_counter() - start_time) * 1000
@@ -242,8 +245,9 @@ def safe_cpp_call(func: Callable[..., T], *args, **kwargs) -> T:
         debug_log(f"safe_cpp_call EXIT: {func_name} [{elapsed_ms:.1f}ms] FAILED - {type(e).__name__}: {e}")
         debug_log(f"  Args were: {args_str}")
         debug_log(f"  Traceback: {traceback.format_exc()}")
-        print(f"ERROR: {error_msg}", file=sys.stderr)
-        traceback.print_exc()
+        if not is_stderr_suppressed():
+            print(f"ERROR: {error_msg}", file=sys.stderr)
+            traceback.print_exc()
         raise
 
 

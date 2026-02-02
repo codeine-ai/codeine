@@ -271,8 +271,9 @@ class ReterJavaScriptLoaderMixin:
         in_file = str(rel_path).replace('\\', '/')
 
         # Load JavaScript code - use the C++ bindings
+        # Returns (facts, errors, registered_methods, unresolved_calls)
         from reter import owl_rete_cpp
-        facts, errors = owl_rete_cpp.parse_javascript_code(code, in_file)
+        facts, errors, _registered_methods, _unresolved_calls = owl_rete_cpp.parse_javascript_code(code, in_file)
 
         # Add facts to the network with source tracking
         wme_count = 0
@@ -340,8 +341,9 @@ class ReterJavaScriptLoaderMixin:
         in_file = in_file.replace('\\', '/')
 
         # Load JavaScript code - use the C++ bindings (C++ derives module name from in_file)
+        # Returns (facts, errors, registered_methods, unresolved_calls)
         from reter import owl_rete_cpp
-        facts, errors = owl_rete_cpp.parse_javascript_code(code, in_file)
+        facts, errors, _registered_methods, _unresolved_calls = owl_rete_cpp.parse_javascript_code(code, in_file)
 
         # Add facts to the network with source tracking
         wme_count = 0

@@ -259,10 +259,12 @@ class DefaultInstanceManager:
         include = os.getenv("RETER_PROJECT_INCLUDE", "")
         if include:
             self._include_patterns = [p.strip() for p in include.split(",") if p.strip()]
+            debug_log(f"[default] Include patterns: {self._include_patterns}")
 
         exclude = os.getenv("RETER_PROJECT_EXCLUDE", "")
         if exclude:
             self._exclude_patterns = [p.strip() for p in exclude.split(",") if p.strip()]
+            debug_log(f"[default] Exclude patterns: {self._exclude_patterns}")
 
     def _looks_like_python_project(self, path: Path) -> bool:
         """
@@ -355,7 +357,8 @@ class DefaultInstanceManager:
             True if watcher started successfully, False otherwise
         """
         if not WATCHDOG_AVAILABLE:
-            print("[FileWatcher] watchdog not installed, file watching disabled", file=sys.stderr)
+            if not self._progress_callback:
+                print("[FileWatcher] watchdog not installed, file watching disabled", file=sys.stderr)
             return False
 
         if self._watcher_started:
@@ -386,9 +389,11 @@ class DefaultInstanceManager:
             try:
                 self._observer.stop()
                 self._observer.join(timeout=2.0)
-                print("[FileWatcher] Stopped", file=sys.stderr)
+                if not self._progress_callback:
+                    print("[FileWatcher] Stopped", file=sys.stderr)
             except Exception as e:
-                print(f"[FileWatcher] Error stopping: {e}", file=sys.stderr)
+                if not self._progress_callback:
+                    print(f"[FileWatcher] Error stopping: {e}", file=sys.stderr)
             finally:
                 self._observer = None
                 self._watcher_started = False
@@ -798,8 +803,17 @@ class DefaultInstanceManager:
                     errors.append(error_msg)
 
             # Process additions
+            # Debug: Log JS/TS files in to_add
+            js_ts_in_to_add = [f for f in changes.to_add if any(f.rel_path.endswith(ext) for ext in self.JAVASCRIPT_EXTENSIONS)]
+            if js_ts_in_to_add:
+                debug_log(f"[default] Found {len(js_ts_in_to_add)} JS/TS files in to_add: {[f.rel_path for f in js_ts_in_to_add[:5]]}")
+
             for file_info in changes.to_add:
                 current_file_idx += 1
+                is_js_ts = any(file_info.rel_path.endswith(ext) for ext in self.JAVASCRIPT_EXTENSIONS)
+                if is_js_ts:
+                    debug_log(f"[default] Processing JS/TS file from to_add: {file_info.rel_path}")
+
                 if self._progress_callback is None:
                     print(f"[default] Adding new file: {file_info.rel_path}", file=sys.stderr, flush=True)
                 else:
@@ -814,12 +828,16 @@ class DefaultInstanceManager:
                     file_info.reter_source_id = source_id
                     if self._source_state:
                         self._source_state.set_file(file_info)
+                        if is_js_ts:
+                            debug_log(f"[default] Saved JS/TS file to state: {file_info.rel_path}")
                     track_changed_source(file_info.rel_path, source_id)
 
                 except Exception as e:
                     error_msg = f"Error loading {file_info.rel_path}: {type(e).__name__}: {e}"
                     if self._progress_callback is None:
                         print(f"[default]   ✗ {error_msg}", file=sys.stderr, flush=True)
+                    if is_js_ts:
+                        debug_log(f"[default] ERROR loading JS/TS file {file_info.rel_path}: {error_msg}")
                     errors.append(error_msg)
 
             # End file loading progress
@@ -1002,7 +1020,8 @@ class DefaultInstanceManager:
                     md5_hash = hashlib.md5(content.encode('utf-8')).hexdigest()
                     files[rel_path_str] = (str(code_file), md5_hash)
                 except Exception as e:
-                    print(f"Warning: Failed to read {code_file}: {e}", file=sys.stderr)
+                    if not self._progress_callback:
+                        print(f"Warning: Failed to read {code_file}: {e}", file=sys.stderr)
 
     def _is_excluded(self, rel_path: Path) -> bool:
         """
@@ -1091,6 +1110,33 @@ class DefaultInstanceManager:
                 if suffix and not fnmatch(path, "*" + suffix):
                     return False
                 return True
+            elif len(parts) >= 3:
+                # Handle patterns with multiple ** like "**/vcpkg*/**"
+                # Check if all non-empty parts match somewhere in the path
+                prefix = parts[0].rstrip("/")
+                suffix = parts[-1].lstrip("/")
+                middle_parts = [p.strip("/") for p in parts[1:-1] if p.strip("/")]
+
+                # Prefix must match start (if non-empty)
+                if prefix and not path.startswith(prefix):
+                    return False
+
+                # Suffix must match end (if non-empty)
+                if suffix and not path.endswith(suffix) and not fnmatch(path.split("/")[-1], suffix):
+                    return False
+
+                # Middle parts must appear somewhere in the path
+                for middle in middle_parts:
+                    # Check if middle pattern matches any path component
+                    matched = False
+                    for component in path.split("/"):
+                        if fnmatch(component, middle):
+                            matched = True
+                            break
+                    if not matched:
+                        return False
+
+                return True
 
         # Regular fnmatch
         return fnmatch(path, pattern)
@@ -1140,11 +1186,17 @@ class DefaultInstanceManager:
         is_csharp = any(rel_path.endswith(ext) for ext in self.CSHARP_EXTENSIONS)
         is_cpp = any(rel_path.endswith(ext) for ext in self.CPP_EXTENSIONS)
 
+        # Debug logging for JS/TS files
+        if is_javascript:
+            debug_log(f"[default] _load_code_file: Loading JS/TS file: {rel_path}")
+
         if is_python:
             # Pass package_roots for proper Python module name calculation
             reter.load_python_file(abs_path, str(self._project_root), self._package_roots)
         elif is_javascript:
+            debug_log(f"[default] _load_code_file: Calling load_javascript_file for: {rel_path}")
             reter.load_javascript_file(abs_path, str(self._project_root))
+            debug_log(f"[default] _load_code_file: Successfully loaded JS/TS file: {rel_path}")
         elif is_html:
             reter.load_html_file(abs_path, str(self._project_root))
         elif is_csharp:
@@ -1460,7 +1512,8 @@ class DefaultInstanceManager:
         """
         import time
         start = time.time()
-        print(f"[default] Force rebuilding to compact RETE network ({self._modification_count} modifications accumulated)...", file=sys.stderr, flush=True)
+        if self._progress_callback is None:
+            print(f"[default] Force rebuilding to compact RETE network ({self._modification_count} modifications accumulated)...", file=sys.stderr, flush=True)
 
         # Create fresh ReterWrapper with new RETE network
         fresh_reter = ReterWrapper()
@@ -1480,7 +1533,8 @@ class DefaultInstanceManager:
                     loaded += 1
                 except Exception as e:
                     error_msg = f"Error loading {rel_path}: {type(e).__name__}: {e}"
-                    print(f"[default]   ✗ {error_msg}", file=sys.stderr, flush=True)
+                    if self._progress_callback is None:
+                        print(f"[default]   ✗ {error_msg}", file=sys.stderr, flush=True)
                     errors.append(error_msg)
         finally:
             # Finalize accumulated entities - creates merged facts
@@ -1489,8 +1543,9 @@ class DefaultInstanceManager:
         # Reset modification count
         self._modification_count = 0
 
-        print(f"[default] Rebuild complete: loaded {loaded} files in {time.time()-start:.2f}s", file=sys.stderr, flush=True)
-        if errors:
-            print(f"[default] Rebuild had {len(errors)} errors", file=sys.stderr, flush=True)
+        if self._progress_callback is None:
+            print(f"[default] Rebuild complete: loaded {loaded} files in {time.time()-start:.2f}s", file=sys.stderr, flush=True)
+            if errors:
+                print(f"[default] Rebuild had {len(errors)} errors", file=sys.stderr, flush=True)
 
         return fresh_reter

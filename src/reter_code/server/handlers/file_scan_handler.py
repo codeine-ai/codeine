@@ -1,0 +1,87 @@
+"""
+RETER File Scan Handler.
+
+Handles file scanning operations over RETER-tracked sources.
+
+::: This is-in-layer Handler-Layer.
+::: This is-in-component Query-Handlers.
+::: This depends-on reter_code.dsl.core.
+"""
+
+from typing import Any, Dict, List
+
+from . import BaseHandler
+from ..protocol import METHOD_FILE_SCAN, FILE_SCAN_ERROR
+
+
+class FileScanHandler(BaseHandler):
+    """Handler for file scan operations.
+
+    ::: This is-defined-in Query-Handlers.
+    ::: This handles-method file_scan.
+    """
+
+    def _register_methods(self) -> None:
+        """Register file scan method handlers."""
+        self._methods = {
+            METHOD_FILE_SCAN: self._handle_file_scan,
+        }
+
+    def can_handle(self, method: str) -> bool:
+        """Check if this handler can process the method."""
+        return method in self._methods
+
+    def _handle_file_scan(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Scan RETER-tracked files with patterns.
+
+        Params:
+            glob: Glob pattern for file matching (e.g., "*.py", "src/**/*.ts")
+            contains: Content pattern to search for
+            exclude: Glob pattern to exclude files
+            case_sensitive: Whether content search is case-sensitive
+            include_matches: Include matching lines in results
+            context_lines: Lines of context around matches
+            limit: Maximum files to return
+
+        Returns:
+            Dictionary with matching files and statistics
+        """
+        glob_pattern = params.get("glob", "*")
+        contains = params.get("contains")
+        exclude = params.get("exclude")
+        case_sensitive = params.get("case_sensitive", False)
+        include_matches = params.get("include_matches", True)
+        context_lines = params.get("context_lines", 0)
+        limit = params.get("limit", 100)
+
+        # Import FileScanSource from DSL
+        from ...dsl.core import FileScanSource
+
+        # Create and execute file scan
+        source = FileScanSource(
+            glob=glob_pattern,
+            exclude=exclude,
+            contains=contains,
+            case_sensitive=case_sensitive,
+            include_matches=include_matches,
+            context_lines=context_lines,
+            include_stats=True
+        )
+
+        # Execute the scan
+        results = source.execute(self.reter)
+
+        # Apply limit
+        files = results.get("files", [])[:limit]
+
+        return {
+            "success": True,
+            "files": files,
+            "count": len(files),
+            "total_matches": results.get("total_matches", 0),
+            "stats": results.get("stats", {}),
+            "execution_time_ms": results.get("execution_time_ms", 0)
+        }
+
+
+__all__ = ["FileScanHandler"]

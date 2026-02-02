@@ -43,7 +43,7 @@ if TYPE_CHECKING:
     from ..reter_wrapper import ReterWrapper
     from .state_persistence import StatePersistenceService
 
-from ..logging_config import configure_logger_for_debug_trace
+from ..logging_config import configure_logger_for_debug_trace, is_stderr_suppressed
 from .rag_analysis import RAGAnalysisMixin
 from .rag_collectors import RAGCollectorMixin
 
@@ -308,18 +308,22 @@ class RAGIndexManager(RAGAnalysisMixin, RAGCollectorMixin):
         # Initialize embedding service
         # If a pre-loaded model was set on RAGIndexManager, pass it to embedding service
         import sys
-        print(f"[RAG] initialize: Creating embedding service...", file=sys.stderr, flush=True)
+        if not is_stderr_suppressed():
+            print(f"[RAG] initialize: Creating embedding service...", file=sys.stderr, flush=True)
         embed_start = time.time()
         self._embedding_service = get_embedding_service(self._config)
 
         # Check if we have a pre-loaded model (set by server at startup to avoid async deadlock)
         if hasattr(self, '_preloaded_model') and self._preloaded_model is not None:
-            print(f"[RAG] initialize: Using pre-loaded model", file=sys.stderr, flush=True)
+            if not is_stderr_suppressed():
+                print(f"[RAG] initialize: Using pre-loaded model", file=sys.stderr, flush=True)
             self._embedding_service.set_preloaded_model(self._preloaded_model)
 
-        print(f"[RAG] initialize: Loading embedding model '{self._embedding_service.model_name}'...", file=sys.stderr, flush=True)
+        if not is_stderr_suppressed():
+            print(f"[RAG] initialize: Loading embedding model '{self._embedding_service.model_name}'...", file=sys.stderr, flush=True)
         self._embedding_service.initialize()
-        print(f"[RAG] initialize: Embedding model loaded in {time.time() - embed_start:.2f}s", file=sys.stderr, flush=True)
+        if not is_stderr_suppressed():
+            print(f"[RAG] initialize: Embedding model loaded in {time.time() - embed_start:.2f}s", file=sys.stderr, flush=True)
 
         # Initialize content extractor
         debug_log("[RAG] initialize: Creating content extractor...")
@@ -1236,7 +1240,7 @@ class RAGIndexManager(RAGAnalysisMixin, RAGCollectorMixin):
         )
         if progress_callback:
             progress_callback(0, total_files_to_index, "initializing")
-        else:
+        elif not is_stderr_suppressed():
             print(f"[RAG] sync_sources: {total_changes} changes detected, {total_files_to_index} files to index", file=sys.stderr, flush=True)
 
         # ALWAYS initialize fully (loads embedding model + FAISS index)

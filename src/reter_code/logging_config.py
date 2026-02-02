@@ -14,23 +14,33 @@ from typing import Optional
 # Snapshot directory priority (same as state_persistence.py):
 # 1. RETER_SNAPSHOTS_DIR (explicit)
 # 2. RETER_PROJECT_ROOT/.reter_code (if set)
-# 3. CWD/.reter_code (fallback)
+# 3. None (don't create file handlers until project root is known)
 # This ensures logs go to the same directory as .default.reter
-def _get_log_directory() -> Path:
-    """Get the log directory path (same as snapshots_dir in state_persistence)."""
+def _get_log_directory() -> Optional[Path]:
+    """Get the log directory path (same as snapshots_dir in state_persistence).
+
+    Returns None if RETER_PROJECT_ROOT is not set, to avoid creating logs
+    in the wrong directory during early module imports.
+    """
     log_dir = os.getenv("RETER_SNAPSHOTS_DIR")
     if not log_dir:
         project_root = os.getenv("RETER_PROJECT_ROOT")
         if project_root:
             log_dir = str(Path(project_root) / ".reter_code")
         else:
-            log_dir = str(Path.cwd() / ".reter_code")
+            # Don't fall back to CWD - wait for RETER_PROJECT_ROOT to be set
+            return None
     return Path(log_dir)
 
 
-def _ensure_log_directory() -> Path:
-    """Ensure log directory exists and return its path."""
+def _ensure_log_directory() -> Optional[Path]:
+    """Ensure log directory exists and return its path.
+
+    Returns None if log directory is not configured yet.
+    """
     log_dir = _get_log_directory()
+    if log_dir is None:
+        return None
     log_dir.mkdir(parents=True, exist_ok=True)
     return log_dir
 
@@ -49,13 +59,16 @@ def _create_file_handler(log_filename: str) -> Optional[logging.FileHandler]:
         log_filename: Name of the log file (e.g., 'debug_trace.log')
 
     Returns:
-        Configured FileHandler, or None if logging is disabled
+        Configured FileHandler, or None if logging is disabled or directory not configured
     """
     if not DEBUG_LOG_ENABLED:
         return None
 
     try:
         log_dir = _ensure_log_directory()
+        if log_dir is None:
+            # RETER_PROJECT_ROOT not set yet, skip file handler
+            return None
         log_path = log_dir / log_filename
         handler = logging.FileHandler(log_path, mode='a', encoding='utf-8')
         handler.setLevel(logging.DEBUG)
@@ -83,11 +96,18 @@ class FlushingStreamHandler(logging.StreamHandler):
 def _create_stderr_handler() -> logging.StreamHandler:
     """Create a stderr handler for console output with auto-flush."""
     handler = FlushingStreamHandler(sys.stderr)
-    handler.setLevel(logging.DEBUG)
+    # If stderr is suppressed, set level to effectively disable
+    if _stderr_suppressed:
+        handler.setLevel(logging.CRITICAL + 1)
+    else:
+        handler.setLevel(logging.DEBUG)
     handler.setFormatter(logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     ))
     return handler
+
+
+_stderr_suppressed = False
 
 
 def get_debug_trace_logger() -> logging.Logger:
@@ -151,6 +171,10 @@ def get_nlq_debug_logger() -> logging.Logger:
 # Track configured log directory for reconfiguration
 _configured_log_dir: Optional[Path] = None
 
+# Track loggers configured via configure_logger_for_debug_trace()
+# so we can update them when reconfigure_log_directory() is called
+_configured_loggers: list = []
+
 
 def ensure_nlq_logger_configured() -> logging.Logger:
     """
@@ -196,6 +220,64 @@ debug_trace_logger = get_debug_trace_logger()
 nlq_debug_logger = get_nlq_debug_logger()
 
 
+def reconfigure_log_directory() -> None:
+    """
+    Reconfigure all loggers to use the correct directory.
+
+    Call this after setting RETER_PROJECT_ROOT to ensure logs go to the right place.
+    """
+    global _configured_log_dir, debug_trace_logger, nlq_debug_logger
+
+    current_dir = _get_log_directory()
+
+    # Skip if directory not configured yet (RETER_PROJECT_ROOT not set)
+    if current_dir is None:
+        return
+
+    # Skip if directory hasn't changed
+    if _configured_log_dir == current_dir:
+        return
+
+    _configured_log_dir = current_dir
+
+    # Reconfigure debug_trace_logger
+    for handler in debug_trace_logger.handlers[:]:
+        handler.close()
+        debug_trace_logger.removeHandler(handler)
+
+    file_handler = _create_file_handler("debug_trace.log")
+    if file_handler:
+        debug_trace_logger.addHandler(file_handler)
+    stderr_handler = _create_stderr_handler()
+    debug_trace_logger.addHandler(stderr_handler)
+
+    # Reconfigure nlq_debug_logger
+    for handler in nlq_debug_logger.handlers[:]:
+        handler.close()
+        nlq_debug_logger.removeHandler(handler)
+
+    file_handler = _create_file_handler("nlq_debug.log")
+    if file_handler:
+        nlq_debug_logger.addHandler(file_handler)
+    stderr_handler = _create_stderr_handler()
+    nlq_debug_logger.addHandler(stderr_handler)
+
+    # Also update all loggers that were configured via configure_logger_for_debug_trace()
+    # They need the new file handler too
+    debug_file_handler = None
+    for handler in debug_trace_logger.handlers:
+        if isinstance(handler, logging.FileHandler):
+            debug_file_handler = handler
+            break
+
+    if debug_file_handler:
+        for logger in _configured_loggers:
+            # Check if this logger already has a file handler
+            has_file_handler = any(isinstance(h, logging.FileHandler) for h in logger.handlers)
+            if not has_file_handler:
+                logger.addHandler(debug_file_handler)
+
+
 def configure_logger_for_debug_trace(logger_name: str) -> logging.Logger:
     """
     Configure a logger to also write to debug_trace.log.
@@ -211,6 +293,9 @@ def configure_logger_for_debug_trace(logger_name: str) -> logging.Logger:
     for handler in debug_trace_logger.handlers:
         if handler not in logger.handlers:
             logger.addHandler(handler)
+    # Track this logger so we can update it when reconfigure_log_directory() is called
+    if logger not in _configured_loggers:
+        _configured_loggers.append(logger)
     return logger
 
 
@@ -221,10 +306,21 @@ def suppress_stderr_logging():
     Call this when using Rich progress UI to avoid log spam in the console.
     File logging continues to work normally.
     """
+    global _stderr_suppressed
+    _stderr_suppressed = True
+
+    # Suppress on known loggers
     for logger in [debug_trace_logger, nlq_debug_logger]:
         for handler in logger.handlers:
             if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
                 handler.setLevel(logging.CRITICAL + 1)  # Effectively disable
+
+    # Also suppress on ALL loggers that might have stderr handlers
+    for name in list(logging.Logger.manager.loggerDict.keys()):
+        logger = logging.getLogger(name)
+        for handler in logger.handlers:
+            if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
+                handler.setLevel(logging.CRITICAL + 1)
 
 
 def restore_stderr_logging():
@@ -233,7 +329,22 @@ def restore_stderr_logging():
 
     Call this after Rich progress UI is done.
     """
+    global _stderr_suppressed
+    _stderr_suppressed = False
     for logger in [debug_trace_logger, nlq_debug_logger]:
         for handler in logger.handlers:
             if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
                 handler.setLevel(logging.DEBUG)
+
+
+def is_stderr_suppressed() -> bool:
+    """
+    Check if stderr output is currently suppressed.
+
+    Use this to guard print() statements that output to stderr when Rich
+    console is active. This avoids interfering with the Rich UI.
+
+    Returns:
+        True if stderr should be suppressed (Rich console is active)
+    """
+    return _stderr_suppressed

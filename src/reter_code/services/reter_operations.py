@@ -18,6 +18,7 @@ from datetime import datetime
 
 from .instance_manager import InstanceManager
 from .utils import make_path_relative
+from ..logging_config import is_stderr_suppressed
 
 logger = logging.getLogger(__name__)
 
@@ -183,7 +184,8 @@ class ReterOperations:
 
                     except Exception as e:
                         # Error parsing or checking this source, skip it
-                        print(f"Error checking source '{source_id}': {e}", file=sys.stderr)
+                        if not is_stderr_suppressed():
+                            print(f"Error checking source '{source_id}': {e}", file=sys.stderr)
                         continue
 
             except TypeError as e:

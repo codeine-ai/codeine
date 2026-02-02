@@ -306,22 +306,38 @@ class GitignoreParser:
         """Get list of loaded .gitignore files."""
         return list(self._loaded_gitignores)
 
-    def load_all_gitignores(self) -> None:
+    def load_all_gitignores(self, exclude_dirs: Optional[Set[str]] = None) -> None:
         """
         Pre-load all .gitignore files in the project tree.
 
         This is more efficient than lazy loading during file scans,
         as it loads all patterns upfront in a single pass.
+
+        Args:
+            exclude_dirs: Set of directory names to skip (e.g., {'vcpkg', 'node_modules'})
         """
         import hashlib
+        import os
 
-        # Find all .gitignore files in project
-        for gitignore_path in self.project_root.rglob(".gitignore"):
-            try:
-                directory = gitignore_path.parent
-                self._load_gitignore(directory)
-            except Exception:
-                pass  # Skip unreadable gitignore files
+        # Default directories to skip (large third-party directories)
+        if exclude_dirs is None:
+            exclude_dirs = {
+                'vcpkg', 'vcpkg_installed', 'node_modules', '.venv', 'venv',
+                '__pycache__', '.git', 'build', 'dist', '.tox', '.pytest_cache',
+                'site-packages', '.mypy_cache', 'eggs', '*.egg-info',
+            }
+
+        # Manual walk to skip excluded directories (much faster than rglob)
+        for root, dirs, files in os.walk(self.project_root):
+            # Skip excluded directories
+            dirs[:] = [d for d in dirs if d not in exclude_dirs and not d.startswith('.')]
+
+            if '.gitignore' in files:
+                try:
+                    directory = Path(root)
+                    self._load_gitignore(directory)
+                except Exception:
+                    pass  # Skip unreadable gitignore files
 
         # Compute combined hash of all gitignore contents
         self._gitignore_files_hashes: Dict[str, str] = {}

@@ -14,7 +14,7 @@ warnings.filterwarnings("ignore", message="builtin type swig", category=Deprecat
 __version__ = "0.1.0"
 __author__ = "Reter.AI"
 
-from .server import create_server, ReterCodeServer, main
+from .mcp_server import create_server, ReterCodeServer, main
 from .models import (
     LogicalThought,
     LogicalSession,

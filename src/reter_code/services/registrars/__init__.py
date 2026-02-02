@@ -14,7 +14,6 @@ Consolidation Updates:
 
 from .base import (
     ToolRegistrarBase,
-    handle_not_initialised,
     truncate_mcp_response,
     truncate_mcp_response_async,
 )
@@ -25,7 +24,6 @@ from .rag_tools import RAGToolsRegistrar
 
 __all__ = [
     'ToolRegistrarBase',
-    'handle_not_initialised',
     'truncate_mcp_response',
     'truncate_mcp_response_async',
     'CodeInspectionToolsRegistrar',

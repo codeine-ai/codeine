@@ -456,8 +456,14 @@ def _handle_requests(requests: List[Dict[str, str]]) -> str:
     return "\n\n".join(responses)
 
 
-def _create_query_tools(reter_instance=None, rag_manager=None):
-    """Create custom MCP tools for query generation assistance."""
+def _create_query_tools(reter_client=None):
+    """Create custom MCP tools for query generation assistance.
+
+    All operations go through ReterClient which connects to RETER server via ZeroMQ.
+
+    Args:
+        reter_client: ReterClient instance connected to RETER server
+    """
     from claude_agent_sdk import tool, create_sdk_mcp_server
 
     @tool("get_grammar", "Get the formal grammar specification for REQL or CADSL. Use language='reql' for structural queries or language='cadsl' for pipelines.", {"language": str})
@@ -493,18 +499,21 @@ def _create_query_tools(reter_instance=None, rag_manager=None):
     @tool("run_reql", "Execute a REQL query and return results (use to test queries)", {"query": str, "limit": int})
     async def run_reql_tool(args):
         debug_log.debug(f"run_reql called with args: {args}")
-        if reter_instance is None:
-            debug_log.debug("run_reql: RETER instance not available")
-            return {"content": [{"type": "text", "text": "Error: RETER instance not available"}], "is_error": True}
+        if reter_client is None:
+            debug_log.debug("run_reql: RETER client not available")
+            return {"content": [{"type": "text", "text": "Error: RETER server not connected"}], "is_error": True}
 
         query = args.get("query", "")
         limit = args.get("limit", 10)
 
         try:
             debug_log.debug(f"run_reql executing: {query[:200]}...")
-            result = reter_instance.reql(query)
-            rows = result.to_pylist()[:limit]
-            row_count = result.num_rows
+            result = reter_client.reql(query)
+
+            # Result is a dict with rows from ReterClient
+            rows = result.get("rows", [])[:limit]
+            row_count = result.get("count", len(rows))
+
             debug_log.debug(f"run_reql result: {row_count} rows")
 
             content = f"Query executed successfully. {row_count} total rows.\n\nFirst {min(limit, row_count)} results:\n"
@@ -519,9 +528,10 @@ def _create_query_tools(reter_instance=None, rag_manager=None):
     @tool("run_rag_search", "Semantic search - find code/docs by meaning (query: str, top_k: int, entity_types: list)", {"query": str, "top_k": int, "entity_types": str})
     async def run_rag_search_tool(args):
         debug_log.debug(f"run_rag_search called with args: {args}")
-        if rag_manager is None:
-            debug_log.debug("run_rag_search: RAG manager not available")
-            return {"content": [{"type": "text", "text": "Error: RAG manager not available"}], "is_error": True}
+
+        if reter_client is None:
+            debug_log.debug("run_rag_search: RETER client not available")
+            return {"content": [{"type": "text", "text": "Error: RETER server not connected"}], "is_error": True}
 
         query = args.get("query", "")
         top_k = args.get("top_k", 10)
@@ -530,20 +540,22 @@ def _create_query_tools(reter_instance=None, rag_manager=None):
 
         try:
             debug_log.debug(f"run_rag_search searching: '{query}' (top_k={top_k}, types={entity_types})")
-            results, stats = rag_manager.search(
+
+            result = reter_client.semantic_search(
                 query=query,
                 top_k=top_k,
                 entity_types=entity_types
             )
-            debug_log.debug(f"run_rag_search result: {len(results)} matches, stats: {stats}")
+            results = result.get("results", [])
+            debug_log.debug(f"run_rag_search result: {len(results)} matches")
 
             content = f"Semantic search for: '{query}'\nFound {len(results)} results:\n\n"
             for i, r in enumerate(results[:top_k]):
-                score = getattr(r, 'score', 0)
-                name = getattr(r, 'name', getattr(r, 'qualified_name', 'unknown'))
-                entity_type = getattr(r, 'entity_type', 'unknown')
-                file = getattr(r, 'file', '')
-                line = getattr(r, 'line', '')
+                score = r.get('score', 0)
+                name = r.get('name', r.get('qualified_name', 'unknown'))
+                entity_type = r.get('entity_type', 'unknown')
+                file = r.get('file', '')
+                line = r.get('line', '')
                 content += f"{i+1}. [{score:.3f}] {entity_type}: {name}\n   File: {file}:{line}\n"
 
             return {"content": [{"type": "text", "text": content}]}
@@ -554,9 +566,10 @@ def _create_query_tools(reter_instance=None, rag_manager=None):
     @tool("run_rag_duplicates", "Find duplicate code pairs using semantic similarity (similarity: float 0-1, limit: int, entity_types: str)", {"similarity": float, "limit": int, "entity_types": str})
     async def run_rag_duplicates_tool(args):
         debug_log.debug(f"run_rag_duplicates called with args: {args}")
-        if rag_manager is None:
-            debug_log.debug("run_rag_duplicates: RAG manager not available")
-            return {"content": [{"type": "text", "text": "Error: RAG manager not available"}], "is_error": True}
+
+        if reter_client is None:
+            debug_log.debug("run_rag_duplicates: RETER client not available")
+            return {"content": [{"type": "text", "text": "Error: RETER server not connected"}], "is_error": True}
 
         similarity = args.get("similarity", 0.85)
         limit = args.get("limit", 50)
@@ -565,19 +578,16 @@ def _create_query_tools(reter_instance=None, rag_manager=None):
 
         try:
             debug_log.debug(f"run_rag_duplicates: similarity={similarity}, limit={limit}, types={entity_types}")
-            result = rag_manager.find_duplicate_candidates(
-                similarity_threshold=similarity,
-                max_results=limit,
-                exclude_same_file=True,
-                exclude_same_class=True,
-                entity_types=entity_types
+
+            result = reter_client.rag_duplicates(
+                threshold=similarity,
+                entity_types=entity_types,
+                limit=limit
             )
-            debug_log.debug(f"run_rag_duplicates result: {result.get('total_pairs', 0)} pairs found")
+            pairs = result.get("duplicates", [])
 
-            if not result.get("success"):
-                return {"content": [{"type": "text", "text": f"Error: {result.get('error', 'Unknown error')}"}], "is_error": True}
+            debug_log.debug(f"run_rag_duplicates result: {len(pairs)} pairs found")
 
-            pairs = result.get("pairs", [])
             content = f"Found {len(pairs)} duplicate code pairs (similarity >= {similarity}):\n\n"
             for i, pair in enumerate(pairs[:limit]):
                 e1, e2 = pair.get("entity1", {}), pair.get("entity2", {})
@@ -593,9 +603,10 @@ def _create_query_tools(reter_instance=None, rag_manager=None):
     @tool("run_rag_clusters", "Find clusters of semantically similar code using K-means (n_clusters: int, min_size: int, entity_types: str)", {"n_clusters": int, "min_size": int, "entity_types": str})
     async def run_rag_clusters_tool(args):
         debug_log.debug(f"run_rag_clusters called with args: {args}")
-        if rag_manager is None:
-            debug_log.debug("run_rag_clusters: RAG manager not available")
-            return {"content": [{"type": "text", "text": "Error: RAG manager not available"}], "is_error": True}
+
+        if reter_client is None:
+            debug_log.debug("run_rag_clusters: RETER client not available")
+            return {"content": [{"type": "text", "text": "Error: RETER server not connected"}], "is_error": True}
 
         n_clusters = args.get("n_clusters", 50)
         min_size = args.get("min_size", 2)
@@ -604,19 +615,15 @@ def _create_query_tools(reter_instance=None, rag_manager=None):
 
         try:
             debug_log.debug(f"run_rag_clusters: n_clusters={n_clusters}, min_size={min_size}, types={entity_types}")
-            result = rag_manager.find_similar_clusters(
+
+            result = reter_client.rag_clusters(
                 n_clusters=n_clusters,
-                min_cluster_size=min_size,
-                exclude_same_file=True,
-                exclude_same_class=True,
                 entity_types=entity_types
             )
-            debug_log.debug(f"run_rag_clusters result: {result.get('total_clusters', 0)} clusters found")
-
-            if not result.get("success"):
-                return {"content": [{"type": "text", "text": f"Error: {result.get('error', 'Unknown error')}"}], "is_error": True}
-
             clusters = result.get("clusters", [])
+
+            debug_log.debug(f"run_rag_clusters result: {len(clusters)} clusters found")
+
             content = f"Found {len(clusters)} code clusters (min_size >= {min_size}):\n\n"
             for cluster in clusters[:20]:  # Show first 20 clusters
                 cid = cluster.get("cluster_id", "?")
@@ -640,6 +647,10 @@ def _create_query_tools(reter_instance=None, rag_manager=None):
         """Execute a CADSL script and return results."""
         debug_log.debug(f"run_cadsl called with args: {args}")
 
+        if reter_client is None:
+            debug_log.debug("run_cadsl: RETER client not available")
+            return {"content": [{"type": "text", "text": "Error: RETER server not connected"}], "is_error": True}
+
         script = args.get("script", "")
         limit = args.get("limit", 20)
 
@@ -647,64 +658,20 @@ def _create_query_tools(reter_instance=None, rag_manager=None):
             return {"content": [{"type": "text", "text": "Error: Empty CADSL script"}], "is_error": True}
 
         try:
-            # Import CADSL components
-            from ..cadsl.parser import parse_cadsl
-            from ..cadsl.transformer import CADSLTransformer
-            from ..cadsl.loader import build_pipeline_factory
-            from ..dsl.core import Context as PipelineContext
-            from ..dsl.catpy import Ok, Err
+            debug_log.debug(f"run_cadsl executing: {script[:200]}...")
 
-            debug_log.debug(f"run_cadsl parsing: {script[:200]}...")
-
-            # Parse CADSL
-            parse_result = parse_cadsl(script)
-            if not parse_result.success:
-                error_msg = f"Parse error: {parse_result.errors}"
-                debug_log.debug(f"run_cadsl parse error: {error_msg}")
-                return {"content": [{"type": "text", "text": error_msg}], "is_error": True}
-
-            # Transform AST to tool spec
-            transformer = CADSLTransformer()
-            tool_specs = transformer.transform(parse_result.tree)
-
-            if not tool_specs:
-                return {"content": [{"type": "text", "text": "Error: No tool spec generated from CADSL"}], "is_error": True}
-
-            tool_spec = tool_specs[0]
-            debug_log.debug(f"run_cadsl tool_spec: {tool_spec.name}")
-
-            # Build pipeline context
-            params = {"rag_manager": rag_manager}
-            for param in tool_spec.params:
-                if param.default is not None:
-                    params[param.name] = param.default
-
-            pipeline_ctx = PipelineContext(reter=reter_instance, params=params)
-
-            # Build and execute pipeline
-            pipeline_factory = build_pipeline_factory(tool_spec)
-            pipeline = pipeline_factory(pipeline_ctx)
-
-            pipeline_result = pipeline.execute(pipeline_ctx)
-
-            # Handle Result monad
-            if isinstance(pipeline_result, Err):
-                error_msg = f"Pipeline error: {pipeline_result.value}"
-                debug_log.debug(f"run_cadsl pipeline error: {error_msg}")
-                return {"content": [{"type": "text", "text": error_msg}], "is_error": True}
-
-            if isinstance(pipeline_result, Ok):
-                pipeline_result = pipeline_result.value
+            # Execute CADSL via ReterClient
+            result = reter_client.execute_cadsl(script)
 
             # Format results
-            if isinstance(pipeline_result, dict):
-                results = pipeline_result.get("results", pipeline_result.get("findings", []))
-                count = pipeline_result.get("count", len(results) if isinstance(results, list) else 0)
-            elif isinstance(pipeline_result, list):
-                results = pipeline_result
+            if isinstance(result, dict):
+                results = result.get("results", result.get("findings", []))
+                count = result.get("count", len(results) if isinstance(results, list) else 0)
+            elif isinstance(result, list):
+                results = result
                 count = len(results)
             else:
-                results = [pipeline_result]
+                results = [result]
                 count = 1
 
             debug_log.debug(f"run_cadsl result: {count} items")
@@ -741,51 +708,31 @@ def _create_query_tools(reter_instance=None, rag_manager=None):
         """Execute a file scan over RETER sources and return results."""
         debug_log.debug(f"run_file_scan called with args: {args}")
 
-        if reter_instance is None:
-            debug_log.debug("run_file_scan: RETER instance not available")
-            return {"content": [{"type": "text", "text": "Error: RETER instance not available"}], "is_error": True}
+        if reter_client is None:
+            debug_log.debug("run_file_scan: RETER client not available")
+            return {"content": [{"type": "text", "text": "Error: RETER server not connected"}], "is_error": True}
 
         # Extract parameters
         glob_pattern = args.get("glob", "*")
         contains = args.get("contains") or None
         exclude_str = args.get("exclude", "")
-        exclude = [p.strip() for p in exclude_str.split(",")] if exclude_str else None
         include_matches = args.get("include_matches", False)
         context_lines = args.get("context_lines", 0)
         limit = args.get("limit", 50)
 
         try:
-            # Import and create FileScanSource
-            from ..dsl.core import FileScanSource, Context as PipelineContext
-            from ..dsl.catpy import Ok, Err
+            debug_log.debug(f"run_file_scan: glob={glob_pattern}, contains={contains}, exclude={exclude_str}")
 
-            debug_log.debug(f"run_file_scan: glob={glob_pattern}, contains={contains}, exclude={exclude}")
-
-            # Create the source
-            source = FileScanSource(
+            result = reter_client.file_scan(
                 glob=glob_pattern,
-                exclude=exclude,
                 contains=contains,
-                case_sensitive=False,  # Case-insensitive by default for usability
+                exclude=exclude_str if exclude_str else None,
+                case_sensitive=False,
                 include_matches=include_matches,
                 context_lines=context_lines,
-                include_stats=True
+                limit=limit
             )
-
-            # Build context and execute
-            pipeline_ctx = PipelineContext(reter=reter_instance, params={})
-            result = source.execute(pipeline_ctx)
-
-            # Handle Result monad
-            if isinstance(result, Err):
-                error_msg = f"File scan error: {result.value}"
-                debug_log.debug(f"run_file_scan error: {error_msg}")
-                return {"content": [{"type": "text", "text": error_msg}], "is_error": True}
-
-            if isinstance(result, Ok):
-                files = result.value
-            else:
-                files = result
+            files = result.get("files", [])
 
             debug_log.debug(f"run_file_scan result: {len(files)} files")
 
@@ -830,16 +777,15 @@ def _create_query_tools(reter_instance=None, rag_manager=None):
             debug_log.debug(f"run_file_scan error: {e}", exc_info=True)
             return {"content": [{"type": "text", "text": error_msg}], "is_error": True}
 
+    # Build tools list - all tools require reter_client
     tools = [get_grammar_tool, list_examples_tool, search_examples_tool, get_example_tool]
-    if reter_instance is not None:
+    if reter_client is not None:
+        # All execution tools available when connected to RETER server
         tools.append(run_reql_tool)
         tools.append(run_file_scan_tool)
-    if rag_manager is not None:
         tools.append(run_rag_search_tool)
         tools.append(run_rag_duplicates_tool)
         tools.append(run_rag_clusters_tool)
-    # CADSL needs both reter and rag for full functionality
-    if reter_instance is not None and rag_manager is not None:
         tools.append(run_cadsl_tool)
 
     return create_sdk_mcp_server(
@@ -849,12 +795,18 @@ def _create_query_tools(reter_instance=None, rag_manager=None):
     )
 
 
-def _build_agent_options(system_prompt: str, max_turns: int, reter_instance, rag_manager):
-    """Build ClaudeAgentOptions with query helper tools."""
+def _build_agent_options(system_prompt: str, max_turns: int, reter_client=None):
+    """Build ClaudeAgentOptions with query helper tools.
+
+    Args:
+        system_prompt: System prompt for the agent
+        max_turns: Maximum conversation turns
+        reter_client: ReterClient instance connected to RETER server
+    """
     from claude_agent_sdk import ClaudeAgentOptions
 
     # Create custom MCP server with query helper tools
-    query_tools_server = _create_query_tools(reter_instance, rag_manager)
+    query_tools_server = _create_query_tools(reter_client)
 
     # Configure tools - include both built-in and custom tools
     base_tools = [
@@ -863,15 +815,14 @@ def _build_agent_options(system_prompt: str, max_turns: int, reter_instance, rag
         "mcp__query_helpers__search_examples",
         "mcp__query_helpers__get_example"
     ]
-    if reter_instance is not None:
+
+    # All execution tools available when connected to RETER server
+    if reter_client is not None:
         base_tools.append("mcp__query_helpers__run_reql")
         base_tools.append("mcp__query_helpers__run_file_scan")
-    if rag_manager is not None:
         base_tools.append("mcp__query_helpers__run_rag_search")
         base_tools.append("mcp__query_helpers__run_rag_duplicates")
         base_tools.append("mcp__query_helpers__run_rag_clusters")
-    # CADSL needs both reter and rag for full functionality
-    if reter_instance is not None and rag_manager is not None:
         base_tools.append("mcp__query_helpers__run_cadsl")
 
     # Allow custom MCP tools plus Read and Grep for code exploration
@@ -914,7 +865,7 @@ async def _process_agent_response(client, tools_used: List[str]) -> str:
     return result_text
 
 
-async def _call_agent(prompt: str, system_prompt: str, max_turns: int = 15, reter_instance=None, rag_manager=None) -> str:
+async def _call_agent(prompt: str, system_prompt: str, max_turns: int = 15, reter_client=None) -> str:
     """Call Agent SDK using ClaudeSDKClient and return the text response.
 
     NOTE: This creates a new session. For multi-turn with retries, use the session-based
@@ -924,8 +875,7 @@ async def _call_agent(prompt: str, system_prompt: str, max_turns: int = 15, rete
         prompt: The prompt to send to the agent
         system_prompt: System prompt for the agent
         max_turns: Maximum conversation turns (default 15)
-        reter_instance: Optional RETER instance for running test REQL queries
-        rag_manager: Optional RAG manager for running semantic search
+        reter_client: ReterClient instance connected to RETER server
     """
     if not is_agent_sdk_available():
         raise ImportError("Claude Agent SDK not installed. Run: pip install claude-agent-sdk")
@@ -933,7 +883,7 @@ async def _call_agent(prompt: str, system_prompt: str, max_turns: int = 15, rete
     from claude_agent_sdk import ClaudeSDKClient
 
     tools_used = []
-    options = _build_agent_options(system_prompt, max_turns, reter_instance, rag_manager)
+    options = _build_agent_options(system_prompt, max_turns, reter_client)
 
     debug_log.debug(f"Starting single-turn agent session")
 
@@ -948,10 +898,9 @@ async def _call_agent(prompt: str, system_prompt: str, max_turns: int = 15, rete
 async def generate_reql_query(
     question: str,
     schema_info: str,
-    reter_instance,
+    reter_client,
     max_iterations: int = 5,
     similar_tools_context: Optional[str] = None,
-    rag_manager=None,
     project_root: Optional[str] = None
 ) -> QueryGenerationResult:
     """
@@ -965,6 +914,14 @@ async def generate_reql_query(
     3. If Agent outputs query, execute and validate
     4. If error, send follow-up message with error feedback
     5. Repeat until success or max iterations
+
+    Args:
+        question: The natural language question to answer
+        schema_info: Schema information for the codebase
+        reter_client: ReterClient instance connected to RETER server
+        max_iterations: Maximum retry attempts
+        similar_tools_context: Optional context about similar tools/examples
+        project_root: Project root directory for context
     """
     if not is_agent_sdk_available():
         return QueryGenerationResult(
@@ -994,7 +951,7 @@ async def generate_reql_query(
     system_prompt = REQL_SYSTEM_PROMPT_TEMPLATE.format(project_root=project_root)
 
     # Build agent options once for the session
-    options = _build_agent_options(system_prompt, max_iterations * 3, reter_instance, rag_manager)
+    options = _build_agent_options(system_prompt, max_iterations * 3, reter_client)
 
     debug_log.debug(f"Starting REQL generation session with max_iterations={max_iterations}")
 
@@ -1023,10 +980,10 @@ async def generate_reql_query(
                 last_query = query
                 debug_log.debug(f"Generated query: {query}")
 
-                # Execute and validate
+                # Execute and validate via ReterClient
                 try:
-                    result = reter_instance.reql(query)
-                    row_count = result.num_rows
+                    result = reter_client.reql(query)
+                    row_count = result.get("count", len(result.get("rows", [])))
                     debug_log.debug(f"Query executed successfully: {row_count} rows")
 
                     return QueryGenerationResult(
@@ -1082,8 +1039,7 @@ async def generate_cadsl_query(
     schema_info: str,
     max_iterations: int = 5,
     similar_tools_context: Optional[str] = None,
-    reter_instance=None,
-    rag_manager=None,
+    reter_client=None,
     project_root: Optional[str] = None
 ) -> QueryGenerationResult:
     """
@@ -1097,6 +1053,14 @@ async def generate_cadsl_query(
     3. If Agent outputs query, return it for caller to execute
     4. If no query found, send follow-up message asking for cadsl block
     5. Repeat until success or max iterations
+
+    Args:
+        question: The natural language question to answer
+        schema_info: Schema information for the codebase
+        max_iterations: Maximum retry attempts
+        similar_tools_context: Optional context about similar tools/examples
+        reter_client: ReterClient instance connected to RETER server
+        project_root: Project root directory for context
     """
     if not is_agent_sdk_available():
         return QueryGenerationResult(
@@ -1124,7 +1088,7 @@ async def generate_cadsl_query(
     system_prompt = CADSL_SYSTEM_PROMPT_TEMPLATE.format(project_root=project_root)
 
     # Build agent options once for the session
-    options = _build_agent_options(system_prompt, max_iterations * 3, reter_instance, rag_manager)
+    options = _build_agent_options(system_prompt, max_iterations * 3, reter_client)
 
     debug_log.debug(f"Starting CADSL generation session with max_iterations={max_iterations}")
 
@@ -1198,11 +1162,17 @@ async def retry_cadsl_query(
     previous_query: str,
     result_count: int,
     error_message: Optional[str] = None,
-    reter_instance=None,
-    rag_manager=None
+    reter_client=None
 ) -> QueryGenerationResult:
     """
     Ask agent to retry a CADSL query after empty results or error.
+
+    Args:
+        question: The original natural language question
+        previous_query: The CADSL query that produced empty/error results
+        result_count: Number of results from previous query (usually 0)
+        error_message: Optional error message if query failed
+        reter_client: ReterClient instance connected to RETER server
 
     Returns:
         QueryGenerationResult with either:
@@ -1243,7 +1213,7 @@ async def retry_cadsl_query(
     system_prompt = CADSL_SYSTEM_PROMPT_TEMPLATE.format(project_root=project_root)
 
     try:
-        response_text = await _call_agent(prompt, system_prompt, reter_instance=reter_instance, rag_manager=rag_manager)
+        response_text = await _call_agent(prompt, system_prompt, reter_client=reter_client)
         debug_log.debug(f"Retry agent response: {response_text[:500]}...")
 
         # Check if agent confirms empty is correct

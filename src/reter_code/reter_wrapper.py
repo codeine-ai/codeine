@@ -12,7 +12,7 @@ import functools
 
 from reter import Reter
 
-from .logging_config import configure_logger_for_debug_trace
+from .logging_config import configure_logger_for_debug_trace, is_stderr_suppressed
 
 # Import exceptions from separate module (re-export for backward compatibility)
 from .reter_exceptions import (
@@ -1068,4 +1068,5 @@ class ReterWrapper(ReterLoaderMixin):
         """
         # No async resources to clean up in synchronous version
         # The operation lock is automatically released when operations complete
-        print(f"  ReterWrapper shutdown complete", file=sys.stderr)
+        if not is_stderr_suppressed():
+            print(f"  ReterWrapper shutdown complete", file=sys.stderr)

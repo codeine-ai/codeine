@@ -1,0 +1,67 @@
+# ZeroMQ Architecture Ontology
+# This file defines the layers and components for architectural tracking
+
+# Layer Definitions
+Server-Layer is a layer.
+Client-Layer is a layer.
+Protocol-Layer is a layer.
+Handler-Layer is a layer.
+UI-Layer is a layer.
+
+# Component Definitions
+ZeroMQ-Server is a component.
+ZeroMQ-Client is a component.
+Console-UI is a component.
+Message-Protocol is a component.
+Query-Handlers is a component.
+RAG-Handlers is a component.
+System-Handlers is a component.
+
+# Layer Hierarchy
+Handler-Layer is-sublayer-of Server-Layer.
+UI-Layer is-sublayer-of Server-Layer.
+Protocol-Layer is-shared-between Server-Layer and Client-Layer.
+
+# Component to Layer Mapping
+ZeroMQ-Server is-in-layer Server-Layer.
+ZeroMQ-Client is-in-layer Client-Layer.
+Console-UI is-in-layer UI-Layer.
+Message-Protocol is-in-layer Protocol-Layer.
+Query-Handlers is-in-layer Handler-Layer.
+RAG-Handlers is-in-layer Handler-Layer.
+System-Handlers is-in-layer Handler-Layer.
+
+# Allowed Dependencies (layered architecture rules)
+Client-Layer may-depend-on Protocol-Layer.
+Server-Layer may-depend-on Protocol-Layer.
+Handler-Layer may-depend-on Protocol-Layer.
+UI-Layer may-depend-on Server-Layer.
+
+# Forbidden Dependencies (architecture violations)
+Client-Layer must-not-depend-on Server-Layer.
+Client-Layer must-not-depend-on Handler-Layer.
+Protocol-Layer must-not-depend-on Server-Layer.
+Protocol-Layer must-not-depend-on Client-Layer.
+
+# External Dependencies
+ZeroMQ-Server depends-on pyzmq.
+ZeroMQ-Client depends-on pyzmq.
+Console-UI depends-on rich.
+Message-Protocol depends-on msgpack.
+
+# Component Responsibilities
+ZeroMQ-Server has-responsibility "Handle incoming ZeroMQ requests".
+ZeroMQ-Server has-responsibility "Route requests to handlers".
+ZeroMQ-Server has-responsibility "Manage client connections".
+
+ZeroMQ-Client has-responsibility "Send requests via ZeroMQ".
+ZeroMQ-Client has-responsibility "Mirror ReterWrapper interface".
+ZeroMQ-Client has-responsibility "Handle reconnection".
+
+Console-UI has-responsibility "Display query logs".
+Console-UI has-responsibility "Show progress bars".
+Console-UI has-responsibility "Display server status".
+
+Message-Protocol has-responsibility "Define message format".
+Message-Protocol has-responsibility "Serialize/deserialize messages".
+Message-Protocol has-responsibility "Define error codes".
