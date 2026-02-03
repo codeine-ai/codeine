@@ -65,7 +65,8 @@ class RAGHandler(BaseHandler):
             raise ValueError("Query is required")
 
         # Execute search via RAG manager
-        results = self.rag_manager.search(
+        # Returns (results_list, stats_dict) tuple
+        results_list, stats = self.rag_manager.search(
             query=query,
             top_k=top_k,
             entity_types=entity_types,
@@ -74,13 +75,34 @@ class RAGHandler(BaseHandler):
             search_scope=search_scope
         )
 
+        # Convert RAGSearchResult objects to dicts
+        results_dicts = [
+            {
+                "entity_type": r.entity_type,
+                "name": r.name,
+                "qualified_name": r.qualified_name,
+                "file": r.file,
+                "line": r.line,
+                "end_line": r.end_line,
+                "score": r.score,
+                "source_type": r.source_type,
+                "docstring": r.docstring,
+                "content_preview": r.content_preview,
+                "content": r.content,
+                "heading": r.heading,
+                "language": r.language,
+                "class_name": r.class_name,
+            }
+            for r in results_list
+        ]
+
         return {
             "success": True,
-            "results": results.get("results", []),
-            "count": results.get("count", 0),
-            "query_embedding_time_ms": results.get("query_embedding_time_ms", 0),
-            "search_time_ms": results.get("search_time_ms", 0),
-            "total_vectors": results.get("total_vectors", 0)
+            "results": results_dicts,
+            "count": len(results_dicts),
+            "query_embedding_time_ms": stats.get("query_embedding_time_ms", 0),
+            "search_time_ms": stats.get("search_time_ms", 0),
+            "total_vectors": stats.get("total_vectors", 0)
         }
 
     def _handle_reindex(self, params: Dict[str, Any]) -> Dict[str, Any]:

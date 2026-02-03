@@ -2663,6 +2663,28 @@ class RenderMermaidStep:
         fc = self.config.flowchart
         lines = [f"flowchart {fc.direction}"]
 
+        # Auto-detect node field if not specified
+        nodes_field = fc.nodes
+        if not nodes_field and not fc.edges_from and data:
+            # Try to auto-detect from first row's fields
+            first_row = data[0] if data else {}
+            # Prefer fields named 'name', 'node', 'layer', or first string field
+            # Also check for REQL-style ?name variants
+            for candidate in ['name', 'node', 'layer', 'label', 'id',
+                              '?name', '?node', '?layer', '?label', '?id']:
+                if candidate in first_row:
+                    nodes_field = candidate
+                    break
+            if not nodes_field and first_row:
+                # Use first non-count field as nodes
+                for key in first_row.keys():
+                    if 'count' not in key.lower():
+                        nodes_field = key
+                        break
+                if not nodes_field:
+                    # Fallback to first field
+                    nodes_field = list(first_row.keys())[0]
+
         # Collect unique nodes and edges
         nodes = set()
         edges = set()
@@ -2674,14 +2696,20 @@ class RenderMermaidStep:
                     nodes.add(from_val)
                     nodes.add(to_val)
                     edges.add((from_val, to_val))
-            elif fc.nodes:
-                nodes.add(row.get(fc.nodes))
+            elif nodes_field:
+                nodes.add(row.get(nodes_field))
 
         # Render edges (nodes are implicit in edges)
-        for from_val, to_val in sorted(edges):
-            safe_from = str(from_val).replace(" ", "_").replace("-", "_").replace(".", "_")
-            safe_to = str(to_val).replace(" ", "_").replace("-", "_").replace(".", "_")
-            lines.append(f'    {safe_from}["{from_val}"] --> {safe_to}["{to_val}"]')
+        if edges:
+            for from_val, to_val in sorted(edges):
+                safe_from = str(from_val).replace(" ", "_").replace("-", "_").replace(".", "_")
+                safe_to = str(to_val).replace(" ", "_").replace("-", "_").replace(".", "_")
+                lines.append(f'    {safe_from}["{from_val}"] --> {safe_to}["{to_val}"]')
+        elif nodes:
+            # Render standalone nodes when no edges defined
+            for node_val in sorted(n for n in nodes if n):
+                safe_node = str(node_val).replace(" ", "_").replace("-", "_").replace(".", "_")
+                lines.append(f'    {safe_node}["{node_val}"]')
 
         return "\n".join(lines)
 

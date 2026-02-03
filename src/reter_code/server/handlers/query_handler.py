@@ -21,6 +21,7 @@ from ..protocol import (
     METHOD_NATURAL_LANGUAGE,
     METHOD_EXECUTE_CADSL,
     METHOD_GENERATE_CADSL,
+    METHOD_SIMILAR_CADSL_TOOLS,
     QUERY_ERROR,
     ReterError,
 )
@@ -43,6 +44,7 @@ class QueryHandler(BaseHandler):
             METHOD_PATTERN: self._handle_pattern,
             METHOD_EXECUTE_CADSL: self._handle_execute_cadsl,
             METHOD_GENERATE_CADSL: self._handle_generate_cadsl,
+            METHOD_SIMILAR_CADSL_TOOLS: self._handle_similar_cadsl_tools,
         }
 
     def can_handle(self, method: str) -> bool:
@@ -144,15 +146,29 @@ class QueryHandler(BaseHandler):
 
         # Check if it looks like a file path (not inline CADSL)
         script_stripped = script.strip()
+
+        # Inline CADSL detection: check for CADSL keywords or comments at start
+        # Also check for newlines - file paths don't have newlines
         is_inline_cadsl = (
             script_stripped.startswith('query ') or
             script_stripped.startswith('detector ') or
             script_stripped.startswith('diagram ') or
             script_stripped.startswith('TOOL ') or
-            script_stripped.startswith('//')
+            script_stripped.startswith('//') or
+            script_stripped.startswith('#') or  # CADSL comment
+            '\n' in script_stripped  # Multi-line content is inline CADSL
         )
 
-        if not is_inline_cadsl and (script_stripped.endswith('.cadsl') or os.path.sep in script_stripped):
+        # File path detection: must look like a path and not be inline CADSL
+        # On Windows, check for drive letter or .cadsl extension
+        # Avoid false positives from backslashes in REQL regex patterns
+        looks_like_path = (
+            script_stripped.endswith('.cadsl') or
+            (len(script_stripped) > 2 and script_stripped[1] == ':') or  # Windows drive letter
+            script_stripped.startswith('/')  # Unix absolute path
+        )
+
+        if not is_inline_cadsl and looks_like_path:
             path = Path(script_stripped)
             if path.exists() and path.is_file():
                 source_file = str(path)
@@ -363,6 +379,50 @@ class QueryHandler(BaseHandler):
             return {
                 "columns": [],
                 "rows": [],
+                "count": 0,
+                "error": str(e)
+            }
+
+    def _handle_similar_cadsl_tools(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Find CADSL tools similar to a question.
+
+        Params:
+            question: Natural language question
+            max_results: Maximum number of similar tools to return (default: 5)
+
+        Returns:
+            Dictionary with similar_tools list
+        """
+        question = params.get("question", "")
+        max_results = params.get("max_results", 5)
+
+        if not question:
+            raise ValueError("Question is required")
+
+        try:
+            from ...services.hybrid_query_engine import find_similar_cadsl_tools
+
+            similar_tools = find_similar_cadsl_tools(question, max_results=max_results)
+
+            return {
+                "success": True,
+                "similar_tools": [
+                    {
+                        "name": t.name,
+                        "score": t.score,
+                        "category": t.category,
+                        "description": t.description,
+                        "content": t.content,
+                    }
+                    for t in similar_tools
+                ],
+                "count": len(similar_tools)
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "similar_tools": [],
                 "count": 0,
                 "error": str(e)
             }

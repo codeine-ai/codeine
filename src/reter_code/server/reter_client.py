@@ -46,6 +46,7 @@ from .protocol import (
     METHOD_SESSION,
     METHOD_THINKING,
     METHOD_ITEMS,
+    METHOD_SIMILAR_CADSL_TOOLS,
 )
 from .config import ClientConfig
 
@@ -698,6 +699,29 @@ class ReterClient:
         return self._send_request(METHOD_ITEMS, {
             "action": action,
             **kwargs
+        })
+
+    # =========================================================================
+    # CADSL Tool Operations
+    # =========================================================================
+
+    def similar_cadsl_tools(
+        self,
+        question: str,
+        max_results: int = 5
+    ) -> Dict[str, Any]:
+        """Find CADSL tools similar to a question.
+
+        Args:
+            question: Natural language question
+            max_results: Maximum results to return
+
+        Returns:
+            Dictionary with similar_tools list
+        """
+        return self._send_request(METHOD_SIMILAR_CADSL_TOOLS, {
+            "question": question,
+            "max_results": max_results
         })
 
 

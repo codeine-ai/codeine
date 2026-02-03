@@ -275,6 +275,9 @@ METHOD_SESSION = "session"
 METHOD_THINKING = "thinking"
 METHOD_ITEMS = "items"
 
+# CADSL tools similarity search
+METHOD_SIMILAR_CADSL_TOOLS = "similar_cadsl_tools"
+
 
 # =============================================================================
 # Exports

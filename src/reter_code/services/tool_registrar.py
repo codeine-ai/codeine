@@ -14,7 +14,7 @@ from ..logging_config import nlq_debug_logger as debug_log, ensure_nlq_logger_co
 from .tools_service import ToolsRegistrar
 from .registrars.system_tools import SystemToolsRegistrar
 from .response_truncation import truncate_response
-from .hybrid_query_engine import build_similar_tools_section
+from .hybrid_query_engine import build_similar_tools_section, SimilarTool
 from .agent_sdk_client import (
     is_agent_sdk_available,
     generate_cadsl_query,
@@ -88,6 +88,70 @@ class ToolRegistrar:
             instance_manager, persistence, default_manager, reter_ops,
             reter_client=reter_client
         )
+
+    def _query_instance_schema(self) -> str:
+        """
+        Query the actual schema (entity types and predicates) from RETER instance.
+
+        Returns:
+            Schema info as formatted string for inclusion in NLQ prompts.
+        """
+        if self.reter_client is None:
+            return "Schema information unavailable (no RETER connection)"
+
+        try:
+            # Query entity types and their predicates with counts
+            schema_query = """SELECT ?concept ?pred (COUNT(*) AS ?count)
+                WHERE { ?s type ?concept . ?s ?pred ?o }
+                GROUP BY ?concept ?pred
+                ORDER BY ?concept DESC(?count)
+                LIMIT 500"""
+
+            result = self.reter_client.reql(schema_query)
+            debug_log.debug(f"[NLQ_SCHEMA] Raw result keys: {result.keys() if isinstance(result, dict) else type(result)}")
+            debug_log.debug(f"[NLQ_SCHEMA] Result count: {result.get('count', 'N/A') if isinstance(result, dict) else 'N/A'}")
+
+            # REQL result format: {"columns": [...], "rows": [...], "count": N}
+            rows = result.get("rows", [])
+            if not rows:
+                # Fallback to basic status info
+                status = self.reter_client.get_status()
+                return f"Codebase has {status.get('class_count', 0)} classes, {status.get('method_count', 0)} methods"
+
+            # Group predicates by concept (entity type)
+            concepts = {}
+            for row in rows:
+                concept = row.get("?concept", "")
+                pred = row.get("?pred", "")
+                count = row.get("?count", 0)
+                if concept and pred:
+                    if concept not in concepts:
+                        concepts[concept] = []
+                    concepts[concept].append(f"{pred} ({count})")
+
+            debug_log.debug(f"[NLQ_SCHEMA] Found {len(concepts)} entity types from {len(rows)} rows")
+
+            # Format schema info
+            schema_lines = ["## Available Entity Types and Predicates\n"]
+            for concept in sorted(concepts.keys()):
+                preds = concepts[concept]
+                schema_lines.append(f"### {concept}")
+                # Show top 15 most common predicates
+                schema_lines.append(f"Predicates: {', '.join(preds[:15])}")
+                schema_lines.append("")
+
+            schema_info = "\n".join(schema_lines)
+            debug_log.debug(f"[NLQ_SCHEMA] Queried schema:\n{schema_info[:500]}...")
+            return schema_info
+
+        except Exception as e:
+            debug_log.debug(f"[NLQ_SCHEMA] Failed to query schema: {e}")
+            # Fallback to basic status
+            try:
+                status = self.reter_client.get_status()
+                return f"Codebase has {status.get('class_count', 0)} classes, {status.get('method_count', 0)} methods"
+            except Exception:
+                return "Schema information unavailable"
 
     def register_all_tools(self, app: FastMCP) -> None:
         """Register all MCP tools with the application."""
@@ -254,23 +318,38 @@ class ToolRegistrar:
         execution_state: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Execute a single CADSL query pipeline via ReterClient."""
+        debug_log.debug(f"\n[NLQ_PIPELINE] Executing CADSL pipeline...")
+        debug_log.debug(f"[NLQ_PIPELINE] Query length: {len(query)} chars")
+
         execution_state["attempts"] += execution_state.get("attempt_delta", 1)
         execution_state["tools_used"].extend(execution_state.get("tools_delta", []))
+        debug_log.debug(f"[NLQ_PIPELINE] Total attempts: {execution_state['attempts']}")
 
         # Auto-fix bare reql blocks
         fixed_query = self._fix_bare_reql_block(query)
+        if fixed_query != query:
+            debug_log.debug(f"[NLQ_PIPELINE] Query was auto-fixed (bare reql block wrapped)")
+        debug_log.debug(f"[NLQ_PIPELINE] Query to execute:\n{fixed_query[:500]}...")
 
         if self.reter_client is None:
+            debug_log.debug("[NLQ_PIPELINE] ERROR: RETER server not connected")
             return self._cadsl_error_response(fixed_query, execution_state, "RETER server not connected")
 
         try:
+            debug_log.debug("[NLQ_PIPELINE] Calling reter_client.execute_cadsl...")
             result = self.reter_client.execute_cadsl(fixed_query)
+            debug_log.debug(f"[NLQ_PIPELINE] Execution complete: success={result.get('success')}, count={result.get('count')}")
+            if result.get('error'):
+                debug_log.debug(f"[NLQ_PIPELINE] Execution error: {result.get('error')}")
             result["cadsl_query"] = fixed_query
             result["query_type"] = "cadsl"
             result["attempts"] = execution_state["attempts"]
             result["tools_used"] = execution_state["tools_used"]
             return result
         except Exception as e:
+            import traceback
+            debug_log.debug(f"[NLQ_PIPELINE] EXCEPTION: {type(e).__name__}: {e}")
+            debug_log.debug(f"[NLQ_PIPELINE] Traceback:\n{traceback.format_exc()}")
             return self._cadsl_error_response(fixed_query, execution_state, str(e))
 
     def _cadsl_error_response(
@@ -298,9 +377,17 @@ class ToolRegistrar:
         similar_tools: Optional[list] = None
     ) -> Dict[str, Any]:
         """Execute a CADSL query using Agent SDK for generation."""
-        debug_log.debug(f"\n{'='*60}\nCADSL EXECUTION (Agent SDK)\n{'='*60}")
+        debug_log.debug(f"\n{'#'*70}")
+        debug_log.debug(f"[NLQ_EXEC] STARTING CADSL EXECUTION")
+        debug_log.debug(f"[NLQ_EXEC] Question: {question}")
+        debug_log.debug(f"[NLQ_EXEC] Max retries: {max_retries}")
+        debug_log.debug(f"[NLQ_EXEC] Similar tools count: {len(similar_tools) if similar_tools else 0}")
+        debug_log.debug(f"{'#'*70}")
+        for handler in debug_log.handlers:
+            handler.flush()
 
         if not is_agent_sdk_available():
+            debug_log.debug("[NLQ_EXEC] ERROR: Claude Agent SDK not available")
             return {
                 "success": False,
                 "results": [],
@@ -309,20 +396,21 @@ class ToolRegistrar:
                 "error": "Claude Agent SDK not available"
             }
 
+        debug_log.debug("[NLQ_EXEC] Agent SDK is available")
         similar_tools_context = build_similar_tools_section(similar_tools) if similar_tools else None
+        if similar_tools_context:
+            debug_log.debug(f"[NLQ_EXEC] Built similar tools context ({len(similar_tools_context)} chars)")
+
         execution_state = {"attempts": 0, "tools_used": []}
         max_empty_retries = 2
 
         try:
-            # Get schema info from server
-            schema_info = "Schema information unavailable"
-            if self.reter_client is not None:
-                try:
-                    status = self.reter_client.get_status()
-                    schema_info = f"Codebase has {status.get('class_count', 0)} classes, {status.get('method_count', 0)} methods"
-                except Exception:
-                    pass
+            # Get schema info from server (entity types and predicates)
+            debug_log.debug("[NLQ_EXEC] Querying instance schema...")
+            schema_info = self._query_instance_schema()
+            debug_log.debug(f"[NLQ_EXEC] Schema info ({len(schema_info)} chars): {schema_info[:200]}...")
 
+            debug_log.debug("[NLQ_EXEC] Calling generate_cadsl_query...")
             result = await generate_cadsl_query(
                 question=question,
                 schema_info=schema_info,
@@ -331,8 +419,10 @@ class ToolRegistrar:
                 reter_client=self.reter_client,
                 project_root=None
             )
+            debug_log.debug(f"[NLQ_EXEC] generate_cadsl_query returned: success={result.success}, attempts={result.attempts}")
 
             if not result.success:
+                debug_log.debug(f"[NLQ_EXEC] Query generation FAILED: {result.error}")
                 return {
                     "success": False,
                     "results": [],
@@ -345,19 +435,25 @@ class ToolRegistrar:
                 }
 
             generated_query = result.query
-            debug_log.debug(f"GENERATED CADSL QUERY:\n{generated_query}")
+            debug_log.debug(f"[NLQ_EXEC] GENERATED CADSL QUERY ({len(generated_query)} chars):\n{generated_query}")
 
             execution_state["attempt_delta"] = result.attempts
             execution_state["tools_delta"] = result.tools_used
-            exec_result = self._execute_single_cadsl_pipeline(generated_query, execution_state)
 
+            debug_log.debug("[NLQ_EXEC] Executing generated CADSL query...")
+            exec_result = self._execute_single_cadsl_pipeline(generated_query, execution_state)
+            debug_log.debug(f"[NLQ_EXEC] Execution result: success={exec_result.get('success')}, count={exec_result.get('count')}")
+
+            debug_log.debug("[NLQ_EXEC] Checking for empty results and retry logic...")
             return await self._retry_cadsl_on_empty(
                 question, generated_query, exec_result,
                 execution_state, max_empty_retries
             )
 
         except Exception as e:
-            debug_log.debug(f"CADSL ERROR: {e}")
+            import traceback
+            debug_log.debug(f"[NLQ_EXEC] EXCEPTION: {type(e).__name__}: {e}")
+            debug_log.debug(f"[NLQ_EXEC] Traceback:\n{traceback.format_exc()}")
             return {
                 "success": False,
                 "results": [],
@@ -377,6 +473,7 @@ class ToolRegistrar:
         max_empty_retries: int
     ) -> Dict[str, Any]:
         """Handle retry logic when CADSL query returns empty or error results."""
+        debug_log.debug(f"\n[NLQ_RETRY_EMPTY] Starting empty result retry logic (max retries: {max_empty_retries})")
         empty_retry_count = 0
 
         while empty_retry_count < max_empty_retries:
@@ -384,10 +481,16 @@ class ToolRegistrar:
             has_error = not exec_result.get("success", False)
             error_msg = exec_result.get("error")
 
+            debug_log.debug(f"[NLQ_RETRY_EMPTY] Iteration {empty_retry_count + 1}/{max_empty_retries}")
+            debug_log.debug(f"[NLQ_RETRY_EMPTY] Result count: {result_count}, Has error: {has_error}")
+            if error_msg:
+                debug_log.debug(f"[NLQ_RETRY_EMPTY] Error message: {error_msg}")
+
             if result_count > 0 and not has_error:
+                debug_log.debug(f"[NLQ_RETRY_EMPTY] SUCCESS: Got {result_count} results, returning")
                 return exec_result
 
-            debug_log.debug(f"CADSL query returned {result_count} results, asking agent to retry...")
+            debug_log.debug(f"[NLQ_RETRY_EMPTY] Query returned {result_count} results, asking agent to retry...")
 
             retry_result = await retry_cadsl_query(
                 question=question,
@@ -396,20 +499,27 @@ class ToolRegistrar:
                 error_message=error_msg if has_error else None,
                 reter_client=self.reter_client
             )
+            debug_log.debug(f"[NLQ_RETRY_EMPTY] Retry result: success={retry_result.success}, has_query={retry_result.query is not None}")
 
             if retry_result.error == "CONFIRM_EMPTY":
+                debug_log.debug("[NLQ_RETRY_EMPTY] Agent confirmed empty results are correct")
                 exec_result["agent_confirmed_empty"] = True
                 return exec_result
 
             if retry_result.success and retry_result.query:
+                debug_log.debug(f"[NLQ_RETRY_EMPTY] Got new query from agent, executing...")
+                debug_log.debug(f"[NLQ_RETRY_EMPTY] New query:\n{retry_result.query}")
                 current_query = retry_result.query
                 execution_state["attempt_delta"] = retry_result.attempts
                 execution_state["tools_delta"] = retry_result.tools_used
                 exec_result = self._execute_single_cadsl_pipeline(current_query, execution_state)
+                debug_log.debug(f"[NLQ_RETRY_EMPTY] New execution result: success={exec_result.get('success')}, count={exec_result.get('count')}")
                 empty_retry_count += 1
             else:
+                debug_log.debug("[NLQ_RETRY_EMPTY] No new query from agent, returning current result")
                 return exec_result
 
+        debug_log.debug(f"[NLQ_RETRY_EMPTY] Max retries ({max_empty_retries}) reached, returning final result")
         return exec_result
 
     def _fix_bare_reql_block(self, cadsl_query: str) -> str:
@@ -463,30 +573,71 @@ class ToolRegistrar:
                 return {"success": False, "error": "RETER server not connected"}
 
             ensure_nlq_logger_configured()
-            debug_log.debug(f"\n{'#'*60}\nNEW NLQ REQUEST\n{'#'*60}")
-            debug_log.debug(f"Question: {question}")
+            debug_log.debug(f"\n{'#'*70}")
+            debug_log.debug(f"[NLQ_TOOL] ======== NEW NLQ REQUEST ========")
+            debug_log.debug(f"[NLQ_TOOL] Question: {question}")
+            debug_log.debug(f"[NLQ_TOOL] Max retries: {max_retries}")
+            debug_log.debug(f"[NLQ_TOOL] Timeout: {timeout}s")
+            debug_log.debug(f"[NLQ_TOOL] Max results: {max_results}")
+            debug_log.debug(f"{'#'*70}")
+            # Flush to ensure logs are written
+            import sys
+            sys.stderr.flush()
+            for handler in debug_log.handlers:
+                handler.flush()
 
             if ctx is None:
+                debug_log.debug("[NLQ_TOOL] ERROR: Context not available")
                 return {"success": False, "error": "Context not available"}
 
-            # Find similar CADSL tools
-            from .hybrid_query_engine import find_similar_cadsl_tools
-            similar_tools = find_similar_cadsl_tools(question, max_results=5)
-            debug_log.debug(f"Similar tools: {[t.name for t in similar_tools]}")
+            # Find similar CADSL tools via RETER server (avoids blocking MCP process)
+            debug_log.debug("[NLQ_TOOL] Step 1: Finding similar CADSL tools via RETER server...")
+            for handler in debug_log.handlers:
+                handler.flush()
+            similar_result = registrar.reter_client.similar_cadsl_tools(question, max_results=5)
+            debug_log.debug(f"[NLQ_TOOL] similar_cadsl_tools returned: success={similar_result.get('success')}")
+
+            # Convert dicts back to SimilarTool objects for compatibility
+            similar_tools = []
+            if similar_result.get("success"):
+                for t in similar_result.get("similar_tools", []):
+                    similar_tools.append(SimilarTool(
+                        name=t["name"],
+                        score=t["score"],
+                        category=t["category"],
+                        description=t["description"],
+                        content=t["content"],
+                    ))
+            debug_log.debug(f"[NLQ_TOOL] Similar tools found ({len(similar_tools)}): {[t.name for t in similar_tools]}")
+            for t in similar_tools:
+                debug_log.debug(f"[NLQ_TOOL]   - {t.name} (score: {t.score:.3f}, category: {t.category})")
+            for handler in debug_log.handlers:
+                handler.flush()
 
             try:
+                debug_log.debug("[NLQ_TOOL] Step 2: Starting _execute_cadsl_query...")
+                for handler in debug_log.handlers:
+                    handler.flush()
                 async with asyncio.timeout(timeout):
                     result = await registrar._execute_cadsl_query(
                         question, max_retries, similar_tools=similar_tools
                     )
+                    debug_log.debug(f"[NLQ_TOOL] _execute_cadsl_query completed")
+                    debug_log.debug(f"[NLQ_TOOL] Result: success={result.get('success')}, count={result.get('count')}")
+                    if result.get('error'):
+                        debug_log.debug(f"[NLQ_TOOL] Error: {result.get('error')}")
 
                     if similar_tools:
                         result["similar_tools"] = [t.to_dict() for t in similar_tools]
 
-                    result["execution_time_ms"] = (time.time() - start_time) * 1000
+                    execution_time = (time.time() - start_time) * 1000
+                    result["execution_time_ms"] = execution_time
+                    debug_log.debug(f"[NLQ_TOOL] Total execution time: {execution_time:.2f}ms")
+                    debug_log.debug(f"[NLQ_TOOL] ======== NLQ REQUEST COMPLETE ========\n")
                     return truncate_response(result)
 
             except asyncio.TimeoutError:
+                debug_log.debug(f"[NLQ_TOOL] TIMEOUT: Query timed out after {timeout} seconds")
                 return {
                     "success": False,
                     "error": f"Query timed out after {timeout} seconds"
@@ -589,17 +740,21 @@ class ToolRegistrar:
             if not is_agent_sdk_available():
                 return {"success": False, "error": "Claude Agent SDK not available"}
 
-            # Get schema info from server
-            schema_info = "Schema information unavailable"
-            try:
-                status = registrar.reter_client.get_status()
-                schema_info = f"Codebase has {status.get('class_count', 0)} classes, {status.get('method_count', 0)} methods"
-            except Exception:
-                pass
+            # Get schema info from server (entity types and predicates)
+            schema_info = registrar._query_instance_schema()
 
-            # Find similar CADSL tools
-            from .hybrid_query_engine import find_similar_cadsl_tools
-            similar_tools = find_similar_cadsl_tools(question, max_results=5)
+            # Find similar CADSL tools via RETER server
+            similar_result = registrar.reter_client.similar_cadsl_tools(question, max_results=5)
+            similar_tools = []
+            if similar_result.get("success"):
+                for t in similar_result.get("similar_tools", []):
+                    similar_tools.append(SimilarTool(
+                        name=t["name"],
+                        score=t["score"],
+                        category=t["category"],
+                        description=t["description"],
+                        content=t["content"],
+                    ))
             similar_tools_context = build_similar_tools_section(similar_tools) if similar_tools else None
 
             try:
