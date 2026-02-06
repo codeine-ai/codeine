@@ -271,6 +271,24 @@ class ConsoleUI:
         table.add_row("Errors", str(stats.get("errors", 0)))
         table.add_row("Avg Time", f"{stats.get('avg_request_time_ms', 0):.1f}ms")
 
+        # Config
+        try:
+            from ..services.config_loader import get_config_loader
+            loader = get_config_loader()
+            config = loader.config
+            if config:
+                table.add_row("", "")
+                config_path = loader.config_path
+                if config_path:
+                    table.add_row("Config", str(config_path.name))
+                for key, value in config.items():
+                    val_str = str(value)
+                    if len(val_str) > 40:
+                        val_str = val_str[:37] + "..."
+                    table.add_row(f"  {key}", val_str)
+        except Exception:
+            pass
+
         return Panel(table, title="Status", border_style="blue")
 
     def _build_progress_panel(self) -> Panel:
