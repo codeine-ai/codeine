@@ -287,7 +287,8 @@ Setup:
 
   1. Start the RETER server (in a separate terminal):
 
-     uvx --from {_UVX_FROM} --find-links {_FIND_LINKS} reter_server --project /path/to/your/project
+     cd /path/to/your/project
+     uvx --from {_UVX_FROM} --find-links {_FIND_LINKS} reter_server
 
   2. Add MCP to Claude Code:
 

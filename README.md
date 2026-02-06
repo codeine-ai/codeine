@@ -68,19 +68,18 @@ This separation means the expensive RETE network and RAG index stay alive across
 | Python API | `reter` | `Reter` class, query result sets, CLI |
 | C++ Engine | `reter_core` | RETE network, OWL RL rules, language parsers (closed source) |
 
-## Installation
+## Quick Start
 
-### Step 1: Install
+### Step 1: Start the RETER Server
+
+Open a terminal, `cd` to your project, and start the server:
 
 ```bash
-uvx --from git+https://github.com/reter-ai/reter_code --find-links https://raw.githubusercontent.com/reter-ai/reter/main/reter_core/index.html reter_code
+cd /path/to/your/project
+uvx --from git+https://github.com/reter-ai/reter_code --find-links https://raw.githubusercontent.com/reter-ai/reter/main/reter_core/index.html reter_server
 ```
 
-This installs everything and prints setup instructions.
-
-### Step 2: Start the RETER Server
-
-In a **separate terminal**, start the server on your project:
+Or specify the project explicitly:
 
 ```bash
 uvx --from git+https://github.com/reter-ai/reter_code --find-links https://raw.githubusercontent.com/reter-ai/reter/main/reter_core/index.html reter_server --project /path/to/your/project
@@ -91,22 +90,20 @@ The server will:
 2. Build RAG embeddings (FAISS index)
 3. Bind ZeroMQ on `tcp://127.0.0.1:5555`
 4. Write a discovery file at `.reter_code/server.json`
-5. Display a console UI showing status and queries
+5. Display a console UI showing status, config, and queries
 
-Keep this terminal open — the server must be running for the MCP client to work.
+**Keep this terminal open** — the server must be running for the MCP client to work.
 
 **Server options:**
 
-```bash
-reter_server --project /path/to/project                # Default port 5555
-reter_server --project /path/to/project --port 6000    # Custom port
-reter_server --project /path/to/project --no-console   # No rich UI
-reter_server --project /path/to/project --verbose      # Debug logging
-```
+| Flag | Description |
+|------|-------------|
+| `--project, -p` | Project root directory (default: current directory) |
+| `--port` | ZeroMQ query port (default: 5555) |
+| `--no-console` | Disable rich console UI |
+| `--verbose, -v` | Enable debug logging |
 
-(Prefix each command with `uvx --from git+https://github.com/reter-ai/reter_code --find-links https://raw.githubusercontent.com/reter-ai/reter/main/reter_core/index.html` if not installed via pip.)
-
-### Step 3: Add MCP Client to Claude Code
+### Step 2: Add MCP Client to Claude Code
 
 ```bash
 claude mcp add reter -- uvx --from git+https://github.com/reter-ai/reter_code --find-links https://raw.githubusercontent.com/reter-ai/reter/main/reter_core/index.html reter_code --stdio
