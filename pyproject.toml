@@ -50,7 +50,7 @@ dev = [
 
 [project.scripts]
 reter_code = "reter_code:main"
-reter_server = "reter_code.server.reter_server:main"
+reter_server = "reter_code._server_entry:main"
 
 [project.urls]
 Homepage = "https://github.com/reter-ai/reter_code"

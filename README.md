@@ -83,7 +83,7 @@ This installs everything and prints setup instructions.
 In a **separate terminal**, start the server on your project:
 
 ```bash
-reter_server --project /path/to/your/project
+uvx --from git+https://github.com/reter-ai/reter_code --find-links https://raw.githubusercontent.com/reter-ai/reter/main/reter_core/index.html reter_server --project /path/to/your/project
 ```
 
 The server will:
@@ -98,11 +98,13 @@ Keep this terminal open — the server must be running for the MCP client to wor
 **Server options:**
 
 ```bash
-reter_server --project /path/to/project          # Default port 5555
-reter_server --project /path/to/project --port 6000  # Custom port
-reter_server --project /path/to/project --no-console # No rich UI
-reter_server --project /path/to/project --verbose    # Debug logging
+reter_server --project /path/to/project                # Default port 5555
+reter_server --project /path/to/project --port 6000    # Custom port
+reter_server --project /path/to/project --no-console   # No rich UI
+reter_server --project /path/to/project --verbose      # Debug logging
 ```
+
+(Prefix each command with `uvx --from git+https://github.com/reter-ai/reter_code --find-links https://raw.githubusercontent.com/reter-ai/reter/main/reter_core/index.html` if not installed via pip.)
 
 ### Step 3: Add MCP Client to Claude Code
 
