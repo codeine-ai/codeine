@@ -611,7 +611,7 @@ def main():
     import os
 
     parser = argparse.ArgumentParser(description="RETER ZeroMQ Server")
-    parser.add_argument("--project", "-p", type=Path, help="Project root directory")
+    parser.add_argument("--project", "-p", type=Path, default=Path.cwd(), help="Project root directory (default: current directory)")
     parser.add_argument("--port", type=int, help="Query socket port (0 for dynamic)")
     parser.add_argument("--no-console", action="store_true", help="Disable console UI")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose logging")

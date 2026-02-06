@@ -11,15 +11,17 @@ import sys
 
 def _early_setup():
     """Parse --project early to set RETER_PROJECT_ROOT before imports."""
+    project_path = None
     for i, arg in enumerate(sys.argv):
         if arg in ('--project', '-p') and i + 1 < len(sys.argv):
             project_path = os.path.abspath(sys.argv[i + 1])
-            os.environ['RETER_PROJECT_ROOT'] = project_path
             break
         elif arg.startswith('--project='):
             project_path = os.path.abspath(arg.split('=', 1)[1])
-            os.environ['RETER_PROJECT_ROOT'] = project_path
             break
+    if not project_path:
+        project_path = os.getcwd()
+    os.environ['RETER_PROJECT_ROOT'] = project_path
 
 
 def main():
