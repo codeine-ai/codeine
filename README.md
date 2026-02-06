@@ -48,7 +48,7 @@ Reter Code runs as **two separate processes** connected via ZeroMQ:
 
 ```
 ┌──────────────────────────────────┐     ZeroMQ      ┌──────────────────────────────────┐
-│  RETER Server (reter_server)     │   REQ/REP       │  MCP Client (reter_code)         │
+│  RETER Server (reter)            │   REQ/REP       │  MCP Client (reter_code)         │
 │                                  │   tcp://         │                                  │
 │  • Holds RETE network + RAG      │◄────────────────►│  • Stateless FastMCP proxy        │
 │  • Builds code ontology          │   127.0.0.1:5555 │  • Registers MCP tools            │
@@ -63,27 +63,46 @@ This separation means the expensive RETE network and RAG index stay alive across
 
 | Component | Command | Description |
 |-----------|---------|-------------|
-| RETER Server | `reter_server` | Stateful server: RETE network, RAG, CADSL pipelines, query processing |
+| RETER Server | `reter` | Stateful server: RETE network, RAG, CADSL pipelines, query processing |
 | MCP Client | `reter_code` | Stateless FastMCP proxy: tool registration, Claude integration |
 | Python API | `reter` | `Reter` class, query result sets, CLI |
 | C++ Engine | `reter_core` | RETE network, OWL RL rules, language parsers (closed source) |
 
 ## Quick Start
 
-### Step 1: Start the RETER Server
+### Option A: Persistent Install (Recommended)
 
-Open a terminal, `cd` to your project, and start the server:
+Install once — commands stay available:
+
+```bash
+uv tool install --from git+https://github.com/reter-ai/reter_code --find-links https://raw.githubusercontent.com/reter-ai/reter/main/reter_core/index.html reter_code
+```
+
+Then start the server and add MCP:
 
 ```bash
 cd /path/to/your/project
-uvx --from git+https://github.com/reter-ai/reter_code --find-links https://raw.githubusercontent.com/reter-ai/reter/main/reter_core/index.html reter_server
+reter
 ```
-
-Or specify the project explicitly:
 
 ```bash
-uvx --from git+https://github.com/reter-ai/reter_code --find-links https://raw.githubusercontent.com/reter-ai/reter/main/reter_core/index.html reter_server --project /path/to/your/project
+claude mcp add reter -e RETER_PROJECT_ROOT=/path/to/your/project -- reter_code --stdio
 ```
+
+### Option B: No Install (uvx)
+
+Run directly without installing — uvx creates a temporary environment each time:
+
+```bash
+cd /path/to/your/project
+uvx --from git+https://github.com/reter-ai/reter_code --find-links https://raw.githubusercontent.com/reter-ai/reter/main/reter_core/index.html reter
+```
+
+```bash
+claude mcp add reter -e RETER_PROJECT_ROOT=/path/to/your/project -- uvx --from git+https://github.com/reter-ai/reter_code --find-links https://raw.githubusercontent.com/reter-ai/reter/main/reter_core/index.html reter_code --stdio
+```
+
+### What Happens
 
 The server will:
 1. Initialize the RETE network and load your codebase into the ontology
@@ -92,7 +111,9 @@ The server will:
 4. Write a discovery file at `.reter_code/server.json`
 5. Display a console UI showing status, config, and queries
 
-**Keep this terminal open** — the server must be running for the MCP client to work.
+**Keep the server terminal open** — the MCP client connects to it via ZeroMQ.
+
+The `-e RETER_PROJECT_ROOT=...` tells the MCP client where to find the server's discovery file.
 
 **Server options:**
 
@@ -103,14 +124,6 @@ The server will:
 | `--no-console` | Disable rich console UI |
 | `--verbose, -v` | Enable debug logging |
 
-### Step 2: Add MCP Client to Claude Code
-
-```bash
-claude mcp add reter -e RETER_PROJECT_ROOT=/path/to/your/project -- uvx --from git+https://github.com/reter-ai/reter_code --find-links https://raw.githubusercontent.com/reter-ai/reter/main/reter_core/index.html reter_code --stdio
-```
-
-The `-e RETER_PROJECT_ROOT=...` tells the MCP client where to find the server's discovery file (`.reter_code/server.json`).
-
 ---
 
 ## Configure with Claude Desktop
@@ -119,6 +132,24 @@ The `-e RETER_PROJECT_ROOT=...` tells the MCP client where to find the server's 
 - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 - **Linux**: `~/.config/Claude/claude_desktop_config.json`
+
+After `uv tool install`:
+
+```json
+{
+  "mcpServers": {
+    "reter": {
+      "command": "reter_code",
+      "args": ["--stdio"],
+      "env": {
+        "RETER_PROJECT_ROOT": "/path/to/your/project"
+      }
+    }
+  }
+}
+```
+
+Or without installing (uvx):
 
 ```json
 {
@@ -138,7 +169,7 @@ The `-e RETER_PROJECT_ROOT=...` tells the MCP client where to find the server's 
 }
 ```
 
-**Important:** The RETER server must be running before starting Claude. The MCP client connects to it via ZeroMQ.
+**Important:** The RETER server must be running before starting Claude.
 
 ---
 

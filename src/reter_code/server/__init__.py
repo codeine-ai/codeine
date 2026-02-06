@@ -12,7 +12,7 @@ Architecture:
 
 Usage:
     # Start server for a project
-    reter_server --project /path/to/project
+    reter --project /path/to/project
 
     # Client connects via discovery
     from reter_code.server import ReterClient

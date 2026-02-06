@@ -283,34 +283,20 @@ def _print_setup_instructions():
     print(f"""
 Reter Code - AI-powered code reasoning MCP server
 
-Setup:
+  Install (persistent):
+    uv tool install --from {_UVX_FROM} --find-links {_FIND_LINKS} reter_code
 
-  1. Start the RETER server (in a separate terminal):
+  After install, start the server:
+    cd /path/to/your/project
+    reter
 
-     cd /path/to/your/project
-     uvx --from {_UVX_FROM} --find-links {_FIND_LINKS} reter_server
+  Add MCP to Claude Code:
+    claude mcp add reter -e RETER_PROJECT_ROOT=/path/to/your/project -- reter_code --stdio
 
-  2. Add MCP to Claude Code:
-
-     claude mcp add reter -e RETER_PROJECT_ROOT=/path/to/your/project -- uvx --from {_UVX_FROM} --find-links {_FIND_LINKS} reter_code --stdio
-
-  3. Or add to Claude Desktop config:
-
-     {{
-       "mcpServers": {{
-         "reter": {{
-           "command": "uvx",
-           "args": [
-             "--from", "{_UVX_FROM}",
-             "--find-links", "{_FIND_LINKS}",
-             "reter_code", "--stdio"
-           ],
-           "env": {{
-             "RETER_PROJECT_ROOT": "/path/to/your/project"
-           }}
-         }}
-       }}
-     }}
+  Or without installing (uvx):
+    cd /path/to/your/project
+    uvx --from {_UVX_FROM} --find-links {_FIND_LINKS} reter
+    claude mcp add reter -e RETER_PROJECT_ROOT=/path/to/your/project -- uvx --from {_UVX_FROM} --find-links {_FIND_LINKS} reter_code --stdio
 
   Config locations:
     macOS:   ~/Library/Application Support/Claude/claude_desktop_config.json
