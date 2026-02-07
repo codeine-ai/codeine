@@ -9,6 +9,7 @@ Contains utility functions for the RETER integration layer:
 """
 
 import hashlib
+import logging
 import os
 import time
 import traceback
@@ -214,6 +215,12 @@ def safe_cpp_call(func: Callable[..., T], *args, **kwargs) -> T:
     func_name = func.__name__ if hasattr(func, '__name__') else str(func)
     args_str = _format_args(args, kwargs)
     logger.debug(f"safe_cpp_call ENTER: {func_name}({args_str})")
+    # Flush log handlers so crash info survives a native segfault
+    for handler in logger.handlers + logging.getLogger().handlers:
+        try:
+            handler.flush()
+        except Exception:
+            pass
     start_time = time.perf_counter()
     try:
         result = func(*args, **kwargs)

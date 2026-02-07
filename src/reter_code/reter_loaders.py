@@ -267,7 +267,7 @@ class ReterJavaScriptLoaderMixin:
         # Load JavaScript code - use the C++ bindings
         # Returns (facts, errors, registered_methods, unresolved_calls)
         from reter import owl_rete_cpp
-        facts, errors, _registered_methods, _unresolved_calls = owl_rete_cpp.parse_javascript_code(code, in_file)
+        facts, errors, _registered_methods, _unresolved_calls = safe_cpp_call(owl_rete_cpp.parse_javascript_code, code, in_file)
 
         # Add facts to the network with source tracking
         # Unified ReteNetwork handles hybrid mode internally
@@ -316,7 +316,7 @@ class ReterJavaScriptLoaderMixin:
         # Load JavaScript code - use the C++ bindings (C++ derives module name from in_file)
         # Returns (facts, errors, registered_methods, unresolved_calls)
         from reter import owl_rete_cpp
-        facts, errors, _registered_methods, _unresolved_calls = owl_rete_cpp.parse_javascript_code(code, in_file)
+        facts, errors, _registered_methods, _unresolved_calls = safe_cpp_call(owl_rete_cpp.parse_javascript_code, code, in_file)
 
         # Add facts to the network with source tracking
         # Unified ReteNetwork handles hybrid mode internally
@@ -438,10 +438,10 @@ class ReterHTMLLoaderMixin:
         from reter import owl_rete_cpp
 
         # First parse to get errors
-        _, errors = owl_rete_cpp.parse_html_code(code, in_file)
+        _, errors = safe_cpp_call(owl_rete_cpp.parse_html_code, code, in_file)
 
         # Load directly into network - unified ReteNetwork handles hybrid mode internally
-        wme_count = owl_rete_cpp.load_html_from_string(self.reasoner.network, code, in_file, source_id)
+        wme_count = safe_cpp_call(owl_rete_cpp.load_html_from_string, self.reasoner.network, code, in_file, source_id)
 
         time_ms = (time.time() - start_time) * 1000
         self._dirty = True  # Mark instance as modified
@@ -483,10 +483,10 @@ class ReterHTMLLoaderMixin:
         from reter import owl_rete_cpp
 
         # First parse to get errors
-        _, errors = owl_rete_cpp.parse_html_code(code, in_file)
+        _, errors = safe_cpp_call(owl_rete_cpp.parse_html_code, code, in_file)
 
         # Load directly into network - unified ReteNetwork handles hybrid mode internally
-        wme_count = owl_rete_cpp.load_html_from_string(self.reasoner.network, code, in_file, source)
+        wme_count = safe_cpp_call(owl_rete_cpp.load_html_from_string, self.reasoner.network, code, in_file, source)
 
         time_ms = (time.time() - start_time) * 1000
         self._dirty = True  # Mark instance as modified
@@ -601,7 +601,8 @@ class ReterCSharpLoaderMixin:
 
         # Load C# code - unified ReteNetwork handles hybrid mode internally
         from reter import owl_rete_cpp
-        wme_count = owl_rete_cpp.load_csharp_from_string(
+        wme_count = safe_cpp_call(
+            owl_rete_cpp.load_csharp_from_string,
             self.reasoner.network,
             code,
             in_file,
@@ -650,7 +651,8 @@ class ReterCSharpLoaderMixin:
 
         # Load C# code - unified ReteNetwork handles hybrid mode internally
         from reter import owl_rete_cpp
-        wme_count = owl_rete_cpp.load_csharp_from_string(
+        wme_count = safe_cpp_call(
+            owl_rete_cpp.load_csharp_from_string,
             self.reasoner.network,
             code,
             in_file,
@@ -772,7 +774,8 @@ class ReterCPPLoaderMixin:
 
         # Load C++ code - unified ReteNetwork handles hybrid mode internally
         from reter import owl_rete_cpp
-        wme_count = owl_rete_cpp.load_cpp_from_string(
+        wme_count = safe_cpp_call(
+            owl_rete_cpp.load_cpp_from_string,
             self.reasoner.network,
             code,
             in_file,
@@ -821,7 +824,8 @@ class ReterCPPLoaderMixin:
 
         # Load C++ code - unified ReteNetwork handles hybrid mode internally
         from reter import owl_rete_cpp
-        wme_count = owl_rete_cpp.load_cpp_from_string(
+        wme_count = safe_cpp_call(
+            owl_rete_cpp.load_cpp_from_string,
             self.reasoner.network,
             code,
             in_file,
